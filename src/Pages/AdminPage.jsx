@@ -1422,42 +1422,50 @@ function AdminPage() {
                     </thead>
                     <tbody>
                       {usuarios.map(u => (
-                        <tr key={u.id} style={{borderBottom: '1px solid #222'}}>
-                          <td style={{padding: '12px', fontWeight: '500'}}>{u.email}</td>
-                          <td style={{padding: '12px', color: '#888', fontSize: '14px'}}>
-                            {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                        <tr key={u.id} style={{borderBottom: '1px solid #333', transition: 'background 0.2s'}}>
+                          <td style={{padding: '20px 12px'}}>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                              <span style={{fontWeight: '600', fontSize: '15px'}}>{u.email}</span>
+                              <span style={{color: '#888', fontSize: '11px', marginTop: '4px'}}>Criado em: {new Date(u.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
                           </td>
-                          <td style={{padding: '12px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                          
+                          <td style={{padding: '20px 12px'}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                               <span style={{
-                                padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', width: 'fit-content',
-                                backgroundColor: u.plano === 'premium' ? 'rgba(76,175,80,0.2)' : u.plano === 'medio' ? 'rgba(33,150,243,0.2)' : 'rgba(255,152,0,0.2)',
+                                padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', width: 'fit-content',
+                                backgroundColor: u.plano === 'premium' ? 'rgba(76,175,80,0.15)' : u.plano === 'medio' ? 'rgba(33,150,243,0.15)' : 'rgba(255,152,0,0.15)',
                                 color: u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800',
                                 border: `1px solid ${u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800'}`
                               }}>
-                                {u.plano?.toUpperCase() || 'BÁSICO'}
+                                {u.plano === 'premium' ? '⭐ PREMIUM' : u.plano === 'medio' ? '🥈 MÉDIO' : '🔒 BÁSICO'}
                               </span>
-                              <div style={{display: 'flex', gap: '4px'}}>
-                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐ P</button>
-                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈 M</button>
-                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'basico')}>📘 B</button>
+                              <div style={{display: 'flex', gap: '6px'}}>
+                                <button title="Premium" style={{...styles.smallButton, backgroundColor: '#4CAF50', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐</button>
+                                <button title="Médio" style={{...styles.smallButton, backgroundColor: '#2196F3', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈</button>
+                                <button title="Básico" style={{...styles.smallButton, backgroundColor: '#FF9800', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'basico')}>🔒</button>
                               </div>
                             </div>
                           </td>
-                          <td style={{padding: '12px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                              <span style={{fontSize: '11px', color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700'}}>
-                                {u.data_expiracao ? `Até: ${new Date(u.data_expiracao).toLocaleString('pt-BR')}` : '✨ Vitalício'}
-                              </span>
-                              <div style={{display: 'flex', gap: '3px', flexWrap: 'wrap'}}>
-                                <button title="15 minutos (Degustação)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer', backgroundColor: '#9C27B0', color: '#FFF'}} onClick={() => atualizarExpiracao(u.id, 15, 'minutos')}>⏱️ 15m</button>
-                                <button title="1 dia" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 1)}>+1d</button>
-                                <button title="7 dias" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 7)}>+7d</button>
-                                <button title="30 dias" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 30)}>+30d</button>
-                                <button title="Vitalício" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer', backgroundColor: '#FFD700', color: '#000'}} onClick={() => atualizarExpiracao(u.id, null)}>∞ Vit</button>
+
+                          <td style={{padding: '20px 12px'}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px'}}>
+                              <div style={{
+                                fontSize: '13px', fontWeight: '600', 
+                                color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700',
+                                display: 'flex', alignItems: 'center', gap: '6px'
+                              }}>
+                                {u.data_expiracao ? `📅 Expira: ${new Date(u.data_expiracao).toLocaleString('pt-BR')}` : '✨ Acesso Vitalício'}
+                              </div>
+                              <div style={{display: 'flex', gap: '4px', flexWrap: 'wrap'}}>
+                                <button onClick={() => atualizarExpiracao(u.id, 15, 'minutos')} style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#9C27B0', padding: '2px 6px'}}>⏱️ 15m</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 1)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+1d</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 7)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+7d</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 30)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+30d</button>
+                                <button onClick={() => atualizarExpiracao(u.id, null)} style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#FFD700', color: '#000', padding: '2px 6px'}}>∞ Vitalício</button>
                                 <input 
                                   type="date" 
-                                  style={{fontSize: '9px', padding: '1px', cursor: 'pointer'}} 
+                                  style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 4px', borderRadius: '4px'}}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     if (val) {
@@ -1469,10 +1477,15 @@ function AdminPage() {
                               </div>
                             </div>
                           </td>
-                          <td style={{padding: '12px'}}>
-                            <div style={{display: 'flex', gap: '6px'}}>
-                              <button style={{...styles.smallButton, backgroundColor: '#1565C0', padding: '4px 8px'}} onClick={() => abrirGerenciarAcesso(u)}>🔑 Acesso</button>
-                              <button style={{...styles.deleteButtonSmall, margin: 0, padding: '4px 8px'}} onClick={() => excluirUsuario(u.id, u.email)}>🗑</button>
+
+                          <td style={{padding: '20px 12px'}}>
+                            <div style={{display: 'flex', gap: '8px'}}>
+                              <button style={{...styles.smallButton, backgroundColor: '#1565C0', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px'}} onClick={() => abrirGerenciarAcesso(u)}>
+                                🔑 Acessos
+                              </button>
+                              <button style={{...styles.deleteButton, padding: '8px 12px'}} onClick={() => excluirUsuario(u.id, u.email)}>
+                                🗑️
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1585,6 +1598,7 @@ function getStyles(isDark) {
     select: { padding: '12px', backgroundColor: inputBg, border: `1px solid ${border}`, color: text, borderRadius: '8px' },
     addButton: { padding: '12px', backgroundColor: '#2196F3', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
     smallButton: { padding: '8px 16px', backgroundColor: '#4CAF50', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' },
+    miniButton: { padding: '4px 8px', backgroundColor: '#555', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' },
     saveButtonSmall: { padding: '8px 12px', backgroundColor: '#2196F3', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer' },
     cancelButtonSmall: { padding: '8px 12px', backgroundColor: '#666', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer' },
     editButtonSmall: { padding: '4px 8px', backgroundColor: '#FF9800', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', marginRight: '4px' },
