@@ -210,24 +210,16 @@ function PreparatorioViewPage() {
               boxShadow: '0 24px 80px rgba(0,0,0,0.9)', maxWidth: '420px'
             }}>
               <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
-              <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Conteúdo Bloqueado</h2>
+              <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Acesso Restrito</h2>
               <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
-                Seu plano atual é <strong style={{color: '#FF9800'}}>{planoUsuario?.toUpperCase()}</strong>.<br/>
-                Faça upgrade para acessar todo o conteúdo.
+                Você não tem acesso a este conteúdo.<br/>
+                Entre em contato com o administrador para liberar seu acesso.
               </p>
-              <div style={{fontSize: '10px', color: '#444', marginTop: '10px', borderTop: '1px solid #222', paddingTop: '10px', textAlign: 'left'}}>
-                <strong>DEBUG INFO:</strong><br/>
-                📧 {user?.email}<br/>
-                💎 Plano: {planoUsuario}<br/>
-                📅 Expira em: {dataExpiracao ? new Date(dataExpiracao).toLocaleString('pt-BR') : 'Não definida'}<br/>
-                ⌚ Agora: {new Date().toLocaleString('pt-BR')}<br/>
-                👑 Admin: {isAdmin ? 'Sim' : 'Não'}
-              </div>
               <button
-                style={{padding: '12px 32px', backgroundColor: '#FF9800', border: 'none', color: '#000', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
-                onClick={() => alert('Entre em contato para fazer upgrade do seu plano!')}
+                style={{padding: '12px 32px', backgroundColor: '#E50914', border: 'none', color: '#FFF', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
+                onClick={() => navigate(-1)}
               >
-                ⭐ Fazer Upgrade
+                ← Voltar
               </button>
             </div>
           </div>

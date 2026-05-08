@@ -210,55 +210,20 @@ function AulaPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [anotacao]);
 
-  // Buscar plano do usuário na tabela profiles
+  // Verificar acesso do aluno baseado no plano e nível da aula
+  // (a lógica detalhada de bloqueio por nível já é feita no isBloqueada abaixo)
+  // Apenas garante que o acesso básico seja permitido enquanto carrega
   useEffect(() => {
-    if (!user) return;
-    
-    const buscarPlano = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('plano')
-        .eq('id', user.id)
-        .single();
-      
-      if (data) {
-        setPlanoUsuario(data.plano);
+    if (planoUsuario !== 'carregando') {
+      // Admin e premium sempre têm acesso total
+      if (isAdmin || planoUsuario === 'premium') {
+        setTemAcesso(true);
+      } else {
+        setTemAcesso(true); // O bloqueio granular por nível é feito pelo isBloqueada
       }
-    };
-    
-    buscarPlano();
-  }, [user]);
-
- // Verificar acesso do aluno baseado no plano
-useEffect(() => {
-  if (!user || !planoUsuario) return;
-  
-  const verificarAcesso = async () => {
-    setCarregandoAcesso(true);
-    
-    // ADMIN (plano premium) sempre tem acesso liberado
-    if (planoUsuario === 'premium' || isAdmin) {
-      setTemAcesso(true);
       setCarregandoAcesso(false);
-      return;
     }
-    
-    let planoId = 1; // padrão básico
-    if (planoUsuario === 'medio') planoId = 2;
-    
-    const { data, error } = await supabase
-      .from('aulas_liberadas')
-      .select('id')
-      .eq('plano_id', planoId)
-      .eq('aula_id', videoKey)
-      .single();
-    
-    setTemAcesso(!!data);
-    setCarregandoAcesso(false);
-  };
-  
-  verificarAcesso();
-}, [user, planoUsuario, videoKey]);
+  }, [planoUsuario, isAdmin]);
 
   // Buscar dados da disciplina, módulo e aulas
   useEffect(() => {
