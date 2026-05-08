@@ -18,62 +18,92 @@ function Home() {
 
   // Pegar usuário logado
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUser(data.user);
-        const nome = data.user.email?.split('@')[0] || 'Aluno';
-        setUserName(nome);
-        const { data: profile } = await supabase
+    const carregarPerfil = async (userObj) => {
+      if (!userObj) {
+        setPlanoUsuario('basico');
+        return;
+      }
+
+      try {
+        console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
+        const { data: profile, error } = await supabase
           .from('profiles')
-          .select('plano, avatar_url, display_name, data_expiracao')
-          .eq('id', data.user.id)
+          .select('plano, avatar_url, display_name, data_expiracao, role')
+          .eq('id', userObj.id)
           .single();
+
+        if (error) {
+          console.error("[Auth] Home: Erro ao buscar profile:", error);
+          setPlanoUsuario('basico');
+          return;
+        }
 
         if (profile) {
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
-          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
-          if (dataExp && new Date(dataExp) < new Date()) {
-            planoNormalizado = 'basico';
+          // Normalização robusta do plano
+          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          
+          // Verificação de expiração com GRACE PERIOD (5 minutos)
+          if (dataExp) {
+            const dataExpiracaoDate = new Date(dataExp);
+            const agora = new Date();
+            const expirou = dataExpiracaoDate < agora;
+            const gracePeriodMs = 5 * 60 * 1000;
+            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
+
+            if (expirou && !dentroDaTolerancia) {
+              console.log("[Auth] Home: Plano expirado:", dataExp);
+              planoNormalizado = 'basico';
+            }
           }
 
-          // Se for o admin (pelo email), força o plano para premium
-          const userEmail = data.user.email?.toLowerCase();
-          if (userEmail === 'rodrigoalmeidja@gmail.com') {
-            setPlanoUsuario('premium');
-          } else {
-            setPlanoUsuario(planoNormalizado);
+          // ADMIN: bypass total se role for admin ou email for o do dono
+          const userEmail = userObj.email?.toLowerCase();
+          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
+          
+          if (isOwnerByRole) {
+            planoNormalizado = 'premium';
+            console.log("[Auth] Home: Admin detectado, acesso total liberado.");
           }
+
+          console.log(`[Auth] Home: Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
+          setPlanoUsuario(planoNormalizado);
           setAvatarUrl(profile.avatar_url || null);
+          
           if (profile.display_name) {
             setUserName(profile.display_name);
             setNewDisplayName(profile.display_name);
           } else {
-            const nome = data.user.email?.split('@')[0] || 'Aluno';
+            const nome = userObj.email?.split('@')[0] || 'Aluno';
             setUserName(nome);
             setNewDisplayName(nome);
           }
-        } else if (data.user.email === 'rodrigoalmeidja@gmail.com') {
-          // Fallback se não tiver profile ainda mas for o email do admin
-          setPlanoUsuario('premium');
-          const nome = data.user.email?.split('@')[0] || 'Aluno';
-          setUserName(nome);
-          setNewDisplayName(nome);
         }
+      } catch (e) {
+        console.error("[Auth] Home: Erro catastrófico:", e);
+        setPlanoUsuario('basico');
       }
     };
-    getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const init = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user);
+        await carregarPerfil(data.user);
+      }
+    };
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user);
-        const nome = session.user.email?.split('@')[0] || 'Aluno';
-        setUserName(nome);
+        await carregarPerfil(session.user);
       } else {
         setUser(null);
         setUserName('Aluno');
+        setPlanoUsuario('basico');
       }
     });
 

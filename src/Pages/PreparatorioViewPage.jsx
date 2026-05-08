@@ -39,28 +39,49 @@ function PreparatorioViewPage() {
       }
 
       try {
-        const { data: profile } = await supabase
+        console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('plano, display_name, role, data_expiracao')
           .eq('id', userObj.id)
           .single();
           
+        if (error) {
+           console.error("[Auth] Erro ao buscar profile:", error);
+           if (mounted) setPlanoUsuario('basico');
+           return;
+        }
+
         if (mounted && profile) {
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
           
-          let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          // Normalização robusta do plano
+          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
           
-          // Verificação de expiração
-          if (dataExp && new Date(dataExp) < new Date()) {
-            planoNormalizado = 'basico';
+          // Verificação de expiração com GRACE PERIOD (5 minutos)
+          if (dataExp) {
+            const dataExpiracaoDate = new Date(dataExp);
+            const agora = new Date();
+            const expirou = dataExpiracaoDate < agora;
+            const gracePeriodMs = 5 * 60 * 1000;
+            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
+
+            if (expirou && !dentroDaTolerancia) {
+              console.log("[Auth] Plano expirado:", dataExp);
+              planoNormalizado = 'basico';
+            }
           }
 
-          // Verificação de admin pelo role no banco
-          const isOwnerByRole = profile.role === 'admin';
+          // ADMIN: bypass total se role for admin ou email for o do dono
+          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
           setIsAdmin(isOwnerByRole);
-          if (isOwnerByRole) planoNormalizado = 'premium';
+          if (isOwnerByRole) {
+            planoNormalizado = 'premium';
+            console.log("[Auth] Admin detectado, acesso total liberado.");
+          }
 
+          console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
           setPlanoUsuario(planoNormalizado);
           setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
           setDataExpiracao(profile.data_expiracao);
@@ -69,7 +90,7 @@ function PreparatorioViewPage() {
           setDataExpiracao(null);
         }
       } catch (e) {
-        console.error("Erro ao carregar perfil:", e);
+        console.error("[Auth] Erro catastrófico no carregarPerfil:", e);
         if (mounted) setPlanoUsuario('basico');
       }
     };

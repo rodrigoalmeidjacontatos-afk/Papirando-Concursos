@@ -105,27 +105,59 @@ function AulaPage() {
       }
 
       try {
-        const { data: profile } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
-        if (mounted) {
-          setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
+        console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
+        const { data: profile, error } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
+        
+        if (error) {
+          console.error("[Auth] Erro ao buscar profile:", error);
+          if (mounted) {
+            setPlanoUsuario('basico');
+            setCarregandoAcesso(false);
+          }
+          return;
+        }
+
+        if (mounted && profile) {
+          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
           
-          const planoDoBanco = profile?.plano || 'basico';
-          const dataExp = profile?.data_expiracao;
-          let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          const planoDoBanco = profile.plano || 'basico';
+          const dataExp = profile.data_expiracao;
           
-          if (dataExp && new Date(dataExp) < new Date()) {
-            planoNormalizado = 'basico';
+          // Normalização robusta do plano
+          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          
+          // Verificação de expiração com GRACE PERIOD (5 minutos) para evitar erros de sincronia
+          if (dataExp) {
+            const dataExpiracaoDate = new Date(dataExp);
+            const agora = new Date();
+            const expirou = dataExpiracaoDate < agora;
+            
+            // Se expirou há menos de 5 minutos, ainda damos acesso (tolerância de clock drift)
+            const gracePeriodMs = 5 * 60 * 1000;
+            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
+
+            if (expirou && !dentroDaTolerancia) {
+              console.log("[Auth] Plano expirado:", dataExp);
+              planoNormalizado = 'basico';
+            } else if (expirou && dentroDaTolerancia) {
+              console.log("[Auth] Plano expirado mas dentro da tolerância de 5min.");
+            }
           }
 
-          const isOwnerByRole = profile?.role === 'admin';
+          // ADMIN: bypass total se role for admin ou email for o do dono
+          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
           setIsAdmin(isOwnerByRole);
-          if (isOwnerByRole) planoNormalizado = 'premium';
+          if (isOwnerByRole) {
+            planoNormalizado = 'premium';
+            console.log("[Auth] Admin detectado, acesso total liberado.");
+          }
 
+          console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
           setPlanoUsuario(planoNormalizado);
           setCarregandoAcesso(false);
         }
       } catch (e) {
-        console.error("Erro ao carregar perfil:", e);
+        console.error("[Auth] Erro catastrófico no carregarPerfil:", e);
         if (mounted) {
           setPlanoUsuario('basico');
           setCarregandoAcesso(false);

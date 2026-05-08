@@ -125,7 +125,8 @@ function AdminPage() {
     if (tempo !== null) {
       const d = new Date();
       if (unidade === 'minutos') {
-        d.setMinutes(d.getMinutes() + tempo);
+        // Adiciona o tempo + 1 minuto de margem de erro para sincronia de relógios
+        d.setMinutes(d.getMinutes() + tempo + 1);
       } else {
         d.setDate(d.getDate() + tempo);
       }
