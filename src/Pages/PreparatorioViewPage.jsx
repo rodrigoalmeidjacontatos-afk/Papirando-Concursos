@@ -100,12 +100,6 @@ function PreparatorioViewPage() {
     };
   }, [preparatorioId, carreiraId]);
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [preparatorioId, carreiraId]);
-
   const toggleModulo = (moduloId) => {
     setModulosExpandidos(prev => ({ ...prev, [moduloId]: !prev[moduloId] }));
   };
