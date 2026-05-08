@@ -15,6 +15,7 @@ function PreparatorioViewPage() {
   const [planoUsuario, setPlanoUsuario] = useState('basico');
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -44,12 +45,14 @@ function PreparatorioViewPage() {
         // Buscar plano do usuário
         if (user) {
           setUser(user);
-          const { data: profile } = await supabase.from('profiles').select('plano, display_name').eq('id', user.id).single();
+          const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', user.id).single();
           setPlanoUsuario(profile?.plano || 'basico');
           setUserName(profile?.display_name || user.email?.split('@')[0] || 'Aluno');
+          setIsAdmin(profile?.role === 'admin' || user.email === 'rodrigoalmeidjacontatos@gmail.com');
         } else {
           setUser(null);
           setUserName('Aluno');
+          setIsAdmin(false);
         }
 
       } catch (err) {
@@ -144,8 +147,8 @@ function PreparatorioViewPage() {
       </header>
 
       <main style={{...styles.main, position: 'relative'}}>
-        {/* Overlay de bloqueio para plano básico */}
-        {planoUsuario === 'basico' && (
+        {/* Overlay de bloqueio para plano básico (Admin não é bloqueado) */}
+        {planoUsuario === 'basico' && !isAdmin && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
             zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
