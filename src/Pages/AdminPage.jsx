@@ -69,25 +69,37 @@ function AdminPage() {
   // ========== FUNÇÕES DE USUÁRIOS ==========
   const buscarUsuarios = async () => {
     setCarregandoUsuarios(true);
+    console.log("[Admin] Buscando usuários...");
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
+    
     if (!error) {
       setUsuarios(data || []);
-      // Contar usuários não vistos pelo admin
-      const novos = (data || []).filter(u => !u.visto_admin).length;
-      setNovosUsuariosBadge(novos);
-      // Marcar todos como vistos
-      await supabase.from('profiles').update({ visto_admin: true }).eq('visto_admin', false);
-      setNovosUsuariosBadge(0);
+      const novosCount = (data || []).filter(u => !u.visto_admin).length;
+      setNovosUsuariosBadge(novosCount);
+      
+      // Atualiza o "visto" de forma assíncrona sem bloquear o carregamento da lista
+      if (novosCount > 0) {
+        supabase.from('profiles')
+          .update({ visto_admin: true })
+          .eq('visto_admin', false)
+          .then(() => setNovosUsuariosBadge(0));
+      }
+    } else {
+      console.error("[Admin] Erro ao buscar usuários:", error);
     }
     setCarregandoUsuarios(false);
   };
 
   const atualizarPlano = async (userId, novoPlano) => {
-    // Ao mudar o plano manualmente (Premium/Médio/Básico), resetamos a expiração para Vitalício (null)
-    // Isso evita que uma data de teste antiga bloqueie o novo plano
+    console.log(`[Admin] Tentando atualizar plano de ${userId} para ${novoPlano}...`);
+    
+    // Atualização otimista (na interface primeiro)
+    const backupUsuarios = [...usuarios];
+    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, plano: novoPlano, data_expiracao: null } : u));
+
     const { error } = await supabase
       .from('profiles')
       .update({ 
@@ -97,13 +109,11 @@ function AdminPage() {
       .eq('id', userId);
     
     if (!error) {
-      setUsuarios(prevUsuarios => 
-        prevUsuarios.map(user => 
-          user.id === userId ? { ...user, plano: novoPlano, data_expiracao: null } : user
-        )
-      );
-      alert(`✅ Plano alterado para ${novoPlano.toUpperCase()} (Acesso Vitalício)!`);
+      console.log(`[Admin] Plano de ${userId} atualizado com sucesso!`);
+      alert(`✅ Plano alterado para ${novoPlano.toUpperCase()}!`);
     } else {
+      console.error("[Admin] Erro ao atualizar plano no Supabase:", error);
+      setUsuarios(backupUsuarios); // Reverte em caso de erro
       alert('❌ Erro ao atualizar plano: ' + error.message);
     }
   };
@@ -232,56 +242,61 @@ function AdminPage() {
     checkAuth();
   }, []);
 
-  // ========== CARREGAR DADOS (SUPABASE) ========== 
+  // ========== CARREGAR DADOS (SUPABASE) EM PARALELO ========== 
   useEffect(() => {
     async function carregarDados() {
-      // Categorias
-      const { data: categoriasData } = await supabase.from('categorias').select('*');
-      setCategorias(categoriasData || []);
-      // Carreiras
-      const { data: carreirasData } = await supabase.from('carreiras').select('*');
-      setCarreiras(carreirasData || []);
-      // Preparatórios
-      const { data: preparatoriosData } = await supabase.from('preparatorios').select('*');
-      setPreparatorios(preparatoriosData || []);
-      // Disciplinas
-      const { data: disciplinasData } = await supabase.from('disciplinas').select('*');
-      setDisciplinas((disciplinasData || []).map(d => ({ ...d, preparatorioId: d.preparatorioId || d.preparatorio_id })));
-      // Módulos
-      const { data: modulosData } = await supabase.from('modulos').select('*');
-      setModulos((modulosData || []).map(m => ({ ...m, disciplinaId: m.disciplinaId || m.disciplina_id })));
-      // Aulas
-      const { data: aulasData } = await supabase.from('aulas').select('*');
-      setAulas((aulasData || []).map(a => ({ ...a, moduloId: a.moduloId || a.modulo_id, videoId: a.videoId || a.video_id })));
-      // Vínculos
-      const { data: vData } = await supabase.from('vinculos').select('*');
-      if (vData) {
-        const obj = {};
-        vData.forEach(row => {
-          if (row.data) {
-            // Suporte legado para JSON blob
-            Object.assign(obj, row.data);
-          } else if (row.carreira_id && row.preparatorio_id) {
-            // Estrutura normalizada (id, carreira_id, preparatorio_id, modulo_id, aula_id)
-            if (!obj[row.carreira_id]) obj[row.carreira_id] = {};
-            if (!obj[row.carreira_id][row.preparatorio_id]) {
-              obj[row.carreira_id][row.preparatorio_id] = { modulos: {} };
-            }
-            if (row.modulo_id) {
-              if (!obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id]) {
-                obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id] = { aulas: {} };
+      console.log("[Admin] Carregando dados do sistema...");
+      const startTime = Date.now();
+      
+      try {
+        const [
+          { data: cat }, 
+          { data: carr }, 
+          { data: prep }, 
+          { data: disc }, 
+          { data: mods }, 
+          { data: aulasData },
+          { data: vData },
+          { data: docsData }
+        ] = await Promise.all([
+          supabase.from('categorias').select('*'),
+          supabase.from('carreiras').select('*'),
+          supabase.from('preparatorios').select('*'),
+          supabase.from('disciplinas').select('*'),
+          supabase.from('modulos').select('*'),
+          supabase.from('aulas').select('*'),
+          supabase.from('vinculos').select('*'),
+          supabase.from('documentos').select('*').order('created_at', { ascending: false })
+        ]);
+
+        setCategorias(cat || []);
+        setCarreiras(carr || []);
+        setPreparatorios(prep || []);
+        setDisciplinas((disc || []).map(d => ({ ...d, preparatorioId: d.preparatorioId || d.preparatorio_id })));
+        setModulos((mods || []).map(m => ({ ...m, disciplinaId: m.disciplinaId || m.disciplina_id })));
+        setAulas((aulasData || []).map(a => ({ ...a, moduloId: a.moduloId || a.modulo_id, videoId: a.videoId || a.video_id })));
+        setDocumentos(docsData || []);
+
+        if (vData) {
+          const obj = {};
+          vData.forEach(row => {
+            if (row.data) Object.assign(obj, row.data);
+            else if (row.carreira_id && row.preparatorio_id) {
+              if (!obj[row.carreira_id]) obj[row.carreira_id] = {};
+              if (!obj[row.carreira_id][row.preparatorio_id]) obj[row.carreira_id][row.preparatorio_id] = { modulos: {} };
+              if (row.modulo_id) {
+                if (!obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id]) obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id] = { aulas: {} };
+                if (row.aula_id) obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id].aulas[row.aula_id] = true;
               }
-              if (row.aula_id) {
-                obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id].aulas[row.aula_id] = true;
-              }
             }
-          }
-        });
-        setVinculos(obj);
+          });
+          setVinculos(obj);
+        }
+
+        console.log(`[Admin] Dados carregados em ${Date.now() - startTime}ms`);
+      } catch (err) {
+        console.error("[Admin] Erro crítico ao carregar dados:", err);
       }
-      // Documentos
-      const { data: docsData } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
-      setDocumentos(docsData || []);
     }
     carregarDados();
   }, []);
