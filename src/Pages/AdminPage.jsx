@@ -86,22 +86,27 @@ function AdminPage() {
   };
 
   const atualizarPlano = async (userId, novoPlano) => {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ plano: novoPlano })
-    .eq('id', userId);
-  
-  if (!error) {
-    setUsuarios(prevUsuarios => 
-      prevUsuarios.map(user => 
-        user.id === userId ? { ...user, plano: novoPlano } : user
-      )
-    );
-    alert(`✅ Plano alterado para ${novoPlano}!`);
-  } else {
-    alert('❌ Erro ao alterar plano: ' + error.message);
-  }
-};
+    // Ao mudar o plano manualmente (Premium/Médio/Básico), resetamos a expiração para Vitalício (null)
+    // Isso evita que uma data de teste antiga bloqueie o novo plano
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        plano: novoPlano,
+        data_expiracao: null 
+      })
+      .eq('id', userId);
+    
+    if (!error) {
+      setUsuarios(prevUsuarios => 
+        prevUsuarios.map(user => 
+          user.id === userId ? { ...user, plano: novoPlano, data_expiracao: null } : user
+        )
+      );
+      alert(`✅ Plano alterado para ${novoPlano.toUpperCase()} (Acesso Vitalício)!`);
+    } else {
+      alert('❌ Erro ao atualizar plano: ' + error.message);
+    }
+  };
 
   const excluirUsuario = async (userId, email) => {
     if (!window.confirm(`Tem certeza que deseja excluir o usuário ${email}? Esta ação não pode ser desfeita.`)) return;
@@ -127,9 +132,9 @@ function AdminPage() {
       dataFinal = d.toISOString();
     }
     
-    // Auto-Premium APENAS para o teste de minutos (degustação)
+    // Sempre que dermos tempo (degustação ou pago), garantimos o plano PREMIUM
     const updates = { data_expiracao: dataFinal };
-    if (unidade === 'minutos' && tempo !== null) {
+    if (tempo !== null) {
       updates.plano = 'premium';
     }
     
@@ -141,7 +146,7 @@ function AdminPage() {
     if (!error) {
       setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       const msg = dataFinal 
-        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
+        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Acesso PREMIUM'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
         : 'Acesso Vitalício!';
       alert(`✅ Sucesso! ${msg}`);
     } else {
