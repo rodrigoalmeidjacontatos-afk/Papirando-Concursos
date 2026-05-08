@@ -148,19 +148,6 @@ function PreparatorioViewPage() {
           </div>
           
           <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-            {userName === 'Aluno' || !user ? (
-              <button 
-                onClick={() => navigate('/login')} 
-                style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '8px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 10px rgba(229,9,20,0.3)'}}
-              >
-                ENTRAR
-              </button>
-            ) : (
-              <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                <span style={{color: '#EEE', fontSize: '14px'}}>Olá, {userName}</span>
-                <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}>Sair</button>
-              </div>
-            )}
             <button onClick={() => navigate(-1)} style={styles.backButton}>← Voltar</button>
           </div>
         </div>

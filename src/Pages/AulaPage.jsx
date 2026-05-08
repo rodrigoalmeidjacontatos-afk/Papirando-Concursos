@@ -695,21 +695,6 @@ useEffect(() => {
             <p style={styles.headerSubtitulo}>{preparatorioId?.replace('_', ' ').toUpperCase()}</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-buttons">
-            <div style={{marginRight: '15px', display: 'flex', alignItems: 'center', gap: '10px'}}>
-               {userName === 'Aluno' || !user ? (
-                 <button 
-                  onClick={() => navigate('/login')} 
-                  style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '7px 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', boxShadow: '0 2px 10px rgba(229,9,20,0.3)'}}
-                 >
-                  ENTRAR
-                 </button>
-               ) : (
-                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <span style={{color: '#EEE', fontSize: '12px'}}>Olá, {userName}</span>
-                    <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px'}}>Sair</button>
-                 </div>
-               )}
-            </div>
             <button 
               onClick={() => navigate(`/preparatorio/${carreiraId}/${preparatorioId}`)} 
               style={styles.backButton}
