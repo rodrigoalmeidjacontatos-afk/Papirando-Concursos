@@ -1144,6 +1144,7 @@ const styles = {
     transition: 'opacity 0.3s ease',
     cursor: 'default'
   },
+  bottomControlsBar: {
     padding: '20px',
     transition: 'opacity 0.3s ease',
   },

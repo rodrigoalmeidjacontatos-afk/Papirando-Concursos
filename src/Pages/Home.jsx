@@ -309,11 +309,6 @@ function Home() {
                   <span>{avatarUrl}</span>
               ) : '👤'}
             </div>
-            {user && (
-              <div style={{display: 'flex', gap: '8px'}}>
-                <button onClick={() => setShowConfig(true)} style={styles.configButton}>⚙️</button>
-                <button onClick={handleLogout} style={styles.logoutButton}>Sair</button>
-              </div>
             )}
           </div>
         </div>
