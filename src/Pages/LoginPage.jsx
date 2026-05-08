@@ -42,7 +42,10 @@ function LoginPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Papirando Concursos</h1>
+        <div style={{cursor: 'pointer', marginBottom: '20px'}} onClick={() => navigate('/')}>
+          <img src="/logos/PNG.png" alt="Logo" style={{ width: '60px', height: '60px', borderRadius: '50%', marginBottom: '10px' }} />
+          <h1 style={styles.title}>Papirando Concursos</h1>
+        </div>
         <h2 style={styles.subtitle}>{isCadastro ? 'Criar Conta' : 'Entrar'}</h2>
         
         {erro && <p style={styles.erro}>{erro}</p>}
@@ -69,9 +72,15 @@ function LoginPage() {
           </button>
         </form>
         
-        <button onClick={() => setIsCadastro(!isCadastro)} style={styles.linkButton}>
-          {isCadastro ? '← Já tenho conta' : 'Não tenho conta → Cadastrar'}
-        </button>
+        <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px'}}>
+          <button onClick={() => setIsCadastro(!isCadastro)} style={styles.linkButton}>
+            {isCadastro ? '← Já tenho conta' : 'Não tenho conta → Cadastrar'}
+          </button>
+          
+          <button onClick={() => navigate('/')} style={{...styles.linkButton, color: '#E50914', fontWeight: 'bold'}}>
+            🏠 Voltar para o Início
+          </button>
+        </div>
       </div>
     </div>
   );
