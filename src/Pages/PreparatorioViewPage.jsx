@@ -18,6 +18,7 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
       try {
