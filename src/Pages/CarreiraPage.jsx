@@ -46,7 +46,7 @@ function CarreiraPage() {
         setUser(user);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plano, preparatorios_liberados, role, data_expiracao')
+          .select('plano, preparatorios_liberados, data_expiracao')
           .eq('id', user.id)
           .single();
 
@@ -62,7 +62,7 @@ function CarreiraPage() {
         }
 
         const userEmail = user?.email?.toLowerCase();
-        const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
+        const isOwner = userEmail === 'rodrigoalmeidja@gmail.com';
         if (isOwner) planoNormalizado = 'premium';
 
         setPlanoUsuario(planoNormalizado);

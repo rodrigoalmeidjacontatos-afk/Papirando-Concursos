@@ -106,7 +106,7 @@ function AulaPage() {
 
       try {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
+        const { data: profile, error } = await supabase.from('profiles').select('display_name, plano, data_expiracao').eq('id', userObj.id).single();
         
         if (error) {
           console.error("[Auth] Erro ao buscar profile:", error);
@@ -146,8 +146,8 @@ function AulaPage() {
             }
           }
 
-          // ADMIN: bypass total se role for admin ou email for o do dono
-          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
+          // ADMIN: bypass total se email for o do dono
+          const isOwnerByRole = userEmail === 'rodrigoalmeidja@gmail.com';
           setIsAdmin(isOwnerByRole);
           if (isOwnerByRole) {
             planoNormalizado = 'premium';

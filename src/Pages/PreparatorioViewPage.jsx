@@ -40,48 +40,48 @@ function PreparatorioViewPage() {
 
       try {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('plano, display_name, role, data_expiracao')
-          .eq('id', userObj.id)
-          .single();
-          
-        if (error) {
-           console.error("[Auth] Erro ao buscar profile:", error);
-           if (mounted) setPlanoUsuario('basico');
-           return;
-        }
-
-        if (mounted && profile) {
-          const planoDoBanco = profile.plano || 'basico';
-          const dataExp = profile.data_expiracao;
-          
-          // Normalização robusta do plano com trim()
-          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-          
-          console.log(`[PrepView] Plano Banco: "${planoDoBanco}" | Normalizado: "${planoNormalizado}"`);
-          
-          // Verificação de expiração com GRACE PERIOD (5 minutos)
-          if (dataExp) {
-            const dataExpiracaoDate = new Date(dataExp);
-            const agora = new Date();
-            const expirou = dataExpiracaoDate < agora;
-            const gracePeriodMs = 5 * 60 * 1000;
-            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
-
-            if (expirou && !dentroDaTolerancia && planoNormalizado !== 'premium') {
-              console.log("[Auth] Plano expirado:", dataExp);
-              planoNormalizado = 'basico';
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('plano, display_name, data_expiracao')
+            .eq('id', userObj.id)
+            .single();
+            
+          if (error) {
+             console.error("[Auth] Erro ao buscar profile:", error);
+             if (mounted) setPlanoUsuario('basico');
+             return;
+          }
+  
+          if (mounted && profile) {
+            const planoDoBanco = profile.plano || 'basico';
+            const dataExp = profile.data_expiracao;
+            
+            // Normalização robusta do plano com trim()
+            let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+            
+            console.log(`[PrepView] Plano Banco: "${planoDoBanco}" | Normalizado: "${planoNormalizado}"`);
+            
+            // Verificação de expiração com GRACE PERIOD (5 minutos)
+            if (dataExp) {
+              const dataExpiracaoDate = new Date(dataExp);
+              const agora = new Date();
+              const expirou = dataExpiracaoDate < agora;
+              const gracePeriodMs = 5 * 60 * 1000;
+              const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
+  
+              if (expirou && !dentroDaTolerancia && planoNormalizado !== 'premium') {
+                console.log("[Auth] Plano expirado:", dataExp);
+                planoNormalizado = 'basico';
+              }
             }
-          }
-
-          // ADMIN: bypass total se role for admin ou email for o do dono
-          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
-          setIsAdmin(isOwnerByRole);
-          if (isOwnerByRole) {
-            planoNormalizado = 'premium';
-            console.log("[Auth] Admin detectado, acesso total liberado.");
-          }
+  
+            // ADMIN: bypass total se email for o do dono
+            const isOwnerByRole = userEmail === 'rodrigoalmeidja@gmail.com';
+            setIsAdmin(isOwnerByRole);
+            if (isOwnerByRole) {
+              planoNormalizado = 'premium';
+              console.log("[Auth] Admin detectado, acesso total liberado.");
+            }
 
           console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
           setPlanoUsuario(planoNormalizado);

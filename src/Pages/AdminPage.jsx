@@ -76,7 +76,7 @@ function AdminPage() {
     
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, created_at, plano, role, data_expiracao, preparatorios_liberados, visto_admin') 
+      .select('id, email, created_at, plano, data_expiracao, preparatorios_liberados') 
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -86,8 +86,6 @@ function AdminPage() {
     } else {
       console.log("[Admin] Usuários carregados:", data?.length);
       setUsuarios(data || []);
-      const novosCount = (data || []).filter(u => !u.visto_admin).length;
-      setNovosUsuariosBadge(novosCount);
     }
     setCarregandoUsuarios(false);
   };
@@ -167,23 +165,6 @@ function AdminPage() {
     }
   };
 
-  const toggleAdmin = async (userId, currentRole) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    if (!window.confirm(`Deseja alterar o cargo deste usuário para ${newRole.toUpperCase()}?`)) return;
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId);
-    
-    if (!error) {
-      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      alert(`✅ Usuário agora é ${newRole.toUpperCase()}!`);
-    } else {
-      alert('❌ Erro ao alterar cargo: ' + error.message);
-    }
-  };
-
   const abrirGerenciarAcesso = (usuario) => {
     setUsuarioEditandoAcesso({
       ...usuario,
@@ -215,15 +196,6 @@ function AdminPage() {
       alert('❌ Erro ao salvar acesso: ' + error.message);
     }
   };
-
-  // Checar badge de novos usuários ao carregar
-  useEffect(() => {
-    const checarNovos = async () => {
-      const { data } = await supabase.from('profiles').select('id').eq('visto_admin', false);
-      setNovosUsuariosBadge((data || []).length);
-    };
-    checarNovos();
-  }, []);
 
   // Carregar quando abrir a aba
   useEffect(() => {
@@ -327,8 +299,6 @@ function AdminPage() {
       nivel: a.nivel || 'basico',
       ordem: a.ordem || 0
     })));
-    // Como agora salvamos de forma normalizada, o "Salvar Tudo" não precisa mais upsertar o JSON blob
-    // Mas para manter compatibilidade com o botão, vamos apenas avisar que os vínculos são salvos em tempo real
     alert('✅ Dados salvos com sucesso! (Os vínculos são atualizados automaticamente ao clicar)');
   };
 
@@ -374,8 +344,6 @@ function AdminPage() {
       if (storedAulas.length > 0) await supabase.from('aulas').upsert(storedAulas.map(a => ({ ...a, video_id: a.video_id || a.videoId, modulo_id: a.modulo_id || a.moduloId })));
       setVinculos(storedVinculos);
 
-      // Opcional: Migrar dados do localStorage para o Supabase de forma normalizada
-      // Aqui poderíamos iterar sobre storedVinculos e inserir cada linha
       alert('✅ Todos os dados sincronizados com sucesso!');
     }
   };
@@ -695,13 +663,11 @@ function AdminPage() {
       nivel: nivelFinal,
       ordem: ordemFinal
     };
-    console.log('[addAula] nivel:', nivelFinal, '| ordem:', ordemFinal);
     const { data, error } = await supabase.from('aulas').insert([dbNova]).select();
     if (!error) {
       const nova = { id, titulo: novaAula.titulo, duracao: novaAula.duracao || null, videoId: extractedVideoId, pdf_url: novaAula.pdf_url || null, moduloId: modId, nivel: nivelFinal, ordem: ordemFinal };
       setAulas(prev => [...prev, nova].sort((a, b) => (a.ordem || 1) - (b.ordem || 1)));
       setNovaAula({ titulo: '', videoId: '', ordem: 1 });
-      // Não reseta nivelNovaAula para manter confortável ao adicionar várias aulas do mesmo nível
     } else {
       alert('Erro ao adicionar aula: ' + (error.message || JSON.stringify(error)));
     }
@@ -1122,7 +1088,7 @@ function AdminPage() {
                             <div style={{display: 'flex', gap: '8px'}}>
                               <button style={{...styles.editButton, padding: '6px 12px'}} onClick={(e) => { e.stopPropagation(); setSelectedPrepId(prep.id); }}>Conteúdo →</button>
                               <button style={{...styles.editButton, padding: '6px 12px', backgroundColor: '#4CAF50'}} onClick={(e) => { e.stopPropagation(); editPreparatorio(prep); }}>Editar</button>
-                              <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removePreparatorio(prep.id); }}>Excluir</button>
+                              <button style={{...styles.deleteButtonSmall, padding: '6px 12px'}} onClick={(e) => { e.stopPropagation(); removePreparatorio(prep.id); }}>Excluir</button>
                             </div>
                           </div>
                         </div>
@@ -1251,13 +1217,6 @@ function AdminPage() {
                                                     <option value="premium">🔒 Premium</option>
                                                   </select>
                                                 </div>
-                                                {/* PDF Oculto temporariamente por falta de coluna no DB */}
-                                                {false && (
-                                                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                    <label style={{fontSize: '11px', color: '#AAA'}}>Material PDF (Link)</label>
-                                                    <input style={styles.inputSmall} placeholder="URL do PDF" value={novaAula.pdf_url || ''} onChange={e => setNovaAula(prev => ({...prev, pdf_url: e.target.value}))} />
-                                                  </div>
-                                                )}
                                                 <button style={{...styles.smallButton, backgroundColor: '#4CAF50', alignSelf: 'flex-end'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
                                               </div>
                                               
@@ -1304,13 +1263,6 @@ function AdminPage() {
                                                             <option value="premium">🔒 Premium</option>
                                                           </select>
                                                         </div>
-                                                        {/* PDF Oculto temporariamente por falta de coluna no DB */}
-                                                        {false && (
-                                                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
-                                                            <label style={{fontSize: '10px', color: '#AAA'}}>Material PDF</label>
-                                                            <input style={styles.inputSmall} placeholder="URL do PDF" value={editandoAula.pdf_url || ''} onChange={e => setEditandoAula(prev => ({...prev, pdf_url: e.target.value}))} />
-                                                          </div>
-                                                        )}
                                                         <div style={{display: 'flex', gap: '4px', alignSelf: 'flex-end'}}>
                                                           <button style={styles.saveButtonSmall} onClick={updateAula}>Salvar</button>
                                                           <button style={styles.cancelButtonSmall} onClick={() => setEditandoAula(null)}>Cancelar</button>
@@ -1319,12 +1271,10 @@ function AdminPage() {
                                                     ) : (
                                                       <>
                                                         <div style={{display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', flex: 1}}>
-                                                          {/* Grip handle */}
                                                           <span style={{cursor: 'grab', color: '#555', fontSize: '16px', padding: '0 4px', userSelect: 'none'}} title="Arrastar para reordenar">⠿</span>
                                                           <span style={{color: '#555', fontSize: '11px', minWidth: '18px'}}>#{aulaIdx+1}</span>
                                                           <span style={{color: '#EEE', fontSize: '14px'}}>{aula.titulo}</span>
                                                           <span style={{fontSize: '11px', color: '#AAA'}}>🕒 {aula.duracao || '--:--'}</span>
-                                                          {aula.pdf_url && <span style={{fontSize: '10px', backgroundColor: '#4CAF50', color: '#FFF', padding: '1px 5px', borderRadius: '4px'}}>PDF</span>}
                                                           <span style={{
                                                             fontSize: '10px', padding: '2px 7px', borderRadius: '999px', fontWeight: 'bold',
                                                             backgroundColor: aula.nivel === 'premium' ? 'rgba(229,9,20,0.2)' : aula.nivel === 'medio' ? 'rgba(33,150,243,0.2)' : 'rgba(76,175,80,0.2)',
@@ -1707,7 +1657,7 @@ function AdminPage() {
                                   if (u.email === 'rodrigoalmeidja@gmail.com') {
                                      alert('Você já é o Super Admin por e-mail!');
                                   } else {
-                                     alert('Para tornar outros usuários Admin, adicione a coluna "role" no seu Supabase Dashboard.');
+                                     alert('O e-mail deste usuário não possui privilégios de Admin.');
                                   }
                                 }}
                                 style={{
