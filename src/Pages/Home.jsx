@@ -233,7 +233,8 @@ function Home() {
   // Carregar categorias e carreiras do Supabase (migrando do localStorage se necessário)
   useEffect(() => {
     async function carregarESincronizarDados() {
-      // Tentar buscar do Supabase
+      try {
+        // Tentar buscar do Supabase
       let { data: categoriasSupabase } = await supabase.from('categorias').select('*');
       let { data: carreirasSupabase } = await supabase.from('carreiras').select('*');
 
