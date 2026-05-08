@@ -433,6 +433,12 @@ function AulaPage() {
 
   const salvarPdfUrl = async (novaUrl) => {
     if (planoUsuario !== 'premium') return;
+    
+    // A coluna 'pdf_url' não existe na tabela 'aulas'. 
+    // Por favor, adicione-a no Supabase Dashboard como text (nullable) para habilitar esta função.
+    alert('Esta função exige a coluna "pdf_url" na tabela "aulas". Por favor, adicione-a no Supabase Dashboard.');
+    
+    /* 
     const { error } = await supabase.from('aulas').update({ pdf_url: novaUrl }).eq('id', aulaId);
     if (!error) {
       setAulaPlaying(prev => ({ ...prev, pdf_url: novaUrl }));
@@ -441,6 +447,7 @@ function AulaPage() {
     } else {
       alert('Erro ao salvar PDF: ' + error.message);
     }
+    */
   };
 
   useEffect(() => {

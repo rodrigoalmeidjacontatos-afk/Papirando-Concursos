@@ -705,7 +705,6 @@ function AdminPage() {
       duracao: novaAula.duracao || null,
       video_id: extractedVideoId,
       modulo_id: modId,
-      pdf_url: novaAula.pdf_url || null,
       nivel: nivelFinal,
       ordem: ordemFinal
     };
@@ -729,7 +728,6 @@ function AdminPage() {
       titulo: editandoAula.titulo,
       video_id: editandoAula.videoId,
       duracao: editandoAula.duracao,
-      pdf_url: editandoAula.pdf_url || null,
       nivel: nivelFinal,
       ordem: ordemFinal
     };
@@ -1266,10 +1264,13 @@ function AdminPage() {
                                                     <option value="premium">🔒 Premium</option>
                                                   </select>
                                                 </div>
-                                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                  <label style={{fontSize: '11px', color: '#AAA'}}>Material PDF (Link)</label>
-                                                  <input style={styles.inputSmall} placeholder="URL do PDF" value={novaAula.pdf_url || ''} onChange={e => setNovaAula(prev => ({...prev, pdf_url: e.target.value}))} />
-                                                </div>
+                                                {/* PDF Oculto temporariamente por falta de coluna no DB */}
+                                                {false && (
+                                                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                                    <label style={{fontSize: '11px', color: '#AAA'}}>Material PDF (Link)</label>
+                                                    <input style={styles.inputSmall} placeholder="URL do PDF" value={novaAula.pdf_url || ''} onChange={e => setNovaAula(prev => ({...prev, pdf_url: e.target.value}))} />
+                                                  </div>
+                                                )}
                                                 <button style={{...styles.smallButton, backgroundColor: '#4CAF50', alignSelf: 'flex-end'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
                                               </div>
                                               
@@ -1316,10 +1317,13 @@ function AdminPage() {
                                                             <option value="premium">🔒 Premium</option>
                                                           </select>
                                                         </div>
-                                                        <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
-                                                          <label style={{fontSize: '10px', color: '#AAA'}}>Material PDF</label>
-                                                          <input style={styles.inputSmall} placeholder="URL do PDF" value={editandoAula.pdf_url || ''} onChange={e => setEditandoAula(prev => ({...prev, pdf_url: e.target.value}))} />
-                                                        </div>
+                                                        {/* PDF Oculto temporariamente por falta de coluna no DB */}
+                                                        {false && (
+                                                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
+                                                            <label style={{fontSize: '10px', color: '#AAA'}}>Material PDF</label>
+                                                            <input style={styles.inputSmall} placeholder="URL do PDF" value={editandoAula.pdf_url || ''} onChange={e => setEditandoAula(prev => ({...prev, pdf_url: e.target.value}))} />
+                                                          </div>
+                                                        )}
                                                         <div style={{display: 'flex', gap: '4px', alignSelf: 'flex-end'}}>
                                                           <button style={styles.saveButtonSmall} onClick={updateAula}>Salvar</button>
                                                           <button style={styles.cancelButtonSmall} onClick={() => setEditandoAula(null)}>Cancelar</button>
