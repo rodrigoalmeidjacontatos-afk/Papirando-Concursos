@@ -24,6 +24,10 @@ function Home() {
         return;
       }
 
+      // Define nome provisório baseado no email enquanto carrega o resto
+      const nomeProvisorio = userObj.email?.split('@')[0] || 'Aluno';
+      setUserName(prev => prev === 'Aluno' ? nomeProvisorio : prev);
+
       try {
         console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
         const { data: profile, error } = await supabase
@@ -32,7 +36,7 @@ function Home() {
           .eq('id', userObj.id)
           .single();
 
-        if (error) {
+        if (error && error.code !== 'PGRST116') { // Ignora erro de "não encontrado" (user novo)
           console.error("[Auth] Home: Erro ao buscar profile:", error);
           setPlanoUsuario('basico');
           return;
@@ -42,33 +46,24 @@ function Home() {
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
           
-          // Normalização robusta do plano
           let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
           
-          // Verificação de expiração com GRACE PERIOD (5 minutos)
           if (dataExp) {
             const dataExpiracaoDate = new Date(dataExp);
             const agora = new Date();
-            const expirou = dataExpiracaoDate < agora;
             const gracePeriodMs = 5 * 60 * 1000;
-            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
-
-            if (expirou && !dentroDaTolerancia) {
-              console.log("[Auth] Home: Plano expirado:", dataExp);
+            if (dataExpiracaoDate < agora && (agora - dataExpiracaoDate) > gracePeriodMs) {
               planoNormalizado = 'basico';
             }
           }
 
-          // ADMIN: bypass total se role for admin ou email for o do dono
           const userEmail = userObj.email?.toLowerCase();
           const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
           
           if (isOwnerByRole) {
             planoNormalizado = 'premium';
-            console.log("[Auth] Home: Admin detectado, acesso total liberado.");
           }
 
-          console.log(`[Auth] Home: Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
           setPlanoUsuario(planoNormalizado);
           setAvatarUrl(profile.avatar_url || null);
           
@@ -76,10 +71,14 @@ function Home() {
             setUserName(profile.display_name);
             setNewDisplayName(profile.display_name);
           } else {
-            const nome = userObj.email?.split('@')[0] || 'Aluno';
-            setUserName(nome);
-            setNewDisplayName(nome);
+            setUserName(nomeProvisorio);
+            setNewDisplayName(nomeProvisorio);
           }
+        } else {
+           // Usuário sem perfil ainda (talvez acabou de cadastrar)
+           setUserName(nomeProvisorio);
+           setNewDisplayName(nomeProvisorio);
+           setPlanoUsuario('basico');
         }
       } catch (e) {
         console.error("[Auth] Home: Erro catastrófico:", e);
@@ -292,7 +291,7 @@ function Home() {
             )}
           </nav>
           <div style={styles.userArea} className="user-area">
-            {(userName === 'Aluno' || !user) ? (
+            {!user ? (
               <button 
                 onClick={() => navigate('/login')} 
                 style={{
