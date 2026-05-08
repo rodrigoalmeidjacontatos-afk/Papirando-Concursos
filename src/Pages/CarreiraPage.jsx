@@ -100,69 +100,85 @@ function CarreiraPage() {
       <div style={styles.hero}>
         <h2>Escolha seu Preparatório</h2>
         <p>Os melhores cursos para sua aprovação em {carreira.nome}</p>
-        {isBasico && (
-          <div style={styles.planeBanner}>
-            🔒 Seu plano atual é <strong>Gratuito</strong>. Faça upgrade para acessar os preparatórios completos.
-          </div>
-        )}
       </div>
 
+      {/* SEÇÃO DE PREPARATÓRIOS */}
       <main style={styles.main}>
-        <div style={styles.grid}>
-          {preparatorios.map(prep => (
-            <div
-              key={prep.id}
-              style={{
-                ...styles.card,
-                filter: isBasico ? 'blur(10px) brightness(0.2) grayscale(0.5)' : 'none',
-                cursor: isBasico ? 'not-allowed' : 'pointer',
-                userSelect: isBasico ? 'none' : 'auto',
-                position: 'relative'
-              }}
-              onClick={() => {
-                if (isBasico) return;
-                navigate(`/preparatorio/${carreiraId}/${prep.id}`);
-              }}
-            >
-              <div style={styles.cardImage}>
-                {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
-                <div style={{
-                  position: prep.capa ? 'absolute' : 'static',
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: prep.capa ? 'rgba(0,0,0,0.4)' : 'transparent',
-                  zIndex: 2
-                }}>
-                  {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
-                    <img src={prep.logo} alt={prep.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
-                  )}
-                </div>
-              </div>
-              <h3 style={styles.cardTitle}>{prep.nome}</h3>
-              <button style={styles.cardButton}>
-                {isBasico ? '🔒 Bloqueado' : 'Acessar →'}
-              </button>
-            </div>
-          ))}
+
+        {/* TÍTULO DA SEÇÃO */}
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionBadge}>📚 PREPARATÓRIOS</span>
+          {isBasico && (
+            <span style={styles.premiumBadge}>⭐ ÁREA EXCLUSIVA PREMIUM</span>
+          )}
         </div>
 
-        {/* Overlay de cadeado sobre a grid para básico */}
-        {isBasico && preparatorios.length > 0 && (
-          <div style={styles.lockOverlay}>
-            <div style={styles.lockBox}>
-              <div style={{ fontSize: '52px', marginBottom: '12px' }}>🔒</div>
-              <h3 style={{ color: '#FFF', margin: '0 0 8px', fontSize: '22px' }}>Conteúdo Bloqueado</h3>
-              <p style={{ color: '#AAA', margin: '0 0 20px', fontSize: '14px', textAlign: 'center' }}>
-                Faça upgrade para o plano <strong style={{ color: '#FF9800' }}>Médio</strong> ou <strong style={{ color: '#4CAF50' }}>Premium</strong><br />e acesse todos os preparatórios.
-              </p>
-              <button style={styles.upgradeBtn} onClick={() => alert('Entre em contato para fazer upgrade do seu plano!')}>
-                ⭐ Fazer Upgrade
-              </button>
-            </div>
+        {/* ÁREA COM BLUR PARA BÁSICO */}
+        <div style={{ position: 'relative' }}>
+
+          {/* GRID DE CARDS — sempre renderiza, mas com blur forte para básico */}
+          <div style={{
+            ...styles.grid,
+            filter: isBasico ? 'blur(18px) brightness(0.15) saturate(0.3)' : 'none',
+            pointerEvents: isBasico ? 'none' : 'auto',
+            userSelect: isBasico ? 'none' : 'auto',
+          }}>
+            {preparatorios.map(prep => (
+              <div
+                key={prep.id}
+                style={styles.card}
+                onClick={() => navigate(`/preparatorio/${carreiraId}/${prep.id}`)}
+              >
+                <div style={styles.cardImage}>
+                  {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
+                  <div style={{
+                    position: prep.capa ? 'absolute' : 'static',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: prep.capa ? 'rgba(0,0,0,0.4)' : 'transparent',
+                    zIndex: 2
+                  }}>
+                    {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
+                      <img src={prep.logo} alt={prep.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                    )}
+                  </div>
+                </div>
+                <h3 style={styles.cardTitle}>{prep.nome}</h3>
+                <button style={styles.cardButton}>Acessar →</button>
+              </div>
+            ))}
+            {/* Cards fantasma para básico (quando lista vazia) */}
+            {isBasico && preparatorios.length === 0 && [1,2,3].map(i => (
+              <div key={i} style={styles.card}>
+                <div style={{...styles.cardImage, backgroundColor: '#222'}} />
+                <h3 style={{...styles.cardTitle, backgroundColor: '#333', borderRadius: 4, color: 'transparent'}}>Preparatório</h3>
+              </div>
+            ))}
           </div>
-        )}
+
+          {/* OVERLAY DE CADEADO — só para básico */}
+          {isBasico && (
+            <div style={styles.lockOverlay}>
+              <div style={styles.lockBox}>
+                <div style={{ fontSize: '64px', marginBottom: '8px', filter: 'drop-shadow(0 0 24px rgba(229,9,20,0.6))' }}>🔒</div>
+                <div style={styles.premiumLabel}>⭐ ÁREA PREMIUM</div>
+                <h3 style={{ color: '#FFF', margin: '12px 0 8px', fontSize: '24px', fontWeight: 'bold' }}>Conteúdo Exclusivo</h3>
+                <p style={{ color: '#AAA', margin: '0 0 24px', fontSize: '14px', textAlign: 'center', lineHeight: '1.7', maxWidth: '320px' }}>
+                  Os preparatórios desta carreira são exclusivos para assinantes.<br />
+                  Entre em contato com o administrador para liberar seu acesso.
+                </p>
+                <button
+                  style={styles.upgradeBtn}
+                  onClick={() => navigate(-1)}
+                >
+                  ← Voltar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {preparatorios.length === 0 && !isBasico && (
           <p style={styles.empty}>Nenhum preparatório disponível para sua conta nesta carreira.</p>
@@ -178,34 +194,64 @@ const styles = {
   backButton: { padding: '8px 20px', backgroundColor: '#333', border: 'none', color: '#F5F5F5', borderRadius: '8px', cursor: 'pointer' },
   title: { color: '#F5F5F5', fontSize: '24px', margin: 0 },
   hero: { textAlign: 'center', padding: '48px 20px 32px', backgroundColor: '#1A1A1A', color: '#F5F5F5' },
-  planeBanner: {
-    display: 'inline-block', marginTop: '16px', padding: '10px 20px',
-    backgroundColor: 'rgba(255,152,0,0.15)', border: '1px solid #FF9800',
-    borderRadius: '8px', color: '#FF9800', fontSize: '14px'
+  main: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', position: 'relative' },
+
+  // Seção de preparatórios
+  sectionHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: '24px', paddingBottom: '16px',
+    borderBottom: '2px solid #222'
   },
-  main: { maxWidth: '1200px', margin: '0 auto', padding: '48px 20px', position: 'relative' },
+  sectionBadge: {
+    fontSize: '18px', fontWeight: 'bold', color: '#F5F5F5',
+    letterSpacing: '2px', textTransform: 'uppercase'
+  },
+  premiumBadge: {
+    fontSize: '12px', fontWeight: 'bold', color: '#FFD700',
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    border: '1px solid rgba(255,215,0,0.4)',
+    padding: '4px 12px', borderRadius: '999px',
+    letterSpacing: '1px'
+  },
+
+  // Grid
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '30px' },
-  card: { backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '32px', textAlign: 'center', transition: 'transform 0.3s', border: '1px solid #333' },
+  card: { backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '32px', textAlign: 'center', transition: 'transform 0.3s', border: '1px solid #333', cursor: 'pointer' },
   cardIcon: { fontSize: '48px', marginBottom: '16px' },
   cardImage: { height: '160px', marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F', borderRadius: '12px', overflow: 'hidden', position: 'relative' },
   cardImageImg: { width: '100%', height: '100%', objectFit: 'cover' },
   cardTitle: { color: '#F5F5F5', fontSize: '20px', marginBottom: '16px' },
   cardButton: { padding: '10px 24px', backgroundColor: '#2196F3', border: 'none', color: '#fff', borderRadius: '25px', cursor: 'pointer' },
+
+  // Overlay de bloqueio
   lockOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 10
+    zIndex: 10,
+    minHeight: '320px',
   },
   lockBox: {
-    backgroundColor: 'rgba(20,20,20,0.95)', borderRadius: '20px',
-    padding: '40px 48px', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', border: '1px solid #333',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
+    backgroundColor: 'rgba(10,10,10,0.92)',
+    borderRadius: '24px',
+    padding: '48px 56px',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center',
+    border: '1px solid rgba(229,9,20,0.3)',
+    boxShadow: '0 0 60px rgba(229,9,20,0.15), 0 24px 80px rgba(0,0,0,0.9)',
+  },
+  premiumLabel: {
+    fontSize: '11px', fontWeight: 'bold', letterSpacing: '3px',
+    color: '#FFD700', backgroundColor: 'rgba(255,215,0,0.1)',
+    border: '1px solid rgba(255,215,0,0.4)',
+    padding: '4px 16px', borderRadius: '999px',
+    textTransform: 'uppercase'
   },
   upgradeBtn: {
-    padding: '12px 32px', backgroundColor: '#FF9800', border: 'none',
-    color: '#000', borderRadius: '8px', cursor: 'pointer',
-    fontWeight: 'bold', fontSize: '15px'
+    padding: '12px 36px', backgroundColor: '#E50914', border: 'none',
+    color: '#FFF', borderRadius: '8px', cursor: 'pointer',
+    fontWeight: 'bold', fontSize: '15px',
+    boxShadow: '0 4px 20px rgba(229,9,20,0.4)',
+    transition: 'transform 0.2s, box-shadow 0.2s'
   },
   empty: { textAlign: 'center', color: '#888', padding: '40px' },
   loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#F5F5F5' }
