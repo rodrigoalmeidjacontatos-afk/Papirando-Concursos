@@ -34,38 +34,39 @@ function Home() {
           .from('profiles')
           .select('plano, avatar_url, display_name, data_expiracao')
           .eq('id', userObj.id)
-          .maybeSingle(); // Usar maybeSingle para evitar erro de objeto não encontrado
+          .maybeSingle();
 
         // Se o perfil não existe, vamos criar um agora mesmo para este usuário
-        if (!profile && !error) {
+        if (!profile && !error && userObj?.id) {
           console.log("[Auth] Perfil não encontrado. Criando perfil inicial para:", userObj.email);
           const novoPerfil = {
             id: userObj.id,
-            email: userObj.email,
+            email: userObj.email || '',
             plano: 'basico',
             display_name: nomeProvisorio,
             visto_admin: false
           };
           
-          const { data: createdProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert([novoPerfil])
-            .select()
-            .single();
-            
-          if (!createError) {
-            profile = createdProfile;
-          } else {
-            console.error("[Auth] Erro ao criar perfil automático:", createError);
+          try {
+            const { data: createdProfile } = await supabase
+              .from('profiles')
+              .insert([novoPerfil])
+              .select()
+              .single();
+              
+            if (createdProfile) {
+              profile = createdProfile;
+            }
+          } catch (err) {
+            console.error("[Auth] Erro ao criar perfil automático:", err);
           }
         }
 
         if (profile) {
-          console.log("[Auth] Perfil carregado com sucesso:", profile.plano);
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
+          const userEmail = userObj?.email?.toLowerCase() || '';
           
-          // Normalização agressiva para aceitar "MÉDIO", "medio", "Medio", etc.
           let planoNormalizado = String(planoDoBanco)
             .toLowerCase()
             .trim()
@@ -74,17 +75,14 @@ function Home() {
           
           if (dataExp) {
             const dataExpiracaoDate = new Date(dataExp);
-            const agora = new Date();
-            if (dataExpiracaoDate < agora) {
-               // Se expirou, só volta pra básico se NÃO for o Admin
-               if (userObj.email?.toLowerCase() !== 'rodrigoalmeidja@gmail.com') {
+            if (dataExpiracaoDate < new Date()) {
+               if (!userEmail.includes('rodrigoalmeidja')) {
                   planoNormalizado = 'basico';
                }
             }
           }
 
-          // Bypass de Admin (Sempre Premium)
-          if (userObj.email?.toLowerCase().includes('rodrigoalmeidja')) {
+          if (userEmail.includes('rodrigoalmeidja')) {
             planoNormalizado = 'premium';
           }
 
@@ -93,8 +91,7 @@ function Home() {
           setUserName(profile.display_name || nomeProvisorio);
           setNewDisplayName(profile.display_name || nomeProvisorio);
         } else {
-          // Fallback total
-          const userEmail = userObj.email?.toLowerCase();
+          const userEmail = userObj?.email?.toLowerCase() || '';
           setPlanoUsuario(userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico');
           setUserName(nomeProvisorio);
         }
