@@ -296,19 +296,6 @@ function Home() {
               </>
             )}
           </div>
-              <input 
-                type="file" 
-                id="avatar-upload" 
-                style={{display: 'none'}} 
-                accept="image/*" 
-                onChange={handleFileUpload} 
-              />
-              {avatarUrl ? (
-                (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:')) ? 
-                  <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', borderRadius: '4px', objectFit: 'cover'}} /> : 
-                  <span>{avatarUrl}</span>
-              ) : '👤'}
-            </div>
           </div>
         </div>
       </header>

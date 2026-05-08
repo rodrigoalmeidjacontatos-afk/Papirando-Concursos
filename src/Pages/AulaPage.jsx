@@ -31,6 +31,7 @@ function AulaPage() {
   const [planoUsuario, setPlanoUsuario] = useState(null);
   const [temAcesso, setTemAcesso] = useState(true);
   const [carregandoAcesso, setCarregandoAcesso] = useState(true);
+  const [userName, setUserName] = useState('Aluno');
   
   // Novos Estados para a Barra Lateral
   const [disciplina, setDisciplina] = useState(null);
@@ -80,9 +81,20 @@ function AulaPage() {
   // Pegar usuário logado
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+      if (data?.user) {
+        setUser(data.user);
+        supabase.from('profiles').select('display_name').eq('id', data.user.id).single()
+          .then(({ data: profile }) => {
+            setUserName(profile?.display_name || data.user.email?.split('@')[0] || 'Aluno');
+          });
+      }
     });
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
 
   // Buscar anotações da aula
   useEffect(() => {
