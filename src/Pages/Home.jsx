@@ -252,23 +252,48 @@ function Home() {
               </button>
             )}
           </nav>
-            <div style={styles.userArea} className="user-area">
-            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px'}}>
-              <span style={styles.userName}>Olá, {userName}</span>
-              <span style={{
-                fontSize: '10px', 
-                fontWeight: 'bold', 
-                color: planoUsuario === 'premium' ? '#FFD700' : planoUsuario === 'medio' ? '#2196F3' : '#4CAF50',
-                textTransform: 'uppercase'
-              }}>
-                Plano {planoUsuario}
-              </span>
-            </div>
-            <div 
-              style={styles.avatar} 
-              onClick={() => setShowConfig(true)} 
-              title="Configurações do Perfil"
-            >
+          <div style={styles.userArea} className="user-area">
+            {userName === 'Aluno' ? (
+              <button 
+                onClick={() => navigate('/login')} 
+                style={{
+                  ...styles.navButton, 
+                  backgroundColor: '#E50914', 
+                  color: '#FFF', 
+                  padding: '8px 20px', 
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Entrar / Login
+              </button>
+            ) : (
+              <>
+                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px'}}>
+                  <span style={styles.userName}>Olá, {userName}</span>
+                  <span style={{
+                    fontSize: '10px', 
+                    fontWeight: 'bold', 
+                    color: planoUsuario === 'premium' ? '#FFD700' : planoUsuario === 'medio' ? '#2196F3' : '#4CAF50',
+                    textTransform: 'uppercase'
+                  }}>
+                    Plano {planoUsuario}
+                  </span>
+                </div>
+                <div 
+                  style={styles.avatar} 
+                  onClick={() => setShowConfig(true)} 
+                  title="Configurações do Perfil"
+                >
+                  <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div style={styles.settingsBadge}>⚙️</div>
+                </div>
+              </>
+            )}
+          </div>
               <input 
                 type="file" 
                 id="avatar-upload" 
