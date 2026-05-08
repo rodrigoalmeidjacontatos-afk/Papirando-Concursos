@@ -115,24 +115,37 @@ function AdminPage() {
     }
   };
 
-  const atualizarExpiracao = async (userId, dias) => {
+  const atualizarExpiracao = async (userId, tempo, unidade = 'dias') => {
     let dataFinal = null;
-    if (dias !== null) {
+    if (tempo !== null) {
       const d = new Date();
-      d.setDate(d.getDate() + dias);
+      if (unidade === 'minutos') {
+        d.setMinutes(d.getMinutes() + tempo);
+      } else {
+        d.setDate(d.getDate() + tempo);
+      }
       dataFinal = d.toISOString();
+    }
+    
+    // Auto-Premium APENAS para o teste de minutos (degustação)
+    const updates = { data_expiracao: dataFinal };
+    if (unidade === 'minutos' && tempo !== null) {
+      updates.plano = 'premium';
     }
     
     const { error } = await supabase
       .from('profiles')
-      .update({ data_expiracao: dataFinal })
+      .update(updates)
       .eq('id', userId);
       
     if (!error) {
-      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, data_expiracao: dataFinal } : u));
-      alert(`✅ Acesso atualizado! ${dataFinal ? 'Expira em: ' + new Date(dataFinal).toLocaleDateString('pt-BR') : 'Acesso Vitalício!'}`);
+      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+      const msg = dataFinal 
+        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
+        : 'Acesso Vitalício!';
+      alert(`✅ Sucesso! ${msg}`);
     } else {
-      alert('❌ Erro ao atualizar expiração: ' + error.message);
+      alert('❌ Erro ao atualizar: ' + error.message);
     }
   };
 
