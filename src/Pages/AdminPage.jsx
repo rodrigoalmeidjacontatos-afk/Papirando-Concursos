@@ -1476,6 +1476,17 @@ function AdminPage() {
                                 <button onClick={() => atualizarExpiracao(u.id, 7)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+7d</button>
                                 <button onClick={() => atualizarExpiracao(u.id, 30)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+30d</button>
                                 <button onClick={() => atualizarExpiracao(u.id, null)} style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#FFD700', color: '#000', padding: '2px 6px'}}>∞ Vitalício</button>
+                                <button 
+                                  onClick={() => {
+                                    if(window.confirm(`Deseja realmente BLOQUEAR o acesso de ${u.email}?`)) {
+                                      atualizarPlano(u.id, 'basico');
+                                      atualizarExpiracao(u.id, null);
+                                    }
+                                  }} 
+                                  style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#E53935', padding: '2px 6px'}}
+                                >
+                                  🚫 Bloquear
+                                </button>
                                 <input 
                                   type="date" 
                                   style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 4px', borderRadius: '4px'}}
