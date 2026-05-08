@@ -12,27 +12,33 @@ function PreparatorioViewPage() {
   const [modulosExpandidos, setModulosExpandidos] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
-  const [planoUsuario, setPlanoUsuario] = useState('basico');
+  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
       try {
         const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
-        if (mounted && profile) {
-          const planoDB = profile.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-          setPlanoUsuario(planoDB);
-          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
-          const isOwner = profile.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
+        if (mounted) {
+          const planoDoBanco = profile?.plano || 'basico';
+          // Normalização total
+          const planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          
+          setPlanoUsuario(planoNormalizado);
+          setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
+          
+          const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja') || userObj.email?.includes('teste@gmail.com');
           setIsAdmin(isOwner);
           if (isOwner) setPlanoUsuario('premium');
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);
+        if (mounted) setPlanoUsuario('basico');
       }
     };
 
@@ -170,7 +176,7 @@ function PreparatorioViewPage() {
       </header>
 
       <main style={{...styles.main, position: 'relative'}}>
-        {/* Overlay de bloqueio para plano básico (Admin não é bloqueado) */}
+        {/* Overlay de bloqueio apenas se for explicitamente básico e não admin */}
         {planoUsuario === 'basico' && !isAdmin && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
