@@ -272,16 +272,36 @@ function Home() {
               </button>
             ) : (
               <>
-                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px'}}>
+                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px'}}>
                   <span style={styles.userName}>Olá, {userName}</span>
-                  <span style={{
-                    fontSize: '10px', 
-                    fontWeight: 'bold', 
-                    color: planoUsuario === 'premium' ? '#FFD700' : planoUsuario === 'medio' ? '#2196F3' : '#4CAF50',
-                    textTransform: 'uppercase'
-                  }}>
-                    Plano {planoUsuario}
-                  </span>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{
+                      fontSize: '10px', 
+                      fontWeight: 'bold', 
+                      color: planoUsuario === 'premium' ? '#FFD700' : planoUsuario === 'medio' ? '#2196F3' : '#4CAF50',
+                      textTransform: 'uppercase',
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      padding: '2px 6px',
+                      borderRadius: '4px'
+                    }}>
+                      {planoUsuario}
+                    </span>
+                    <button 
+                      onClick={handleLogout} 
+                      style={{
+                        backgroundColor: 'transparent', 
+                        border: '1px solid #E50914', 
+                        color: '#E50914', 
+                        fontSize: '10px', 
+                        padding: '2px 8px', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      SAIR
+                    </button>
+                  </div>
                 </div>
                 <div 
                   style={styles.avatar} 
