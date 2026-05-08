@@ -18,6 +18,26 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    // Monitor de sessão em tempo real
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        supabase.from('profiles').select('plano, display_name, role').eq('id', session.user.id).single()
+          .then(({ data: profile }) => {
+            setPlanoUsuario(profile?.plano || 'basico');
+            setUserName(profile?.display_name || session.user.email?.split('@')[0] || 'Aluno');
+            const isOwner = profile?.role === 'admin' || session.user.email?.includes('rodrigoalmeidja');
+            setIsAdmin(isOwner);
+            if (isOwner) setPlanoUsuario('premium');
+          });
+      } else {
+        setUser(null);
+        setUserName('Aluno');
+        setIsAdmin(false);
+        setPlanoUsuario('basico');
+      }
+    });
+
     const carregarDados = async () => {
       try {
         const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
@@ -42,20 +62,16 @@ function PreparatorioViewPage() {
           setAulas(aulaData || []);
         }
 
-        // Buscar plano do usuário
-        if (user) {
-          setUser(user);
-          const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', user.id).single();
+        // Busca inicial de usuário (fallback)
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          setUser(currentUser);
+          const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', currentUser.id).single();
           setPlanoUsuario(profile?.plano || 'basico');
-          setUserName(profile?.display_name || user.email?.split('@')[0] || 'Aluno');
-          // Verificação de Admin robusta: papel no banco ou e-mail do dono
-          const isOwner = profile?.role === 'admin' || user.email?.includes('rodrigoalmeidja');
+          setUserName(profile?.display_name || currentUser.email?.split('@')[0] || 'Aluno');
+          const isOwner = profile?.role === 'admin' || currentUser.email?.includes('rodrigoalmeidja');
           setIsAdmin(isOwner);
-          if (isOwner) setPlanoUsuario('premium'); // Garante acesso premium visual também
-        } else {
-          setUser(null);
-          setUserName('Aluno');
-          setIsAdmin(false);
+          if (isOwner) setPlanoUsuario('premium');
         }
 
       } catch (err) {
@@ -66,6 +82,7 @@ function PreparatorioViewPage() {
     };
 
     carregarDados();
+    return () => subscription.unsubscribe();
   }, [preparatorioId, carreiraId]);
 
   const toggleModulo = (moduloId) => {

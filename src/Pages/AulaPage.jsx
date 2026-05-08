@@ -79,8 +79,27 @@ function AulaPage() {
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
-  // Pegar usuário logado
+  // Pegar usuário logado e monitorar sessão
   useEffect(() => {
+    // Monitor de sessão em tempo real
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        supabase.from('profiles').select('display_name, role').eq('id', session.user.id).single()
+          .then(({ data: profile }) => {
+            setUserName(profile?.display_name || session.user.email?.split('@')[0] || 'Aluno');
+            const isOwner = profile?.role === 'admin' || session.user.email?.includes('rodrigoalmeidja');
+            setIsAdmin(isOwner);
+            if (isOwner) setPlanoUsuario('premium');
+          });
+      } else {
+        setUser(null);
+        setUserName('Aluno');
+        setIsAdmin(false);
+      }
+    });
+
+    // Busca inicial (fallback)
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         setUser(data.user);
@@ -93,6 +112,8 @@ function AulaPage() {
           });
       }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleLogout = async () => {
