@@ -170,12 +170,9 @@ function CarreiraPage() {
                 <div style={{ fontSize: '64px', marginBottom: '8px', filter: 'drop-shadow(0 0 24px rgba(229,9,20,0.6))' }}>🔒</div>
                 <div style={styles.premiumLabel}>🔒 ACESSO RESTRITO</div>
                 <h3 style={{ color: '#FFF', margin: '12px 0 8px', fontSize: '24px', fontWeight: 'bold' }}>Conteúdo Exclusivo</h3>
-                <p style={{ color: '#AAA', margin: '0 0 20px', fontSize: '13px', textAlign: 'center', lineHeight: '1.7', maxWidth: '320px' }}>
-                  Sua conta está sendo detectada com o plano: <strong style={{color: '#E50914'}}>{String(planoUsuario).toUpperCase()}</strong><br/>
-                  Seu ID: <code style={{color: '#FFF', fontSize: '10px'}}>{user?.id}</code>
-                </p>
-                <p style={{ color: '#888', margin: '0 0 24px', fontSize: '12px', textAlign: 'center' }}>
-                  Se você deveria ser Premium, peça ao admin para verificar seu ID acima.
+                <p style={{ color: '#AAA', margin: '0 0 24px', fontSize: '14px', textAlign: 'center', lineHeight: '1.7', maxWidth: '320px' }}>
+                  Esta área é exclusiva para usuários com acesso habilitado.<br />
+                  Entre em contato com o administrador para liberar seu acesso.
                 </p>
                 <button
                   style={styles.upgradeBtn}
