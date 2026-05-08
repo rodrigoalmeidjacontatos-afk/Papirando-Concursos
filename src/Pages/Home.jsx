@@ -79,7 +79,7 @@ function Home() {
             .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
           if (profile.data_expiracao && new Date(profile.data_expiracao) < new Date()) {
-             if (!userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'basico';
+             if (!userEmail.includes('rodrigoalmeidja') && planoNormalizado !== 'premium') planoNormalizado = 'basico';
           }
 
           if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';

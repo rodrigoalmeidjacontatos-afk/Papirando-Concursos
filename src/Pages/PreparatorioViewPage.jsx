@@ -67,7 +67,7 @@ function PreparatorioViewPage() {
             const gracePeriodMs = 5 * 60 * 1000;
             const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
 
-            if (expirou && !dentroDaTolerancia) {
+            if (expirou && !dentroDaTolerancia && planoNormalizado !== 'premium') {
               console.log("[Auth] Plano expirado:", dataExp);
               planoNormalizado = 'basico';
             }

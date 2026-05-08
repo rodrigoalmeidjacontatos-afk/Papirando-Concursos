@@ -52,7 +52,7 @@ function CarreiraPage() {
         const dataExp = profile?.data_expiracao;
         let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
-        if (dataExp && new Date(dataExp) < new Date()) {
+        if (dataExp && new Date(dataExp) < new Date() && planoNormalizado !== 'premium') {
           planoNormalizado = 'basico';
         }
 

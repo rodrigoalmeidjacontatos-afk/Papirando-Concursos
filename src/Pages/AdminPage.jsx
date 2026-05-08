@@ -116,7 +116,8 @@ function AdminPage() {
       .from('profiles')
       .update({ 
         plano: novoPlano,
-        data_expiracao: null 
+        data_expiracao: null,
+        preparatorios_liberados: novoPlano === 'premium' ? [] : undefined // Se for premium, limpa os filtros de medio
       })
       .eq('id', userId);
     
