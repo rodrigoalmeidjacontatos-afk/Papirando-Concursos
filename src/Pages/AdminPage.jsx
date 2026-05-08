@@ -157,6 +157,23 @@ function AdminPage() {
     }
   };
 
+  const toggleAdmin = async (userId, currentRole) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    if (!window.confirm(`Deseja alterar o cargo deste usuário para ${newRole.toUpperCase()}?`)) return;
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', userId);
+    
+    if (!error) {
+      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      alert(`✅ Usuário agora é ${newRole.toUpperCase()}!`);
+    } else {
+      alert('❌ Erro ao alterar cargo: ' + error.message);
+    }
+  };
+
   const abrirGerenciarAcesso = (usuario) => {
     setUsuarioEditandoAcesso({
       ...usuario,
@@ -1511,11 +1528,30 @@ function AdminPage() {
                           </td>
 
                           <td style={{padding: '20px 12px'}}>
-                            <div style={{display: 'flex', gap: '8px'}}>
-                              <button style={{...styles.smallButton, backgroundColor: '#1565C0', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px'}} onClick={() => abrirGerenciarAcesso(u)}>
-                                🔑 Acessos
+                            <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                              <button 
+                                onClick={() => abrirGerenciarAcesso(u)}
+                                style={{...styles.editButtonSmall, padding: '4px 8px', fontSize: '11px'}}
+                              >
+                                📂 Acessos
                               </button>
-                              <button style={{...styles.deleteButton, padding: '8px 12px'}} onClick={() => excluirUsuario(u.id, u.email)}>
+                              <button 
+                                onClick={() => toggleAdmin(u.id, u.role)}
+                                style={{
+                                  ...styles.editButtonSmall, 
+                                  backgroundColor: u.role === 'admin' ? '#FFD700' : '#444',
+                                  color: u.role === 'admin' ? '#000' : '#FFF',
+                                  padding: '4px 8px', 
+                                  fontSize: '11px',
+                                  border: 'none'
+                                }}
+                              >
+                                {u.role === 'admin' ? '👑 Admin' : '👤 Tornar Admin'}
+                              </button>
+                              <button 
+                                onClick={() => excluirUsuario(u.id, u.email)}
+                                style={{...styles.deleteButton, padding: '4px 8px', fontSize: '11px'}}
+                              >
                                 🗑️
                               </button>
                             </div>

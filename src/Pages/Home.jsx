@@ -56,12 +56,13 @@ function Home() {
               planoNormalizado = 'basico';
             }
           }
-
           const userEmail = userObj.email?.toLowerCase();
-          const isOwnerByRole = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
+          const isOwnerByEmail = userEmail === 'rodrigoalmeidja@gmail.com';
+          const isOwnerByRole = profile.role === 'admin' || isOwnerByEmail;
           
           if (isOwnerByRole) {
             planoNormalizado = 'premium';
+            console.log("[Auth] Admin detectado por e-mail/role, forçando Premium.");
           }
 
           setPlanoUsuario(planoNormalizado);
@@ -75,14 +76,26 @@ function Home() {
             setNewDisplayName(nomeProvisorio);
           }
         } else {
-           // Usuário sem perfil ainda (talvez acabou de cadastrar)
-           setUserName(nomeProvisorio);
-           setNewDisplayName(nomeProvisorio);
-           setPlanoUsuario('basico');
+          // Usuário sem perfil ainda (talvez acabou de cadastrar)
+          console.log("[Auth] Perfil não encontrado para:", userObj.email);
+          const userEmail = userObj.email?.toLowerCase();
+          if (userEmail === 'rodrigoalmeidja@gmail.com') {
+            setPlanoUsuario('premium');
+            console.log("[Auth] Admin detectado (sem perfil), forçando Premium.");
+          } else {
+            setPlanoUsuario('basico');
+          }
+          setUserName(nomeProvisorio);
+          setNewDisplayName(nomeProvisorio);
         }
       } catch (e) {
         console.error("[Auth] Home: Erro catastrófico:", e);
-        setPlanoUsuario('basico');
+        const userEmail = userObj?.email?.toLowerCase();
+        if (userEmail === 'rodrigoalmeidja@gmail.com') {
+          setPlanoUsuario('premium');
+        } else {
+          setPlanoUsuario('basico');
+        }
       }
     };
 
