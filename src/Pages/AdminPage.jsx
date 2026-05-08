@@ -1428,9 +1428,6 @@ function AdminPage() {
                             {new Date(u.created_at).toLocaleDateString('pt-BR')}
                           </td>
                           <td style={{padding: '12px'}}>
-                            <span style={{
-                              padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold',
-                              backgroundColor:
                             <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                               <span style={{
                                 padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', width: 'fit-content',
