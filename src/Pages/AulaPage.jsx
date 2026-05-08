@@ -89,8 +89,6 @@ function AulaPage() {
         const { data: profile } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
         if (mounted) {
           setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
-          const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja') || userObj.email?.includes('teste@gmail.com');
-          setIsAdmin(isOwner);
           
           // Normalização do plano
           const planoDoBanco = profile?.plano || 'basico';
