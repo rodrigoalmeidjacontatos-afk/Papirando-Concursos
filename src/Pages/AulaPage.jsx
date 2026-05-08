@@ -28,7 +28,7 @@ function AulaPage() {
 
   // Estados de Dados
   const [user, setUser] = useState(null);
-  const [planoUsuario, setPlanoUsuario] = useState(null);
+  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [temAcesso, setTemAcesso] = useState(true);
   const [carregandoAcesso, setCarregandoAcesso] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -84,7 +84,13 @@ function AulaPage() {
     let mounted = true;
 
     const carregarPerfil = async (userObj) => {
-      if (!userObj) return;
+      if (!userObj) {
+        if (mounted) {
+          setPlanoUsuario('basico');
+          setCarregandoAcesso(false);
+        }
+        return;
+      }
       try {
         const { data: profile } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
         if (mounted) {
@@ -93,7 +99,7 @@ function AulaPage() {
           // Normalização do plano
           const planoDoBanco = profile?.plano || 'basico';
           const dataExp = profile?.data_expiracao;
-          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
           
           if (dataExp && new Date(dataExp) < new Date()) {
             planoNormalizado = 'basico';
@@ -104,10 +110,14 @@ function AulaPage() {
           if (isOwner) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
+          setCarregandoAcesso(false);
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);
-        if (mounted) setPlanoUsuario('basico');
+        if (mounted) {
+          setPlanoUsuario('basico');
+          setCarregandoAcesso(false);
+        }
       }
     };
 
@@ -676,34 +686,48 @@ useEffect(() => {
 
   const progressoPercentual = duracao > 0 ? (tempoAtual / duracao) * 100 : 0;
 
-// Tela de carregamento (desabilitado temporariamente)
-// if (carregandoAcesso) {
-//   return (
-//     <div style={styles.appContainer}>
-//       <div style={styles.loadingContainer}>
-//         Verificando seu acesso...
-//       </div>
-//     </div>
-//   );
-// }
+  // Tela de carregamento
+  if (carregandoAcesso || planoUsuario === 'carregando') {
+    return (
+      <div style={{...styles.appContainer, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#050505'}}>
+        <div style={{textAlign: 'center', color: '#FFF'}}>
+          <div style={{fontSize: '40px', marginBottom: '16px'}}>⏳</div>
+          <div style={{fontSize: '18px', fontWeight: '500'}}>Verificando seu acesso...</div>
+        </div>
+      </div>
+    );
+  }
 
-// Tela de acesso negado (desabilitado temporariamente)
-// if (!temAcesso) {
-//   return (
-//     <div style={styles.appContainer}>
-//       <div style={styles.acessoNegadoContainer}>
-//         <h2>🔒 Acesso Bloqueado</h2>
-//         <p>Esta aula não está disponível no seu plano atual.</p>
-//         <button onClick={() => navigate('/planos')} style={styles.botaoUpgrade}>
-//           Ver Planos Disponíveis →
-//         </button>
-//         <button onClick={() => navigate(-1)} style={styles.botaoVoltar}>
-//           Voltar para o curso
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
+  // Verificação de bloqueio baseada no nível da aula
+  const nivelAula = aulaPlaying?.nivel || 'basico'; // Pega o nível da aula (basico, medio, premium)
+  const isBloqueada = 
+    (nivelAula === 'premium' && planoUsuario !== 'premium') ||
+    (nivelAula === 'medio' && planoUsuario === 'basico');
+
+  if (isBloqueada && !isAdmin) {
+    return (
+      <div style={{...styles.appContainer, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#050505'}}>
+        <div style={{
+          backgroundColor: '#1A1A1A', borderRadius: '20px', padding: '48px',
+          textAlign: 'center', border: '1px solid #333',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.9)', maxWidth: '420px'
+        }}>
+          <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
+          <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Conteúdo Bloqueado</h2>
+          <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
+            Esta aula requer o plano <strong style={{color: '#FF9800'}}>{nivelAula.toUpperCase()}</strong>.<br/>
+            Faça upgrade para acessar este conteúdo!
+          </p>
+          <button 
+            onClick={() => navigate(-1)} 
+            style={{padding: '12px 32px', backgroundColor: '#FF9800', border: 'none', color: '#000', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
+          >
+            ← Voltar para o curso
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={styles.appContainer} className="aula-app-container" onMouseMove={handleMouseMove}>
       <header style={styles.header} className="aula-header">

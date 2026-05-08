@@ -21,27 +21,37 @@ function PreparatorioViewPage() {
     let mounted = true;
 
     const carregarPerfil = async (userObj) => {
-      if (!userObj) return;
+      if (!userObj) {
+        if (mounted) setPlanoUsuario('basico');
+        return;
+      }
       try {
-        const { data: profile } = await supabase.from('profiles').select('plano, display_name, role, data_expiracao').eq('id', userObj.id).single();
-        if (mounted) {
-          const planoDoBanco = profile?.plano || 'basico';
-          const dataExp = profile?.data_expiracao;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plano, display_name, role, data_expiracao')
+          .eq('id', userObj.id)
+          .single();
+          
+        if (mounted && profile) {
+          const planoDoBanco = profile.plano || 'basico';
+          const dataExp = profile.data_expiracao;
           
           // Normalização total
-          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
           // Verificação de expiração
           if (dataExp && new Date(dataExp) < new Date()) {
             planoNormalizado = 'basico'; // Acesso expirado
           }
 
-          const isOwner = profile?.role === 'admin' || userObj.email === 'rodrigoalmeidja@gmail.com' || userObj.email === 'teste@gmail.com';
+          const isOwner = profile.role === 'admin' || userObj.email === 'rodrigoalmeidja@gmail.com' || userObj.email === 'teste@gmail.com';
           setIsAdmin(isOwner);
           if (isOwner) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
-          setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
+          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
+        } else if (mounted) {
+          setPlanoUsuario('basico');
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);
@@ -50,17 +60,13 @@ function PreparatorioViewPage() {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user) {
-          setUser(session.user);
-          await carregarPerfil(session.user);
-        }
-      } else if (event === 'SIGNED_OUT') {
+      if (session?.user) {
+        setUser(session.user);
+        await carregarPerfil(session.user);
+      } else {
         if (mounted) {
           setUser(null);
-          setUserName('Aluno');
           setPlanoUsuario('basico');
-          setIsAdmin(false);
         }
       }
     });
@@ -74,6 +80,8 @@ function PreparatorioViewPage() {
         if (session?.user) {
           setUser(session.user);
           await carregarPerfil(session.user);
+        } else {
+          setPlanoUsuario('basico');
         }
 
         // 2. Depois carrega os dados da página
@@ -102,8 +110,9 @@ function PreparatorioViewPage() {
       } catch (err) {
         console.error('Erro geral:', err);
         if (mounted) setErro(err.message);
+      } finally {
+        if (mounted) setCarregando(false);
       }
-      if (mounted) setCarregando(false);
     };
 
     carregarTudo();
@@ -151,7 +160,7 @@ function PreparatorioViewPage() {
     return <span style={{fontSize: '24px'}}>{iconStr}</span>;
   };
 
-  if (carregando) return <div style={styles.loading}>Carregando...</div>;
+  if (carregando || planoUsuario === 'carregando') return <div style={styles.loading}>Verificando acesso...</div>;
   if (erro) return <div style={styles.loading}>Erro: {erro}</div>;
   if (!preparatorio) return <div style={styles.loading}>Preparatório não encontrado</div>;
 

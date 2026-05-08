@@ -7,7 +7,7 @@ function CarreiraPage() {
   const navigate = useNavigate();
   const [carreira, setCarreira] = useState(null);
   const [preparatorios, setPreparatorios] = useState([]);
-  const [planoUsuario, setPlanoUsuario] = useState('basico');
+  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ function CarreiraPage() {
 
         const planoDoBanco = profile?.plano || 'basico';
         const dataExp = profile?.data_expiracao;
-        let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
         if (dataExp && new Date(dataExp) < new Date()) {
           planoNormalizado = 'basico';
@@ -74,6 +74,7 @@ function CarreiraPage() {
           setPreparatorios(prepsFiltrados);
         }
       } else {
+        setPlanoUsuario('basico');
         setPreparatorios(prepsFiltrados);
       }
 
@@ -83,7 +84,7 @@ function CarreiraPage() {
     carregarDados();
   }, [carreiraId]);
 
-  if (carregando) return <div style={styles.loading}>Carregando...</div>;
+  if (carregando || planoUsuario === 'carregando') return <div style={styles.loading}>Verificando acesso...</div>;
   if (!carreira) return <div style={styles.loading}>Carreira não encontrada</div>;
 
   const isBasico = planoUsuario === 'basico';
