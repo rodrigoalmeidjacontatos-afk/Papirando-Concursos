@@ -26,16 +26,24 @@ function Home() {
         setUserName(nome);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plano, avatar_url, display_name')
+          .select('plano, avatar_url, display_name, data_expiracao')
           .eq('id', data.user.id)
           .single();
 
         if (profile) {
+          const planoDoBanco = profile.plano || 'basico';
+          const dataExp = profile.data_expiracao;
+          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          
+          if (dataExp && new Date(dataExp) < new Date()) {
+            planoNormalizado = 'basico';
+          }
+
           // Se for o admin (pelo email), força o plano para premium
           if (data.user.email === 'rodrigoalmeidja@gmail.com') {
             setPlanoUsuario('premium');
           } else {
-            setPlanoUsuario(profile.plano || 'basico');
+            setPlanoUsuario(planoNormalizado);
           }
           setAvatarUrl(profile.avatar_url || null);
           if (profile.display_name) {

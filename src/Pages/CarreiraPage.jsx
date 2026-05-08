@@ -44,18 +44,26 @@ function CarreiraPage() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plano, preparatorios_liberados')
+          .select('plano, preparatorios_liberados, role, data_expiracao')
           .eq('id', user.id)
           .single();
 
-        const plano = profile?.plano || 'basico';
-        setPlanoUsuario(plano);
+        const planoDoBanco = profile?.plano || 'basico';
+        const dataExp = profile?.data_expiracao;
+        let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (dataExp && new Date(dataExp) < new Date()) {
+          planoNormalizado = 'basico';
+        }
 
-        if (plano === 'basico') {
-          // Básico: vê tudo mas bloqueado (não filtramos, mostramos com blur)
+        const isOwner = profile?.role === 'admin' || user?.email === 'rodrigoalmeidja@gmail.com' || user?.email === 'teste@gmail.com';
+        if (isOwner) planoNormalizado = 'premium';
+
+        setPlanoUsuario(planoNormalizado);
+
+        if (planoNormalizado === 'basico') {
           setPreparatorios(prepsFiltrados);
-        } else if (plano === 'medio') {
-          // Médio: apenas os liberados pelo admin
+        } else if (planoNormalizado === 'medio') {
           const liberados = profile?.preparatorios_liberados || [];
           if (liberados.length > 0) {
             setPreparatorios(prepsFiltrados.filter(p => liberados.includes(p.id)));
@@ -63,7 +71,6 @@ function CarreiraPage() {
             setPreparatorios([]);
           }
         } else {
-          // Premium: acesso a tudo
           setPreparatorios(prepsFiltrados);
         }
       } else {

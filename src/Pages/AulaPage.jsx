@@ -97,14 +97,15 @@ function AulaPage() {
           const dataExp = profile?.data_expiracao;
           let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
           
-          // Verificação de expiração
           if (dataExp && new Date(dataExp) < new Date()) {
             planoNormalizado = 'basico';
           }
 
+          const isOwner = profile?.role === 'admin' || userObj.email === 'rodrigoalmeidja@gmail.com' || userObj.email === 'teste@gmail.com';
+          setIsAdmin(isOwner);
+          if (isOwner) planoNormalizado = 'premium';
+
           setPlanoUsuario(planoNormalizado);
-          
-          if (isOwner) setPlanoUsuario('premium');
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);

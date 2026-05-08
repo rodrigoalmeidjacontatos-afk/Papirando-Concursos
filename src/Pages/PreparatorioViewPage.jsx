@@ -36,12 +36,12 @@ function PreparatorioViewPage() {
             planoNormalizado = 'basico'; // Acesso expirado
           }
 
+          const isOwner = profile?.role === 'admin' || userObj.email === 'rodrigoalmeidja@gmail.com' || userObj.email === 'teste@gmail.com';
+          setIsAdmin(isOwner);
+          if (isOwner) planoNormalizado = 'premium';
+
           setPlanoUsuario(planoNormalizado);
           setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
-          
-          const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja') || userObj.email?.includes('teste@gmail.com');
-          setIsAdmin(isOwner);
-          if (isOwner) setPlanoUsuario('premium');
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);
