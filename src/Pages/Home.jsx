@@ -8,7 +8,7 @@ function Home() {
   const [categorias, setCategorias] = useState([]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState('basico');
+  const [planoUsuario, setPlanoUsuario] = useState(localStorage.getItem('papirando_plano') || 'basico');
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -18,15 +18,11 @@ function Home() {
 
   // Pegar usuário logado
   useEffect(() => {
-    const carregarPerfil = async (userObj) => {
-      if (!userObj) {
-        setPlanoUsuario('basico');
-        return;
-      }
+    let mounted = true;
 
-      // Define nome provisório baseado no email enquanto carrega o resto
+    const carregarPerfil = async (userObj) => {
+      if (!userObj?.id) return;
       const nomeProvisorio = userObj.email?.split('@')[0] || 'Aluno';
-      setUserName(prev => prev === 'Aluno' ? nomeProvisorio : prev);
 
       try {
         console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
@@ -36,67 +32,38 @@ function Home() {
           .eq('id', userObj.id)
           .maybeSingle();
 
-        // Se o perfil não existe, vamos criar um agora mesmo para este usuário
-        if (!profile && !error && userObj?.id) {
-          console.log("[Auth] Perfil não encontrado. Criando perfil inicial para:", userObj.email);
-          const novoPerfil = {
-            id: userObj.id,
-            email: userObj.email || '',
-            plano: 'basico',
-            display_name: nomeProvisorio,
-            visto_admin: false
-          };
-          
-          try {
-            const { data: createdProfile } = await supabase
-              .from('profiles')
-              .insert([novoPerfil])
-              .select()
-              .single();
-              
-            if (createdProfile) {
-              profile = createdProfile;
-            }
-          } catch (err) {
-            console.error("[Auth] Erro ao criar perfil automático:", err);
-          }
+        // Auto-criação de perfil se não existir
+        if (!profile && !error && mounted) {
+          const novoPerfil = { id: userObj.id, email: userObj.email || '', plano: 'basico', display_name: nomeProvisorio };
+          const { data: created } = await supabase.from('profiles').insert([novoPerfil]).select().single();
+          if (created) profile = created;
         }
 
-        if (profile) {
-          const planoDoBanco = profile.plano || 'basico';
-          const dataExp = profile.data_expiracao;
+        if (profile && mounted) {
           const userEmail = userObj?.email?.toLowerCase() || '';
+          let planoNormalizado = String(profile.plano || 'basico')
+            .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
-          let planoNormalizado = String(planoDoBanco)
-            .toLowerCase()
-            .trim()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "") || 'basico';
-          
-          if (dataExp) {
-            const dataExpiracaoDate = new Date(dataExp);
-            if (dataExpiracaoDate < new Date()) {
-               if (!userEmail.includes('rodrigoalmeidja')) {
-                  planoNormalizado = 'basico';
-               }
-            }
+          if (profile.data_expiracao && new Date(profile.data_expiracao) < new Date()) {
+             if (!userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'basico';
           }
 
-          if (userEmail.includes('rodrigoalmeidja')) {
-            planoNormalizado = 'premium';
-          }
+          if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
 
+          // SALVA NO CACHE PARA O REFRESH
+          localStorage.setItem('papirando_plano', planoNormalizado);
           setPlanoUsuario(planoNormalizado);
           setAvatarUrl(profile.avatar_url || null);
           setUserName(profile.display_name || nomeProvisorio);
           setNewDisplayName(profile.display_name || nomeProvisorio);
-        } else {
+        } else if (mounted) {
           const userEmail = userObj?.email?.toLowerCase() || '';
-          setPlanoUsuario(userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico');
+          const planoFallback = userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico';
+          setPlanoUsuario(planoFallback);
           setUserName(nomeProvisorio);
         }
       } catch (e) {
-        console.error("[Auth] Home: Erro catastrófico no perfil:", e);
+        console.error("[Auth] Erro no perfil:", e);
       }
     };
 
@@ -477,8 +444,8 @@ function Home() {
           // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
           const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const isPrep = nomeNorm.includes('preparatorio');
-          // Apenas PREMIUM tem acesso — básico e médio são bloqueados
-          const bloqueado = isPrep && planoUsuario !== 'premium';
+          // Permite acesso se for PREMIUM ou MEDIO
+          const bloqueado = isPrep && planoUsuario !== 'premium' && planoUsuario !== 'medio';
 
           return (
             <div key={categoria.id} style={styles.category}>
