@@ -253,22 +253,22 @@ function Home() {
             )}
           </nav>
           <div style={styles.userArea} className="user-area">
-            {userName === 'Aluno' ? (
+            {(userName === 'Aluno' || !user) ? (
               <button 
                 onClick={() => navigate('/login')} 
                 style={{
-                  ...styles.navButton, 
                   backgroundColor: '#E50914', 
                   color: '#FFF', 
-                  padding: '8px 20px', 
+                  padding: '10px 20px', 
                   borderRadius: '6px',
                   fontWeight: 'bold',
                   fontSize: '14px',
                   border: 'none',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(229, 9, 20, 0.4)'
                 }}
               >
-                Entrar / Login
+                ENTRAR / LOGIN
               </button>
             ) : (
               <>
@@ -288,7 +288,9 @@ function Home() {
                   onClick={() => setShowConfig(true)} 
                   title="Configurações do Perfil"
                 >
-                  <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                  ) : '👤'}
                   <div style={styles.settingsBadge}>⚙️</div>
                 </div>
               </>
