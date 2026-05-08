@@ -5,10 +5,9 @@ import { supabase } from '../services/supabase';
 function Home() {
   const navigate = useNavigate();
   const [favoritos, setFavoritos] = useState([]);
-  const [categorias, setCategorias] = useState([]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState(localStorage.getItem('papirando_plano') || 'basico');
+  const [planoUsuario, setPlanoUsuario] = useState('...'); // Estado inicial neutro (carregando)
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -50,8 +49,6 @@ function Home() {
 
           if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
 
-          // SALVA NO CACHE PARA O REFRESH
-          localStorage.setItem('papirando_plano', planoNormalizado);
           setPlanoUsuario(planoNormalizado);
           setAvatarUrl(profile.avatar_url || null);
           setUserName(profile.display_name || nomeProvisorio);
@@ -444,8 +441,8 @@ function Home() {
           // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
           const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const isPrep = nomeNorm.includes('preparatorio');
-          // Permite acesso se for PREMIUM ou MEDIO
-          const bloqueado = isPrep && planoUsuario !== 'premium' && planoUsuario !== 'medio';
+          // Apenas PREMIUM tem acesso — básico e médio são bloqueados (como solicitado)
+          const bloqueado = isPrep && planoUsuario !== 'premium';
 
           return (
             <div key={categoria.id} style={styles.category}>
