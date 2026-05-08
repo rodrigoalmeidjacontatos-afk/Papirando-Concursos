@@ -48,7 +48,10 @@ function PreparatorioViewPage() {
           const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', user.id).single();
           setPlanoUsuario(profile?.plano || 'basico');
           setUserName(profile?.display_name || user.email?.split('@')[0] || 'Aluno');
-          setIsAdmin(profile?.role === 'admin' || user.email === 'rodrigoalmeidjacontatos@gmail.com');
+          // Verificação de Admin robusta: papel no banco ou e-mail do dono
+          const isOwner = profile?.role === 'admin' || user.email?.includes('rodrigoalmeidja');
+          setIsAdmin(isOwner);
+          if (isOwner) setPlanoUsuario('premium'); // Garante acesso premium visual também
         } else {
           setUser(null);
           setUserName('Aluno');

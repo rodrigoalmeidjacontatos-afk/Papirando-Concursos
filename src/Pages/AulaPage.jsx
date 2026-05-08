@@ -31,6 +31,7 @@ function AulaPage() {
   const [planoUsuario, setPlanoUsuario] = useState(null);
   const [temAcesso, setTemAcesso] = useState(true);
   const [carregandoAcesso, setCarregandoAcesso] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState('Aluno');
   
   // Novos Estados para a Barra Lateral
@@ -83,9 +84,12 @@ function AulaPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         setUser(data.user);
-        supabase.from('profiles').select('display_name').eq('id', data.user.id).single()
+        supabase.from('profiles').select('display_name, role').eq('id', data.user.id).single()
           .then(({ data: profile }) => {
             setUserName(profile?.display_name || data.user.email?.split('@')[0] || 'Aluno');
+            const isOwner = profile?.role === 'admin' || data.user.email?.includes('rodrigoalmeidja');
+            setIsAdmin(isOwner);
+            if (isOwner) setPlanoUsuario('premium');
           });
       }
     });
@@ -174,7 +178,7 @@ useEffect(() => {
     setCarregandoAcesso(true);
     
     // ADMIN (plano premium) sempre tem acesso liberado
-    if (planoUsuario === 'premium') {
+    if (planoUsuario === 'premium' || isAdmin) {
       setTemAcesso(true);
       setCarregandoAcesso(false);
       return;
