@@ -91,12 +91,24 @@ function AulaPage() {
         }
         return;
       }
+
+      // ADMIN: verifica email ANTES de qualquer consulta ao banco
+      const userEmail = userObj.email?.toLowerCase();
+      if (userEmail === 'rodrigoalmeidja@gmail.com') {
+        if (mounted) {
+          setIsAdmin(true);
+          setPlanoUsuario('premium');
+          setUserName(userObj.email?.split('@')[0] || 'Admin');
+          setCarregandoAcesso(false);
+        }
+        return;
+      }
+
       try {
         const { data: profile } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
         if (mounted) {
           setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
           
-          // Normalização do plano
           const planoDoBanco = profile?.plano || 'basico';
           const dataExp = profile?.data_expiracao;
           let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
@@ -105,10 +117,9 @@ function AulaPage() {
             planoNormalizado = 'basico';
           }
 
-          const userEmail = userObj.email?.toLowerCase();
-          const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
-          setIsAdmin(isOwner);
-          if (isOwner) planoNormalizado = 'premium';
+          const isOwnerByRole = profile?.role === 'admin';
+          setIsAdmin(isOwnerByRole);
+          if (isOwnerByRole) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
           setCarregandoAcesso(false);
@@ -121,6 +132,7 @@ function AulaPage() {
         }
       }
     };
+
 
     const inicializarSessao = async () => {
       const { data: { session } } = await supabase.auth.getSession();

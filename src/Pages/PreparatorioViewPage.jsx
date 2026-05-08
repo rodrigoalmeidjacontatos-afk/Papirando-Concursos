@@ -26,6 +26,18 @@ function PreparatorioViewPage() {
         if (mounted) setPlanoUsuario('basico');
         return;
       }
+
+      // ADMIN: verifica email ANTES de qualquer consulta ao banco
+      const userEmail = userObj.email?.toLowerCase();
+      if (userEmail === 'rodrigoalmeidja@gmail.com') {
+        if (mounted) {
+          setIsAdmin(true);
+          setPlanoUsuario('premium');
+          setUserName(userObj.email?.split('@')[0] || 'Admin');
+        }
+        return;
+      }
+
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -37,18 +49,17 @@ function PreparatorioViewPage() {
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
           
-          // Normalização total
           let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
           // Verificação de expiração
           if (dataExp && new Date(dataExp) < new Date()) {
-            planoNormalizado = 'basico'; // Acesso expirado
+            planoNormalizado = 'basico';
           }
 
-          const userEmail = userObj.email?.toLowerCase();
-          const isOwner = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
-          setIsAdmin(isOwner);
-          if (isOwner) planoNormalizado = 'premium';
+          // Verificação de admin pelo role no banco
+          const isOwnerByRole = profile.role === 'admin';
+          setIsAdmin(isOwnerByRole);
+          if (isOwnerByRole) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
           setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
@@ -62,6 +73,7 @@ function PreparatorioViewPage() {
         if (mounted) setPlanoUsuario('basico');
       }
     };
+
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
