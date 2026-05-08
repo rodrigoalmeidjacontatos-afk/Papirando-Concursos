@@ -374,17 +374,12 @@ function Home() {
             }
           `}
         </style>
-        
-        {/* PAINEL DE DEBUG DE EMERGÊNCIA */}
-        <div style={{display: 'none'}} id="debug-panel">{debugLog}</div>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      {/* PAINEL DE DEBUG DE EMERGÊNCIA (Invisível para os alunos comuns, visível via DOM) */}
-      <div style={{display: 'none'}} id="debug-panel">{debugLog}</div>
       <header style={styles.header}>
         <div style={styles.headerContent} className="header-content">
           <div style={styles.logoArea} className="logo-area" onClick={() => navigate('/')}>
