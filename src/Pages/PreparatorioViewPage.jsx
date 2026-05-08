@@ -249,10 +249,13 @@ function PreparatorioViewPage() {
             }}>
               <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
               <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Acesso Restrito</h2>
-              <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
-                Seu plano atual detectado é: <strong style={{color: '#E50914'}}>"{planoUsuario}"</strong>.<br/>
-                Para acessar este conteúdo Premium, seu plano deve ser atualizado.
-              </p>
+               <div style={{backgroundColor: '#000', padding: '12px', borderRadius: '8px', margin: '15px 0', textAlign: 'left', border: '1px solid #333'}}>
+                 <p style={{color: '#AAA', fontSize: '11px', margin: '0 0 4px'}}>Plano Detectado: <strong style={{color: '#E50914'}}>{String(planoUsuario).toUpperCase()}</strong></p>
+                 <p style={{color: '#AAA', fontSize: '11px', margin: 0}}>Seu ID de Usuário: <code style={{color: '#FFF'}}>{user?.id}</code></p>
+               </div>
+               <p style={{color: '#AAA', fontSize: '13px', margin: '0 0 24px', lineHeight: '1.6'}}>
+                 Se você já adquiriu o Premium, peça ao administrador para verificar o ID acima no sistema.
+               </p>
               <button
                 style={{padding: '12px 32px', backgroundColor: '#E50914', border: 'none', color: '#FFF', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
                 onClick={() => navigate(-1)}

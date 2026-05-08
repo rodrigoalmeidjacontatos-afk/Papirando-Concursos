@@ -1644,7 +1644,7 @@ function AdminPage() {
                           <td style={{padding: '20px 12px'}}>
                             <div style={{display: 'flex', flexDirection: 'column'}}>
                               <span style={{fontWeight: '600', fontSize: '15px'}}>{u.email}</span>
-                              <span style={{color: '#888', fontSize: '11px', marginTop: '4px'}}>Criado em: {new Date(u.created_at).toLocaleDateString('pt-BR')}</span>
+                              <span style={{color: '#888', fontSize: '11px', marginTop: '4px'}}>ID: {u.id.substring(0, 8)}... | Criado em: {new Date(u.created_at).toLocaleDateString('pt-BR')}</span>
                             </div>
                           </td>
                           

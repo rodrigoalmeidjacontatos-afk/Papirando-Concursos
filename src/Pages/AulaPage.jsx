@@ -745,9 +745,13 @@ function AulaPage() {
         }}>
           <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
           <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Conteúdo Bloqueado</h2>
-          <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
-            Esta aula requer o plano <strong style={{color: '#FF9800'}}>{nivelAula.toUpperCase()}</strong>.<br/>
-            Faça upgrade para acessar este conteúdo!
+          <div style={{backgroundColor: '#000', padding: '12px', borderRadius: '8px', margin: '15px 0', textAlign: 'left', border: '1px solid #333'}}>
+            <p style={{color: '#AAA', fontSize: '11px', margin: '0 0 4px'}}>Seu Plano: <strong style={{color: '#E50914'}}>{String(planoUsuario).toUpperCase()}</strong></p>
+            <p style={{color: '#AAA', fontSize: '11px', margin: '0 0 4px'}}>Nível da Aula: <strong style={{color: '#FFF'}}>{nivelAula.toUpperCase()}</strong></p>
+            <p style={{color: '#AAA', fontSize: '11px', margin: 0}}>Seu ID: <code style={{color: '#AAA'}}>{user?.id}</code></p>
+          </div>
+          <p style={{color: '#AAA', fontSize: '13px', margin: '0 0 24px', lineHeight: '1.6'}}>
+            Seu plano atual não permite o acesso a esta aula específica.
           </p>
           <button 
             onClick={() => navigate(-1)} 
