@@ -657,7 +657,22 @@ useEffect(() => {
             <h1 style={styles.headerTitle}>{disciplina?.nome || disciplinaId?.replace('_', ' ').toUpperCase()}</h1>
             <p style={styles.headerSubtitulo}>{preparatorioId?.replace('_', ' ').toUpperCase()}</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }} className="aula-header-buttons">
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-buttons">
+            <div style={{marginRight: '15px', display: 'flex', alignItems: 'center', gap: '10px'}}>
+               {userName === 'Aluno' ? (
+                 <button 
+                  onClick={() => navigate('/login')} 
+                  style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px'}}
+                 >
+                  Entrar
+                 </button>
+               ) : (
+                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{color: '#EEE', fontSize: '12px'}}>Olá, {userName}</span>
+                    <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px'}}>Sair</button>
+                 </div>
+               )}
+            </div>
             <button 
               onClick={() => navigate(`/preparatorio/${carreiraId}/${preparatorioId}`)} 
               style={styles.backButton}

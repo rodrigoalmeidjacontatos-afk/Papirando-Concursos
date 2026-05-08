@@ -13,6 +13,8 @@ function PreparatorioViewPage() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [planoUsuario, setPlanoUsuario] = useState('basico');
+  const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState('Aluno');
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -40,10 +42,14 @@ function PreparatorioViewPage() {
         }
 
         // Buscar plano do usuário
-        const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profile } = await supabase.from('profiles').select('plano').eq('id', user.id).single();
+          setUser(user);
+          const { data: profile } = await supabase.from('profiles').select('plano, display_name').eq('id', user.id).single();
           setPlanoUsuario(profile?.plano || 'basico');
+          setUserName(profile?.display_name || user.email?.split('@')[0] || 'Aluno');
+        } else {
+          setUser(null);
+          setUserName('Aluno');
         }
 
       } catch (err) {
@@ -81,6 +87,11 @@ function PreparatorioViewPage() {
     return `${minutos}:${segs.toString().padStart(2, '0')}`;
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   const renderIcon = (iconStr) => {
     if (typeof iconStr === 'string' && (iconStr.startsWith('http') || iconStr.startsWith('data:'))) {
       return <img src={iconStr} alt="logo" style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />;
@@ -112,7 +123,23 @@ function PreparatorioViewPage() {
             {renderIcon(preparatorio.logo)}
             <h1 style={styles.title}>{preparatorio.nome}</h1>
           </div>
-          <button onClick={() => navigate(-1)} style={styles.backButton}>← Voltar</button>
+          
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            {userName === 'Aluno' ? (
+              <button 
+                onClick={() => navigate('/login')} 
+                style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer'}}
+              >
+                Entrar
+              </button>
+            ) : (
+              <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <span style={{color: '#EEE', fontSize: '14px'}}>Olá, {userName}</span>
+                <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}>Sair</button>
+              </div>
+            )}
+            <button onClick={() => navigate(-1)} style={styles.backButton}>← Voltar</button>
+          </div>
         </div>
       </header>
 
