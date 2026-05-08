@@ -87,32 +87,46 @@ function Home() {
     };
 
     const init = async () => {
-      // Usa getSession() (lê do cache local, sem round-trip ao servidor)
-      // mais rápido e não depende de latência de rede para restaurar sessão
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("[Auth] Erro ao recuperar sessão inicial:", error);
+          return;
+        }
+        
+        if (session?.user) {
+          console.log("[Auth] Sessão inicial detectada:", session.user.email);
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        } else {
+          console.log("[Auth] Nenhuma sessão inicial encontrada.");
+        }
+      } catch (err) {
+        console.error("[Auth] Falha crítica no init:", err);
       }
     };
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Filtra apenas eventos relevantes para evitar que INITIAL_SESSION com null
-      // sobreescreva uma sessão já carregada pelo init() acima
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        if (session?.user) {
-          setUser(session.user);
-          await carregarPerfil(session.user);
-        }
+      console.log(`[Auth] Evento recebido: ${event}`, session?.user?.email || 'sem usuário');
+      
+      // Reagimos a qualquer evento que traga um usuário válido
+      if (session?.user) {
+        setUser(session.user);
+        await carregarPerfil(session.user);
       } else if (event === 'SIGNED_OUT') {
+        // Apenas limpamos se o evento for explicitamente de logout
+        console.log("[Auth] Logout detectado.");
         setUser(null);
         setUserName('Aluno');
         setPlanoUsuario('basico');
       }
+      // Se for INITIAL_SESSION ou similar com session null, ignoramos para não resetar o que o init() já fez
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {

@@ -167,19 +167,28 @@ function AulaPage() {
 
 
     const inicializarSessao = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user && mounted) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("[Auth] Erro ao obter sessão inicial:", error);
+          return;
+        }
+
+        if (session?.user && mounted) {
+          console.log("[Auth] AulaPage: Sessão inicial detectada:", session.user.email);
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
+      } catch (err) {
+        console.error("[Auth] Falha no inicializarSessao:", err);
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user && mounted) {
-          setUser(session.user);
-          await carregarPerfil(session.user);
-        }
+      console.log(`[Auth] AulaPage: Evento ${event}`, session?.user?.email || 'sem usuário');
+      if (session?.user && mounted) {
+        setUser(session.user);
+        await carregarPerfil(session.user);
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);

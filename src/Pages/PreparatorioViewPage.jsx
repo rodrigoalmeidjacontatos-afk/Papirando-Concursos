@@ -97,11 +97,10 @@ function PreparatorioViewPage() {
 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        if (session?.user && mounted) {
-          setUser(session.user);
-          await carregarPerfil(session.user);
-        }
+      console.log(`[Auth] PreparatorioView: Evento ${event}`, session?.user?.email || 'sem usuário');
+      if (session?.user && mounted) {
+        setUser(session.user);
+        await carregarPerfil(session.user);
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
@@ -114,12 +113,14 @@ function PreparatorioViewPage() {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Primeiro garante a sessão e o perfil
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        // 1. Primeiro garante a sessão e o perfil (via getSession, mais rápido)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) console.error("[Auth] Erro ao obter sessão:", sessionError);
+
+        if (session?.user && mounted) {
           setUser(session.user);
           await carregarPerfil(session.user);
-        } else {
+        } else if (mounted) {
           setPlanoUsuario('basico');
         }
 
