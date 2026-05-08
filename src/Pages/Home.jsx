@@ -400,58 +400,102 @@ function Home() {
       </div>
 
       <main style={styles.main}>
-        {categorias.map((categoria) => (
-          <div key={categoria.id} style={styles.category}>
-            <div style={styles.categoryHeader}>
-              <h2 style={styles.categoryTitle}>{categoria.nome}</h2>
-              <button style={styles.seeAllButton}>Ver todos →</button>
-            </div>
+        {categorias.map((categoria) => {
+          // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
+          const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const isPrep = nomeNorm.includes('preparatorio');
+          // Básico não tem acesso aos preparatórios
+          const bloqueado = isPrep && planoUsuario === 'basico';
 
-            <div style={styles.carouselContainer}>
-              <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft}>‹</button>
-              <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
-                {categoria.cursos.map((curso, idx) => (
-                  <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
-                    <div style={styles.cardImage}>
-                      <img 
-                        src={curso.capa} 
-                        alt={curso.nome} 
-                        style={{
-                          ...styles.image,
-                          filter: (planoUsuario === 'basico' && !isAdmin) ? 'blur(10px) grayscale(0.8)' : 'none',
-                          transition: 'filter 0.3s'
-                        }} 
-                      />
-                      <div style={styles.cardOverlay}>
-                        {(planoUsuario === 'basico' && !isAdmin) && (
-                          <div style={{
-                            backgroundColor: 'rgba(0,0,0,0.5)',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            color: '#FFF',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            backdropFilter: 'blur(4px)'
-                          }}>
-                            🔒 PREMIUM
+          return (
+            <div key={categoria.id} style={styles.category}>
+              <div style={styles.categoryHeader}>
+                <h2 style={styles.categoryTitle}>{categoria.nome}</h2>
+                {!bloqueado && <button style={styles.seeAllButton}>Ver todos →</button>}
+                {bloqueado && (
+                  <span style={{
+                    fontSize: '11px', fontWeight: 'bold', color: '#E50914',
+                    backgroundColor: 'rgba(229,9,20,0.1)',
+                    border: '1px solid rgba(229,9,20,0.3)',
+                    padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
+                  }}>🔒 ACESSO RESTRITO</span>
+                )}
+              </div>
+
+              {/* Wrapper relativo para posicionar o overlay */}
+              <div style={{ position: 'relative' }}>
+
+                {/* Carrossel — com blur forte se bloqueado */}
+                <div style={{ position: 'relative' }}>
+                  <div style={{
+                    ...styles.carouselContainer,
+                    filter: bloqueado ? 'blur(22px) brightness(0.1) saturate(0.2)' : 'none',
+                    pointerEvents: bloqueado ? 'none' : 'auto',
+                    userSelect: bloqueado ? 'none' : 'auto',
+                  }}>
+                    <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft}>‹</button>
+                    <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
+                      {categoria.cursos.map((curso, idx) => (
+                        <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
+                          <div style={styles.cardImage}>
+                            <img src={curso.capa} alt={curso.nome} style={styles.image} />
+                            <div style={styles.cardOverlay}></div>
                           </div>
-                        )}
-                      </div>
+                          <div style={styles.cardInfo}>
+                            <h3 style={styles.cardTitle}>{curso.nome}</h3>
+                            <div style={styles.cardDetails}></div>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Cards fantasma para quando lista vazia mas bloqueado */}
+                      {bloqueado && categoria.cursos.length === 0 && [1,2,3,4].map(i => (
+                        <div key={i} style={{...styles.card, minWidth: '200px'}}>
+                          <div style={{...styles.cardImage, backgroundColor: '#1A1A1A'}} />
+                          <div style={{...styles.cardInfo}}>
+                            <div style={{height: '14px', backgroundColor: '#222', borderRadius: '4px', marginBottom: '8px'}} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div style={styles.cardInfo}>
-                      <h3 style={styles.cardTitle}>{curso.nome}</h3>
-                      <div style={styles.cardDetails}></div>
+                    <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight}>›</button>
+                  </div>
+                </div>
+
+                {/* OVERLAY DE BLOQUEIO — só aparece para básico na seção de preparatórios */}
+                {bloqueado && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 10, minHeight: '200px'
+                  }}>
+                    <div style={{
+                      backgroundColor: 'rgba(8,8,8,0.93)',
+                      borderRadius: '20px', padding: '36px 48px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      border: '1px solid rgba(229,9,20,0.25)',
+                      boxShadow: '0 0 50px rgba(229,9,20,0.1), 0 20px 60px rgba(0,0,0,0.9)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '48px', marginBottom: '8px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
+                      <div style={{
+                        fontSize: '10px', fontWeight: 'bold', letterSpacing: '3px',
+                        color: '#E50914', border: '1px solid rgba(229,9,20,0.4)',
+                        backgroundColor: 'rgba(229,9,20,0.08)',
+                        padding: '3px 14px', borderRadius: '999px', marginBottom: '12px'
+                      }}>ACESSO RESTRITO</div>
+                      <h3 style={{ color: '#FFF', margin: '0 0 8px', fontSize: '20px', fontWeight: 'bold' }}>
+                        Área de Preparatórios
+                      </h3>
+                      <p style={{ color: '#888', margin: '0', fontSize: '13px', lineHeight: '1.7', maxWidth: '280px' }}>
+                        Esta área é exclusiva para usuários<br />com acesso habilitado pelo administrador.
+                      </p>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-              <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight}>›</button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </main>
 
       <footer style={styles.footer}>
