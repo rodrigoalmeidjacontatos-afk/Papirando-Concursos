@@ -39,6 +39,16 @@ function LoginPage() {
     setCarregando(false);
   };
 
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) setErro(error.message);
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -71,6 +81,28 @@ function LoginPage() {
             {carregando ? 'Carregando...' : (isCadastro ? 'Cadastrar' : 'Entrar')}
           </button>
         </form>
+
+        <div style={{margin: '20px 0', display: 'flex', alignItems: 'center', gap: '10px'}}>
+          <div style={{flex: 1, height: '1px', backgroundColor: '#333'}}></div>
+          <span style={{color: '#666', fontSize: '12px'}}>OU</span>
+          <div style={{flex: 1, height: '1px', backgroundColor: '#333'}}></div>
+        </div>
+
+        <button 
+          onClick={handleGoogleLogin} 
+          style={{
+            ...styles.button, 
+            backgroundColor: '#FFF', 
+            color: '#000', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '10px'
+          }}
+        >
+          <img src="https://www.google.com/favicon.ico" alt="Google" style={{width: '18px'}} />
+          {isCadastro ? 'Cadastrar com Google' : 'Entrar com Google'}
+        </button>
         
         <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px'}}>
           <button onClick={() => setIsCadastro(!isCadastro)} style={styles.linkButton}>
