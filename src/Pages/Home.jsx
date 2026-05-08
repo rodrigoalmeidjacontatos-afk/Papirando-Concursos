@@ -404,8 +404,8 @@ function Home() {
           // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
           const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const isPrep = nomeNorm.includes('preparatorio');
-          // Básico não tem acesso aos preparatórios
-          const bloqueado = isPrep && planoUsuario === 'basico';
+          // Apenas PREMIUM tem acesso — básico e médio são bloqueados
+          const bloqueado = isPrep && planoUsuario !== 'premium';
 
           return (
             <div key={categoria.id} style={styles.category}>
