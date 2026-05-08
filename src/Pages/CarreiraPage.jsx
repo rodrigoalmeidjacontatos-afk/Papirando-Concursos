@@ -57,7 +57,7 @@ function CarreiraPage() {
         }
 
         const userEmail = user?.email?.toLowerCase();
-        const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com' || userEmail === 'teste@gmail.com';
+        const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
         if (isOwner) planoNormalizado = 'premium';
 
         setPlanoUsuario(planoNormalizado);

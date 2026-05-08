@@ -132,9 +132,11 @@ function AdminPage() {
       dataFinal = d.toISOString();
     }
     
-    // Sempre que dermos tempo (degustação ou pago), garantimos o plano PREMIUM
     const updates = { data_expiracao: dataFinal };
-    if (tempo !== null) {
+    
+    // REGRA: Apenas o botão de 15 minutos (degustação) força o plano PREMIUM
+    // Os outros botões (+1d, +30d) apenas definem o tempo do plano que o usuário já tem
+    if (unidade === 'minutos' && tempo !== null) {
       updates.plano = 'premium';
     }
     
@@ -146,7 +148,7 @@ function AdminPage() {
     if (!error) {
       setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       const msg = dataFinal 
-        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Acesso PREMIUM'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
+        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
         : 'Acesso Vitalício!';
       alert(`✅ Sucesso! ${msg}`);
     } else {

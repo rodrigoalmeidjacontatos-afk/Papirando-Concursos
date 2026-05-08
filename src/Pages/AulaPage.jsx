@@ -106,7 +106,7 @@ function AulaPage() {
           }
 
           const userEmail = userObj.email?.toLowerCase();
-          const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com' || userEmail === 'teste@gmail.com';
+          const isOwner = profile?.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com';
           setIsAdmin(isOwner);
           if (isOwner) planoNormalizado = 'premium';
 

@@ -41,7 +41,7 @@ function Home() {
 
           // Se for o admin (pelo email), força o plano para premium
           const userEmail = data.user.email?.toLowerCase();
-          if (userEmail === 'rodrigoalmeidja@gmail.com' || userEmail === 'teste@gmail.com') {
+          if (userEmail === 'rodrigoalmeidja@gmail.com') {
             setPlanoUsuario('premium');
           } else {
             setPlanoUsuario(planoNormalizado);
@@ -145,7 +145,7 @@ function Home() {
   };
 
   // Verificar se é admin (e-mails autorizados)
-  const isAdmin = user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com' || user?.email?.toLowerCase() === 'teste@gmail.com';
+  const isAdmin = user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com';
 
   // Carregar favoritos
   useEffect(() => {
