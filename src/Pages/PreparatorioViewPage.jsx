@@ -32,7 +32,11 @@ function PreparatorioViewPage() {
       const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
       if (mounted) {
         setUser(userObj);
-        setPlanoUsuario(profile?.plano || 'basico');
+        
+        // Normalização do plano (para evitar erro com acentos ou maiúsculas)
+        const planoDB = profile?.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+        setPlanoUsuario(planoDB);
+        
         setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
         const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
         setIsAdmin(isOwner);

@@ -90,7 +90,11 @@ function AulaPage() {
         setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
         const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
         setIsAdmin(isOwner);
-        setPlanoUsuario(profile?.plano || 'basico');
+        
+        // Normalização do plano
+        const planoDB = profile?.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+        setPlanoUsuario(planoDB);
+        
         if (isOwner) setPlanoUsuario('premium');
       }
     };
