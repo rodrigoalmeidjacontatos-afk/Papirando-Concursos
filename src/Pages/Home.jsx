@@ -32,7 +32,7 @@ function Home() {
         console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('plano, avatar_url, display_name, data_expiracao, role')
+          .select('plano, avatar_url, display_name, data_expiracao') // Removido 'role'
           .eq('id', userObj.id)
           .single();
 
@@ -58,7 +58,7 @@ function Home() {
           }
           const userEmail = userObj.email?.toLowerCase();
           const isOwnerByEmail = userEmail === 'rodrigoalmeidja@gmail.com';
-          const isOwnerByRole = profile.role === 'admin' || isOwnerByEmail;
+          const isOwnerByRole = isOwnerByEmail; // Role removido do banco, usa apenas e-mail
           
           if (isOwnerByRole) {
             planoNormalizado = 'premium';

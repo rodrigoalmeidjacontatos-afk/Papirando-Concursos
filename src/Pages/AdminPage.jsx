@@ -72,7 +72,7 @@ function AdminPage() {
     console.log("[Admin] Buscando usuários...");
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, email, created_at, plano, data_expiracao, display_name, avatar_url, visto_admin')
       .order('created_at', { ascending: false });
     
     if (!error) {
@@ -1551,17 +1551,23 @@ function AdminPage() {
                                 📂 Acessos
                               </button>
                               <button 
-                                onClick={() => toggleAdmin(u.id, u.role)}
+                                onClick={() => {
+                                  if (u.email === 'rodrigoalmeidja@gmail.com') {
+                                     alert('Você já é o Super Admin por e-mail!');
+                                  } else {
+                                     alert('Para tornar outros usuários Admin, adicione a coluna "role" no seu Supabase Dashboard.');
+                                  }
+                                }}
                                 style={{
                                   ...styles.editButtonSmall, 
-                                  backgroundColor: u.role === 'admin' ? '#FFD700' : '#444',
-                                  color: u.role === 'admin' ? '#000' : '#FFF',
+                                  backgroundColor: u.email === 'rodrigoalmeidja@gmail.com' ? '#FFD700' : '#444',
+                                  color: u.email === 'rodrigoalmeidja@gmail.com' ? '#000' : '#FFF',
                                   padding: '4px 8px', 
                                   fontSize: '11px',
                                   border: 'none'
                                 }}
                               >
-                                {u.role === 'admin' ? '👑 Admin' : '👤 Tornar Admin'}
+                                {u.email === 'rodrigoalmeidja@gmail.com' ? '👑 Super Admin' : '👤 Usuário'}
                               </button>
                               <button 
                                 onClick={() => excluirUsuario(u.id, u.email)}
