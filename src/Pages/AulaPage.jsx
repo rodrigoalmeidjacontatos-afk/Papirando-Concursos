@@ -170,16 +170,16 @@ function AulaPage() {
 
     const inicializarSessao = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
         if (error) {
-          console.error("[Auth] Erro ao obter sessão inicial:", error);
+          console.error("[Auth] Erro ao obter usuário inicial:", error);
           return;
         }
 
-        if (session?.user && mounted) {
-          console.log("[Auth] AulaPage: Sessão inicial detectada:", session.user.email);
-          setUser(session.user);
-          await carregarPerfil(session.user);
+        if (currentUser && mounted) {
+          console.log("[Auth] AulaPage: Usuário detectado:", currentUser.email);
+          setUser(currentUser);
+          await carregarPerfil(currentUser);
         }
       } catch (err) {
         console.error("[Auth] Falha no inicializarSessao:", err);
@@ -188,9 +188,12 @@ function AulaPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[Auth] AulaPage: Evento ${event}`, session?.user?.email || 'sem usuário');
-      if (session?.user && mounted) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser && mounted) {
+          setUser(currentUser);
+          await carregarPerfil(currentUser);
+        }
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);

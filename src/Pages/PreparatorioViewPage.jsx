@@ -115,13 +115,13 @@ function PreparatorioViewPage() {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Primeiro garante a sessão e o perfil (via getSession, mais rápido)
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) console.error("[Auth] Erro ao obter sessão:", sessionError);
+        // 1. Primeiro garante a sessão e o perfil (via getUser, mais seguro que getSession)
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+        if (authError) console.error("[Auth] Erro ao obter usuário:", authError);
 
-        if (session?.user && mounted) {
-          setUser(session.user);
-          await carregarPerfil(session.user);
+        if (currentUser && mounted) {
+          setUser(currentUser);
+          await carregarPerfil(currentUser);
         } else if (mounted) {
           setPlanoUsuario('basico');
         }
@@ -250,8 +250,8 @@ function PreparatorioViewPage() {
               <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
               <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Acesso Restrito</h2>
               <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
-                Você não tem acesso a este conteúdo.<br/>
-                Entre em contato com o administrador para liberar seu acesso.
+                Seu plano atual detectado é: <strong style={{color: '#E50914'}}>"{planoUsuario}"</strong>.<br/>
+                Para acessar este conteúdo Premium, seu plano deve ser atualizado.
               </p>
               <button
                 style={{padding: '12px 32px', backgroundColor: '#E50914', border: 'none', color: '#FFF', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
