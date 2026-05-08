@@ -8,7 +8,7 @@ function Home() {
   const [categorias, setCategorias] = useState([]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState('...'); 
+  const [planoUsuario, setPlanoUsuario] = useState('basico'); // Volta para basico por padrão para não travar
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -288,9 +288,27 @@ function Home() {
         }))
       }));
 
-      // Atualiza o estado da Home
-      setCategorias(categoriasComCursos);
+      // Se ainda estiver vazio (falha total), usa o plano de emergência para a tela não ficar branca
+      if (categoriasComCursos.length === 0) {
+        setCategorias([
+          {
+            id: 'policiais',
+            nome: '👮 Carreiras Policiais',
+            cursos: [
+              { id: 'gm', nome: 'Guarda Municipal', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', cor: '#1565c0' },
+              { id: 'pm', nome: 'Polícia Militar', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', cor: '#1565c0' }
+            ]
+          }
+        ]);
+      } else {
+        setCategorias(categoriasComCursos);
+      }
+    } catch (err) {
+      console.error("[Admin] Erro fatal no carregamento:", err);
+      // Fallback de segurança para o site não sumir
+      setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Recarregue a página', cursos: [] }]);
     }
+  }
 
     carregarESincronizarDados();
   }, []);
@@ -561,13 +579,12 @@ function Home() {
       </main>
 
       <footer style={styles.footer}>
-        <div style={styles.footerContent}>
-          <p style={styles.footerText}>© 2026 Papirando Concursos - Todos os direitos reservados</p>
-          <div style={styles.footerLinks}>
-            <a href="#" style={styles.footerLink}>Termos de uso</a>
-            <a href="#" style={styles.footerLink}>Privacidade</a>
-            <a href="#" style={styles.footerLink}>Ajuda</a>
-          </div>
+        <p>&copy; 2026 Papirando Concursos - Todos os direitos reservados - v1.0.5</p>
+        <div style={{fontSize: '10px', color: '#444', marginTop: '5px'}}>ID: {user?.id || 'Desconectado'}</div>
+        <div style={styles.footerLinks}>
+          <span style={styles.footerLink}>Termos de uso</span>
+          <span style={styles.footerLink}>Privacidade</span>
+          <span style={styles.footerLink}>Ajuda</span>
         </div>
       </footer>
 
