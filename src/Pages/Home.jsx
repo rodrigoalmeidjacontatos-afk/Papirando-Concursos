@@ -142,6 +142,16 @@ function Home() {
     };
   }, []);
 
+  // BYPASS DE EMERGÊNCIA: Força Premium para o Admin em tempo real
+  useEffect(() => {
+    if (user?.email?.toLowerCase().includes('rodrigoalmeidja')) {
+      if (planoUsuario !== 'premium') {
+        console.log("[Auth] Bypass Ativo: Forçando plano Premium para Admin.");
+        setPlanoUsuario('premium');
+      }
+    }
+  }, [user, planoUsuario]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
