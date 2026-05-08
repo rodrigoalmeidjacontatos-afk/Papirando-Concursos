@@ -5,9 +5,10 @@ import { supabase } from '../services/supabase';
 function Home() {
   const navigate = useNavigate();
   const [favoritos, setFavoritos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState('...'); // Estado inicial neutro (carregando)
+  const [planoUsuario, setPlanoUsuario] = useState('...'); 
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
