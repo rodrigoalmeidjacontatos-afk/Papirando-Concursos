@@ -687,15 +687,23 @@ useEffect(() => {
           >
             <div ref={playerRef} style={styles.player}></div>
             
-            {/* Camadas de bloqueio para custom controls */}
+            {/* Camadas de bloqueio para evitar saída para o YouTube */}
             <div style={isFullscreen ? styles.blockTopFullscreen : styles.blockTop}></div>
+            <div style={styles.blockBottomRight}></div>
+            <div style={styles.blockFull} onClick={togglePlayPause}></div>
             
             {/* Overlay de Controles Moderno */}
-            <div style={{
-              ...styles.controlsOverlay,
-              opacity: showControls || !isPlaying ? 1 : 0,
-              pointerEvents: showControls || !isPlaying ? 'auto' : 'none'
-            }}>
+            <div 
+              style={{
+                ...styles.controlsOverlay,
+                opacity: showControls || !isPlaying ? 1 : 0,
+                pointerEvents: showControls || !isPlaying ? 'auto' : 'none'
+              }}
+              onClick={(e) => {
+                // Se clicar no fundo do overlay (não em um botão), dá play/pause
+                if (e.target === e.currentTarget) togglePlayPause();
+              }}
+            >
               {/* Botão Central de Play/Pause (opcional, dá um toque premium) */}
               <div style={styles.centerPlayButton} onClick={togglePlayPause}>
                 {isPlaying ? null : <span style={styles.centerPlayIcon}>▶</span>}
@@ -999,7 +1007,8 @@ useEffect(() => {
 
       <style>{`
         iframe { width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; }
-        .ytp-gradient-top, .ytp-gradient-bottom, .ytp-chrome-top, .ytp-chrome-bottom, .ytp-title, .ytp-watermark { display: none !important; }
+        .ytp-gradient-top, .ytp-gradient-bottom, .ytp-chrome-top, .ytp-chrome-bottom, .ytp-title, .ytp-watermark, .ytp-youtube-button, .ytp-share-button { display: none !important; pointer-events: none !important; }
+        .ytp-pause-overlay { display: none !important; } /* Esconde sugestões ao pausar */
       `}</style>
     </div>
   );
@@ -1085,6 +1094,25 @@ const styles = {
     backgroundColor: 'transparent',
     zIndex: 15,
   },
+  blockBottomRight: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: '15%',
+    height: '15%',
+    backgroundColor: 'transparent',
+    zIndex: 15,
+  },
+  blockFull: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 14, // Fica entre o vídeo e os controles
+    cursor: 'pointer'
+  },
   
   // Novos Estilos Premium
   controlsOverlay: {
@@ -1094,10 +1122,13 @@ const styles = {
     right: 0,
     bottom: 0,
     background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%)',
-    zIndex: 20,
+    zIndex: 20, // Fica por cima de tudo
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
+    transition: 'opacity 0.3s ease',
+    cursor: 'default'
+  },
     padding: '20px',
     transition: 'opacity 0.3s ease',
   },
