@@ -296,7 +296,6 @@ function Home() {
               </>
             )}
           </div>
-          </div>
         </div>
       </header>
 
