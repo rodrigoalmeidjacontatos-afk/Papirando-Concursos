@@ -5,11 +5,20 @@ import { supabase } from '../services/supabase';
 function Home() {
   const navigate = useNavigate();
   const [favoritos, setFavoritos] = useState([]);
-  const [categorias, setCategorias] = useState([]);
+  const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState('basico'); // Volta para basico por padrão para não travar
+  const [planoUsuario, setPlanoUsuario] = useState('basico'); 
   const [avatarUrl, setAvatarUrl] = useState(null);
+
+  // Helper para não deixar requisições penduradas para sempre
+  const withTimeout = (promise, ms = 8000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
+
   const [showConfig, setShowConfig] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
 
@@ -29,30 +38,30 @@ function Home() {
         console.log(`[Auth] Home: Carregando perfil para: ${userEmail}`);
         
         // 1. TENTA BUSCAR PELO ID (Padrão)
-        let { data: profile, error } = await supabase
+        let { data: profile, error } = await withTimeout(supabase
           .from('profiles')
           .select('id, plano, avatar_url, display_name, data_expiracao')
           .eq('id', userObj.id)
-          .maybeSingle();
+          .maybeSingle(), 5000);
 
         // 2. SE NÃO ACHOU PELO ID, TENTA PELO E-MAIL (Sincronização de contas órfãs)
         if (!profile && !error && userEmail) {
           console.log("[Auth] Perfil não achado por ID, tentando por e-mail...");
-          const { data: profileByEmail } = await supabase
+          const { data: profileByEmail } = await withTimeout(supabase
             .from('profiles')
             .select('id, plano, avatar_url, display_name, data_expiracao')
             .eq('email', userEmail)
-            .maybeSingle();
+            .maybeSingle(), 5000);
           
           if (profileByEmail) {
             console.log("[Auth] Perfil achado por e-mail! Sincronizando ID...");
             // Atualiza o perfil antigo com o novo ID de autenticação
-            const { data: updated } = await supabase
+            const { data: updated } = await withTimeout(supabase
               .from('profiles')
               .update({ id: userObj.id })
               .eq('id', profileByEmail.id)
               .select()
-              .single();
+              .single(), 5000);
             if (updated) profile = updated;
           }
         }
@@ -61,7 +70,7 @@ function Home() {
         if (!profile && !error && mounted) {
           console.log("[Auth] Criando perfil totalmente novo para:", userEmail);
           const novoPerfil = { id: userObj.id, email: userEmail, plano: 'basico', display_name: nomeProvisorio };
-          const { data: created } = await supabase.from('profiles').insert([novoPerfil]).select().single();
+          const { data: created } = await withTimeout(supabase.from('profiles').insert([novoPerfil]).select().single(), 5000);
           if (created) profile = created;
         }
 
@@ -91,7 +100,7 @@ function Home() {
 
     const init = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 5000);
         if (error) {
           console.error("[Auth] Erro ao recuperar sessão inicial:", error);
           return;
@@ -235,8 +244,8 @@ function Home() {
     async function carregarESincronizarDados() {
       try {
         // Tentar buscar do Supabase
-      let { data: categoriasSupabase } = await supabase.from('categorias').select('*');
-      let { data: carreirasSupabase } = await supabase.from('carreiras').select('*');
+      let { data: categoriasSupabase } = await withTimeout(supabase.from('categorias').select('*'), 8000);
+      let { data: carreirasSupabase } = await withTimeout(supabase.from('carreiras').select('*'), 8000);
 
       categoriasSupabase = categoriasSupabase || [];
       carreirasSupabase = carreirasSupabase || [];
