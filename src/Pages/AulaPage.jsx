@@ -659,17 +659,17 @@ useEffect(() => {
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-buttons">
             <div style={{marginRight: '15px', display: 'flex', alignItems: 'center', gap: '10px'}}>
-               {userName === 'Aluno' ? (
+               {userName === 'Aluno' || !user ? (
                  <button 
                   onClick={() => navigate('/login')} 
-                  style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px'}}
+                  style={{backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '7px 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', boxShadow: '0 2px 10px rgba(229,9,20,0.3)'}}
                  >
-                  Entrar
+                  ENTRAR
                  </button>
                ) : (
                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <span style={{color: '#EEE', fontSize: '12px'}}>Olá, {userName}</span>
-                    <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px'}}>Sair</button>
+                    <button onClick={handleLogout} style={{backgroundColor: 'transparent', border: '1px solid #E50914', color: '#E50914', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px'}}>Sair</button>
                  </div>
                )}
             </div>
