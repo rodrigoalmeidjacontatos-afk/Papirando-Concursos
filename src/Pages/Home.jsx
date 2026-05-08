@@ -75,8 +75,11 @@ function Home() {
         }
 
         if (profile && mounted) {
+          // Normalização robusta com trim()
           let planoNormalizado = String(profile.plano || 'basico')
             .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          
+          console.log(`[Home] User: ${userEmail} | Plano Banco: "${profile.plano}" | Normalizado: "${planoNormalizado}"`);
           
           if (profile.data_expiracao && new Date(profile.data_expiracao) < new Date()) {
              if (!userEmail.includes('rodrigoalmeidja') && planoNormalizado !== 'premium') planoNormalizado = 'basico';

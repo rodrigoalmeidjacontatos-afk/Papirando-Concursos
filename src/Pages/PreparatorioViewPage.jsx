@@ -56,8 +56,10 @@ function PreparatorioViewPage() {
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
           
-          // Normalização robusta do plano
+          // Normalização robusta do plano com trim()
           let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          
+          console.log(`[PrepView] Plano Banco: "${planoDoBanco}" | Normalizado: "${planoNormalizado}"`);
           
           // Verificação de expiração com GRACE PERIOD (5 minutos)
           if (dataExp) {

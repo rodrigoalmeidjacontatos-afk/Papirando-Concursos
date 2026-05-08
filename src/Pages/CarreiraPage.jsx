@@ -48,9 +48,12 @@ function CarreiraPage() {
           .eq('id', user.id)
           .single();
 
-        const planoDoBanco = profile?.plano || 'basico';
         const dataExp = profile?.data_expiracao;
-        let planoNormalizado = String(planoDoBanco).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // Normalização robusta com trim()
+        let planoNormalizado = String(profile?.plano || 'basico')
+          .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        console.log(`[CarreiraPage] User: ${user.email} | Plano Banco: "${profile?.plano}" | Normalizado: "${planoNormalizado}"`);
         
         if (dataExp && new Date(dataExp) < new Date() && planoNormalizado !== 'premium') {
           planoNormalizado = 'basico';
