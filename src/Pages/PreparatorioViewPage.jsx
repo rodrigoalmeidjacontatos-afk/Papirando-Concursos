@@ -16,6 +16,7 @@ function PreparatorioViewPage() {
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [dataExpiracao, setDataExpiracao] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -50,8 +51,10 @@ function PreparatorioViewPage() {
 
           setPlanoUsuario(planoNormalizado);
           setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
+          setDataExpiracao(profile.data_expiracao);
         } else if (mounted) {
           setPlanoUsuario('basico');
+          setDataExpiracao(null);
         }
       } catch (e) {
         console.error("Erro ao carregar perfil:", e);
@@ -208,9 +211,17 @@ function PreparatorioViewPage() {
               <div style={{fontSize: '56px', marginBottom: '16px'}}>🔒</div>
               <h2 style={{color: '#FFF', margin: '0 0 10px', fontSize: '22px'}}>Conteúdo Bloqueado</h2>
               <p style={{color: '#AAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.6'}}>
-                Seu plano atual é <strong style={{color: '#FF9800'}}>Gratuito</strong>.<br/>
-                Faça upgrade para o plano <strong style={{color: '#FF9800'}}>Médio</strong> ou <strong style={{color: '#4CAF50'}}>Premium</strong> e acesse todo o conteúdo.
+                Seu plano atual é <strong style={{color: '#FF9800'}}>{planoUsuario?.toUpperCase()}</strong>.<br/>
+                Faça upgrade para acessar todo o conteúdo.
               </p>
+              <div style={{fontSize: '10px', color: '#444', marginTop: '10px', borderTop: '1px solid #222', paddingTop: '10px', textAlign: 'left'}}>
+                <strong>DEBUG INFO:</strong><br/>
+                📧 {user?.email}<br/>
+                💎 Plano: {planoUsuario}<br/>
+                📅 Expira em: {dataExpiracao ? new Date(dataExpiracao).toLocaleString('pt-BR') : 'Não definida'}<br/>
+                ⌚ Agora: {new Date().toLocaleString('pt-BR')}<br/>
+                👑 Admin: {isAdmin ? 'Sim' : 'Não'}
+              </div>
               <button
                 style={{padding: '12px 32px', backgroundColor: '#FF9800', border: 'none', color: '#000', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px'}}
                 onClick={() => alert('Entre em contato para fazer upgrade do seu plano!')}
