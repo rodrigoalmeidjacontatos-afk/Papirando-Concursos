@@ -85,17 +85,21 @@ function AulaPage() {
 
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
-      const { data: profile } = await supabase.from('profiles').select('display_name, role, plano').eq('id', userObj.id).single();
-      if (mounted) {
-        setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
-        const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
-        setIsAdmin(isOwner);
-        
-        // Normalização do plano
-        const planoDB = profile?.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-        setPlanoUsuario(planoDB);
-        
-        if (isOwner) setPlanoUsuario('premium');
+      try {
+        const { data: profile } = await supabase.from('profiles').select('display_name, role, plano').eq('id', userObj.id).single();
+        if (mounted && profile) {
+          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
+          const isOwner = profile.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
+          setIsAdmin(isOwner);
+          
+          // Normalização do plano
+          const planoDB = profile.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          setPlanoUsuario(planoDB);
+          
+          if (isOwner) setPlanoUsuario('premium');
+        }
+      } catch (e) {
+        console.error("Erro ao carregar perfil:", e);
       }
     };
 

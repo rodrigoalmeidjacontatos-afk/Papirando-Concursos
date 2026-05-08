@@ -18,35 +18,29 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    const inicializarSessao = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user && mounted) {
-        await carregarPerfil(session.user);
-      }
-    };
-
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
-      const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
-      if (mounted) {
-        setUser(userObj);
-        
-        // Normalização do plano (para evitar erro com acentos ou maiúsculas)
-        const planoDB = profile?.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-        setPlanoUsuario(planoDB);
-        
-        setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
-        const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
-        setIsAdmin(isOwner);
-        if (isOwner) setPlanoUsuario('premium');
+      try {
+        const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
+        if (mounted && profile) {
+          const planoDB = profile.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          setPlanoUsuario(planoDB);
+          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
+          const isOwner = profile.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
+          setIsAdmin(isOwner);
+          if (isOwner) setPlanoUsuario('premium');
+        }
+      } catch (e) {
+        console.error("Erro ao carregar perfil:", e);
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user) await carregarPerfil(session.user);
+        if (session?.user) {
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
@@ -57,10 +51,18 @@ function PreparatorioViewPage() {
       }
     });
 
-    inicializarSessao();
-
-    const carregarDados = async () => {
+    const carregarTudo = async () => {
+      if (!mounted) return;
+      setCarregando(true);
       try {
+        // 1. Primeiro garante a sessão e o perfil
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
+
+        // 2. Depois carrega os dados da página
         const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
         if (mounted) setPreparatorio(prepData);
 
@@ -90,7 +92,13 @@ function PreparatorioViewPage() {
       if (mounted) setCarregando(false);
     };
 
-    carregarDados();
+    carregarTudo();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [preparatorioId, carreiraId]);
 
     return () => {
       mounted = false;
