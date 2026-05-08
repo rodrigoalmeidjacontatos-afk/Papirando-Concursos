@@ -627,15 +627,26 @@ function AdminPage() {
   // ========== CRUD AULAS (SUPABASE) ==========
   const addAula = async (modId) => {
     if (!novaAula.titulo || !novaAula.videoId || !modId) return alert('Preencha título e ID do YouTube');
+    
+    let extractedVideoId = novaAula.videoId;
+    // Extrai o ID se o usuário colou o link completo do Youtube
+    if (extractedVideoId.includes('youtube.com') || extractedVideoId.includes('youtu.be')) {
+      const match = extractedVideoId.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^"&?\/\s]{11})/);
+      if (match && match[1]) {
+        extractedVideoId = match[1];
+      } else {
+        return alert('Link do YouTube inválido. Cole apenas o ID do vídeo ou o link padrão.');
+      }
+    }
+
     const id = `aula_${Date.now()}`;
-    // nivelNovaAula é estado separado, nunca afetado por outros inputs
     const nivelFinal = nivelNovaAula;
     const ordemFinal = parseInt(novaAula.ordem) || 1;
     const dbNova = {
       id,
       titulo: novaAula.titulo,
       duracao: novaAula.duracao || null,
-      video_id: novaAula.videoId,
+      video_id: extractedVideoId,
       modulo_id: modId,
       pdf_url: novaAula.pdf_url || null,
       nivel: nivelFinal,
@@ -644,7 +655,7 @@ function AdminPage() {
     console.log('[addAula] nivel:', nivelFinal, '| ordem:', ordemFinal);
     const { data, error } = await supabase.from('aulas').insert([dbNova]).select();
     if (!error) {
-      const nova = { id, titulo: novaAula.titulo, duracao: novaAula.duracao || null, videoId: novaAula.videoId, pdf_url: novaAula.pdf_url || null, moduloId: modId, nivel: nivelFinal, ordem: ordemFinal };
+      const nova = { id, titulo: novaAula.titulo, duracao: novaAula.duracao || null, videoId: extractedVideoId, pdf_url: novaAula.pdf_url || null, moduloId: modId, nivel: nivelFinal, ordem: ordemFinal };
       setAulas(prev => [...prev, nova].sort((a, b) => (a.ordem || 1) - (b.ordem || 1)));
       setNovaAula({ titulo: '', videoId: '', ordem: 1 });
       // Não reseta nivelNovaAula para manter confortável ao adicionar várias aulas do mesmo nível
