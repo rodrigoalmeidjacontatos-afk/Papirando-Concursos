@@ -1431,19 +1431,6 @@ function AdminPage() {
                             <span style={{
                               padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold',
                               backgroundColor:
-                                u.plano === 'premium' ? 'rgba(76,175,80,0.2)' :
-                                u.plano === 'medio' ? 'rgba(33,150,243,0.2)' :
-                                'rgba(255,152,0,0.2)',
-                              color:
-                                u.plano === 'premium' ? '#4CAF50' :
-                                u.plano === 'medio' ? '#2196F3' :
-                                '#FF9800',
-                              border: `1px solid ${
-                                u.plano === 'premium' ? '#4CAF50' :
-                                u.plano === 'medio' ? '#2196F3' :
-                                '#FF9800'
-                              }`
-                            }}>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                               <span style={{
                                 padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', width: 'fit-content',
@@ -1462,14 +1449,14 @@ function AdminPage() {
                           </td>
                           <td style={{padding: '12px'}}>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                              <span style={{fontSize: '12px', color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700'}}>
-                                {u.data_expiracao ? `Expira: ${new Date(u.data_expiracao).toLocaleDateString('pt-BR')}` : '✨ Vitalício'}
+                              <span style={{fontSize: '11px', color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700'}}>
+                                {u.data_expiracao ? `Até: ${new Date(u.data_expiracao).toLocaleString('pt-BR')}` : '✨ Vitalício'}
                               </span>
                               <div style={{display: 'flex', gap: '3px', flexWrap: 'wrap'}}>
-                                <button title="1 dia (Teste)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 1)}>+1d</button>
-                                <button title="7 dias (Cortesia)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 7)}>+7d</button>
-                                <button title="30 dias (Mensal)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 30)}>+30d</button>
-                                <button title="90 dias (Trimestral)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 90)}>+90d</button>
+                                <button title="15 minutos (Degustação)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer', backgroundColor: '#9C27B0', color: '#FFF'}} onClick={() => atualizarExpiracao(u.id, 15, 'minutos')}>⏱️ 15m</button>
+                                <button title="1 dia" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 1)}>+1d</button>
+                                <button title="7 dias" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 7)}>+7d</button>
+                                <button title="30 dias" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 30)}>+30d</button>
                                 <button title="Vitalício" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer', backgroundColor: '#FFD700', color: '#000'}} onClick={() => atualizarExpiracao(u.id, null)}>∞ Vit</button>
                                 <input 
                                   type="date" 
