@@ -22,25 +22,50 @@ function Home() {
 
     const carregarPerfil = async (userObj) => {
       if (!userObj?.id) return;
-      const nomeProvisorio = userObj.email?.split('@')[0] || 'Aluno';
+      const userEmail = userObj.email?.toLowerCase() || '';
+      const nomeProvisorio = userEmail.split('@')[0] || 'Aluno';
 
       try {
-        console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
+        console.log(`[Auth] Home: Carregando perfil para: ${userEmail}`);
+        
+        // 1. TENTA BUSCAR PELO ID (Padrão)
         let { data: profile, error } = await supabase
           .from('profiles')
-          .select('plano, avatar_url, display_name, data_expiracao')
+          .select('id, plano, avatar_url, display_name, data_expiracao')
           .eq('id', userObj.id)
           .maybeSingle();
 
-        // Auto-criação de perfil se não existir
+        // 2. SE NÃO ACHOU PELO ID, TENTA PELO E-MAIL (Sincronização de contas órfãs)
+        if (!profile && !error && userEmail) {
+          console.log("[Auth] Perfil não achado por ID, tentando por e-mail...");
+          const { data: profileByEmail } = await supabase
+            .from('profiles')
+            .select('id, plano, avatar_url, display_name, data_expiracao')
+            .eq('email', userEmail)
+            .maybeSingle();
+          
+          if (profileByEmail) {
+            console.log("[Auth] Perfil achado por e-mail! Sincronizando ID...");
+            // Atualiza o perfil antigo com o novo ID de autenticação
+            const { data: updated } = await supabase
+              .from('profiles')
+              .update({ id: userObj.id })
+              .eq('id', profileByEmail.id)
+              .select()
+              .single();
+            if (updated) profile = updated;
+          }
+        }
+
+        // 3. SE AINDA NÃO EXISTE NADA, CRIA UM NOVO
         if (!profile && !error && mounted) {
-          const novoPerfil = { id: userObj.id, email: userObj.email || '', plano: 'basico', display_name: nomeProvisorio };
+          console.log("[Auth] Criando perfil totalmente novo para:", userEmail);
+          const novoPerfil = { id: userObj.id, email: userEmail, plano: 'basico', display_name: nomeProvisorio };
           const { data: created } = await supabase.from('profiles').insert([novoPerfil]).select().single();
           if (created) profile = created;
         }
 
         if (profile && mounted) {
-          const userEmail = userObj?.email?.toLowerCase() || '';
           let planoNormalizado = String(profile.plano || 'basico')
             .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           
@@ -55,13 +80,12 @@ function Home() {
           setUserName(profile.display_name || nomeProvisorio);
           setNewDisplayName(profile.display_name || nomeProvisorio);
         } else if (mounted) {
-          const userEmail = userObj?.email?.toLowerCase() || '';
           const planoFallback = userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico';
           setPlanoUsuario(planoFallback);
           setUserName(nomeProvisorio);
         }
       } catch (e) {
-        console.error("[Auth] Erro no perfil:", e);
+        console.error("[Auth] Erro crítico no carregamento de perfil:", e);
       }
     };
 
