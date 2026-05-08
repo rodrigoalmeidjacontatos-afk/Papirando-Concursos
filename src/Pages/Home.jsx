@@ -30,72 +30,76 @@ function Home() {
 
       try {
         console.log(`[Auth] Home: Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase
+        let { data: profile, error } = await supabase
           .from('profiles')
-          .select('plano, avatar_url, display_name, data_expiracao') // Removido 'role'
+          .select('plano, avatar_url, display_name, data_expiracao')
           .eq('id', userObj.id)
-          .single();
+          .maybeSingle(); // Usar maybeSingle para evitar erro de objeto não encontrado
 
-        if (error && error.code !== 'PGRST116') { // Ignora erro de "não encontrado" (user novo)
-          console.error("[Auth] Home: Erro ao buscar profile:", error);
-          setPlanoUsuario('basico');
-          return;
+        // Se o perfil não existe, vamos criar um agora mesmo para este usuário
+        if (!profile && !error) {
+          console.log("[Auth] Perfil não encontrado. Criando perfil inicial para:", userObj.email);
+          const novoPerfil = {
+            id: userObj.id,
+            email: userObj.email,
+            plano: 'basico',
+            display_name: nomeProvisorio,
+            visto_admin: false
+          };
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([novoPerfil])
+            .select()
+            .single();
+            
+          if (!createError) {
+            profile = createdProfile;
+          } else {
+            console.error("[Auth] Erro ao criar perfil automático:", createError);
+          }
         }
 
         if (profile) {
+          console.log("[Auth] Perfil carregado com sucesso:", profile.plano);
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
           
-          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          // Normalização agressiva para aceitar "MÉDIO", "medio", "Medio", etc.
+          let planoNormalizado = String(planoDoBanco)
+            .toLowerCase()
+            .trim()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") || 'basico';
           
           if (dataExp) {
             const dataExpiracaoDate = new Date(dataExp);
             const agora = new Date();
-            const gracePeriodMs = 5 * 60 * 1000;
-            if (dataExpiracaoDate < agora && (agora - dataExpiracaoDate) > gracePeriodMs) {
-              planoNormalizado = 'basico';
+            if (dataExpiracaoDate < agora) {
+               // Se expirou, só volta pra básico se NÃO for o Admin
+               if (userObj.email?.toLowerCase() !== 'rodrigoalmeidja@gmail.com') {
+                  planoNormalizado = 'basico';
+               }
             }
           }
-          const userEmail = userObj.email?.toLowerCase();
-          const isOwnerByEmail = userEmail === 'rodrigoalmeidja@gmail.com';
-          const isOwnerByRole = isOwnerByEmail; // Role removido do banco, usa apenas e-mail
-          
-          if (isOwnerByRole) {
+
+          // Bypass de Admin (Sempre Premium)
+          if (userObj.email?.toLowerCase().includes('rodrigoalmeidja')) {
             planoNormalizado = 'premium';
-            console.log("[Auth] Admin detectado por e-mail/role, forçando Premium.");
           }
 
           setPlanoUsuario(planoNormalizado);
           setAvatarUrl(profile.avatar_url || null);
-          
-          if (profile.display_name) {
-            setUserName(profile.display_name);
-            setNewDisplayName(profile.display_name);
-          } else {
-            setUserName(nomeProvisorio);
-            setNewDisplayName(nomeProvisorio);
-          }
+          setUserName(profile.display_name || nomeProvisorio);
+          setNewDisplayName(profile.display_name || nomeProvisorio);
         } else {
-          // Usuário sem perfil ainda (talvez acabou de cadastrar)
-          console.log("[Auth] Perfil não encontrado para:", userObj.email);
+          // Fallback total
           const userEmail = userObj.email?.toLowerCase();
-          if (userEmail === 'rodrigoalmeidja@gmail.com') {
-            setPlanoUsuario('premium');
-            console.log("[Auth] Admin detectado (sem perfil), forçando Premium.");
-          } else {
-            setPlanoUsuario('basico');
-          }
+          setPlanoUsuario(userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico');
           setUserName(nomeProvisorio);
-          setNewDisplayName(nomeProvisorio);
         }
       } catch (e) {
-        console.error("[Auth] Home: Erro catastrófico:", e);
-        const userEmail = userObj?.email?.toLowerCase();
-        if (userEmail === 'rodrigoalmeidja@gmail.com') {
-          setPlanoUsuario('premium');
-        } else {
-          setPlanoUsuario('basico');
-        }
+        console.error("[Auth] Home: Erro catastrófico no perfil:", e);
       }
     };
 
