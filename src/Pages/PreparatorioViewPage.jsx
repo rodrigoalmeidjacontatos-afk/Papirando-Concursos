@@ -23,12 +23,19 @@ function PreparatorioViewPage() {
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
       try {
-        const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
+        const { data: profile } = await supabase.from('profiles').select('plano, display_name, role, data_expiracao').eq('id', userObj.id).single();
         if (mounted) {
           const planoDoBanco = profile?.plano || 'basico';
-          // Normalização total
-          const planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const dataExp = profile?.data_expiracao;
           
+          // Normalização total
+          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          
+          // Verificação de expiração
+          if (dataExp && new Date(dataExp) < new Date()) {
+            planoNormalizado = 'basico'; // Acesso expirado
+          }
+
           setPlanoUsuario(planoNormalizado);
           setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
           

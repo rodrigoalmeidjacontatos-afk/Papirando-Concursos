@@ -86,15 +86,23 @@ function AulaPage() {
     const carregarPerfil = async (userObj) => {
       if (!userObj) return;
       try {
-        const { data: profile } = await supabase.from('profiles').select('display_name, role, plano').eq('id', userObj.id).single();
+        const { data: profile } = await supabase.from('profiles').select('display_name, role, plano, data_expiracao').eq('id', userObj.id).single();
         if (mounted) {
           setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
           const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja') || userObj.email?.includes('teste@gmail.com');
           setIsAdmin(isOwner);
           
           // Normalização do plano
-          const planoDB = profile?.plano?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-          setPlanoUsuario(planoDB);
+          const planoDoBanco = profile?.plano || 'basico';
+          const dataExp = profile?.data_expiracao;
+          let planoNormalizado = planoDoBanco.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
+          
+          // Verificação de expiração
+          if (dataExp && new Date(dataExp) < new Date()) {
+            planoNormalizado = 'basico';
+          }
+
+          setPlanoUsuario(planoNormalizado);
           
           if (isOwner) setPlanoUsuario('premium');
         }

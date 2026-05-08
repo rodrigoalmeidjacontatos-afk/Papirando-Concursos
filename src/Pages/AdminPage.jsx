@@ -115,6 +115,27 @@ function AdminPage() {
     }
   };
 
+  const atualizarExpiracao = async (userId, dias) => {
+    let dataFinal = null;
+    if (dias !== null) {
+      const d = new Date();
+      d.setDate(d.getDate() + dias);
+      dataFinal = d.toISOString();
+    }
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ data_expiracao: dataFinal })
+      .eq('id', userId);
+      
+    if (!error) {
+      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, data_expiracao: dataFinal } : u));
+      alert(`✅ Acesso atualizado! ${dataFinal ? 'Expira em: ' + new Date(dataFinal).toLocaleDateString('pt-BR') : 'Acesso Vitalício!'}`);
+    } else {
+      alert('❌ Erro ao atualizar expiração: ' + error.message);
+    }
+  };
+
   const abrirGerenciarAcesso = (usuario) => {
     setUsuarioEditandoAcesso({
       ...usuario,
@@ -1423,24 +1444,51 @@ function AdminPage() {
                                 '#FF9800'
                               }`
                             }}>
-                              {u.plano === 'premium' ? '⭐ PREMIUM' : u.plano === 'medio' ? '🥈 MÉDIO' : '🔒 BÁSICO'}
-                            </span>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                              <span style={{
+                                padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', width: 'fit-content',
+                                backgroundColor: u.plano === 'premium' ? 'rgba(76,175,80,0.2)' : u.plano === 'medio' ? 'rgba(33,150,243,0.2)' : 'rgba(255,152,0,0.2)',
+                                color: u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800',
+                                border: `1px solid ${u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800'}`
+                              }}>
+                                {u.plano?.toUpperCase() || 'BÁSICO'}
+                              </span>
+                              <div style={{display: 'flex', gap: '4px'}}>
+                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐ P</button>
+                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈 M</button>
+                                <button style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarPlano(u.id, 'basico')}>📘 B</button>
+                              </div>
+                            </div>
                           </td>
                           <td style={{padding: '12px'}}>
-                            <span style={{color: '#AAA', fontSize: '12px'}}>
-                              {(u.preparatorios_liberados && u.preparatorios_liberados.length > 0)
-                                ? `${u.preparatorios_liberados.length} curso(s)`
-                                : <span style={{color: '#666', fontStyle: 'italic'}}>Todos</span>
-                              }
-                            </span>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                              <span style={{fontSize: '12px', color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700'}}>
+                                {u.data_expiracao ? `Expira: ${new Date(u.data_expiracao).toLocaleDateString('pt-BR')}` : '✨ Vitalício'}
+                              </span>
+                              <div style={{display: 'flex', gap: '3px', flexWrap: 'wrap'}}>
+                                <button title="1 dia (Teste)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 1)}>+1d</button>
+                                <button title="7 dias (Cortesia)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 7)}>+7d</button>
+                                <button title="30 dias (Mensal)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 30)}>+30d</button>
+                                <button title="90 dias (Trimestral)" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer'}} onClick={() => atualizarExpiracao(u.id, 90)}>+90d</button>
+                                <button title="Vitalício" style={{fontSize: '9px', padding: '2px 4px', cursor: 'pointer', backgroundColor: '#FFD700', color: '#000'}} onClick={() => atualizarExpiracao(u.id, null)}>∞ Vit</button>
+                                <input 
+                                  type="date" 
+                                  style={{fontSize: '9px', padding: '1px', cursor: 'pointer'}} 
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val) {
+                                      const d = new Date(val);
+                                      atualizarExpiracao(u.id, Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)));
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </td>
                           <td style={{padding: '12px'}}>
-                            <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
-                              <button style={{...styles.smallButton, backgroundColor: '#388E3C'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐ Premium</button>
-                              <button style={{...styles.smallButton, backgroundColor: '#1565C0'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈 Médio</button>
-                              <button style={{...styles.smallButton, backgroundColor: '#555'}} onClick={() => atualizarPlano(u.id, 'basico')}>⬇ Básico</button>
-                              <button style={{...styles.smallButton, backgroundColor: '#1565C0'}} onClick={() => abrirGerenciarAcesso(u)}>🔑 Acesso</button>
-                              <button style={{...styles.smallButton, backgroundColor: '#C62828'}} onClick={() => excluirUsuario(u.id, u.email)}>🗑 Excluir</button>
+                            <div style={{display: 'flex', gap: '6px'}}>
+                              <button style={{...styles.smallButton, backgroundColor: '#1565C0', padding: '4px 8px'}} onClick={() => abrirGerenciarAcesso(u)}>🔑 Acesso</button>
+                              <button style={{...styles.deleteButtonSmall, margin: 0, padding: '4px 8px'}} onClick={() => excluirUsuario(u.id, u.email)}>🗑</button>
                             </div>
                           </td>
                         </tr>
