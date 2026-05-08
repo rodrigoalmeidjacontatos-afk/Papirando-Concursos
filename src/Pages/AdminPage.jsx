@@ -73,32 +73,19 @@ function AdminPage() {
   const buscarUsuarios = async () => {
     setCarregandoUsuarios(true);
     console.log("[Admin] Buscando usuários...");
-    console.log("[Admin] Buscando usuários com select resiliente...");
     
-    // Tenta buscar primeiro apenas o essencial para garantir que a lista apareça
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, created_at') 
+      .select('id, email, created_at, plano, role, data_expiracao, preparatorios_liberados, visto_admin') 
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error("[Admin] Erro crítico ao buscar usuários:", error);
+      console.error("[Admin] Erro ao buscar usuários:", error);
       alert("Erro ao carregar usuários: " + error.message);
       setUsuarios([]);
     } else {
-      console.log("[Admin] Usuários básicos carregados:", data?.length);
-      
-      // Agora tenta buscar os detalhes separadamente para não quebrar a lista principal
-      const { data: details } = await supabase
-        .from('profiles')
-        .select('*'); // Se isso falhar por causa do 'role', a gente ignora
-
-      if (details) {
-        setUsuarios(details);
-      } else {
-        setUsuarios(data || []);
-      }
-
+      console.log("[Admin] Usuários carregados:", data?.length);
+      setUsuarios(data || []);
       const novosCount = (data || []).filter(u => !u.visto_admin).length;
       setNovosUsuariosBadge(novosCount);
     }
