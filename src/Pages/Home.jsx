@@ -309,7 +309,6 @@ function Home() {
                   <span>{avatarUrl}</span>
               ) : '👤'}
             </div>
-            )}
           </div>
         </div>
       </header>
