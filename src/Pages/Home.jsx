@@ -87,19 +87,25 @@ function Home() {
     };
 
     const init = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUser(data.user);
-        await carregarPerfil(data.user);
+      // Usa getSession() (lê do cache local, sem round-trip ao servidor)
+      // mais rápido e não depende de latência de rede para restaurar sessão
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await carregarPerfil(session.user);
       }
     };
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Filtra apenas eventos relevantes para evitar que INITIAL_SESSION com null
+      // sobreescreva uma sessão já carregada pelo init() acima
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserName('Aluno');
         setPlanoUsuario('basico');

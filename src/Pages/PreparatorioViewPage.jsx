@@ -97,10 +97,12 @@ function PreparatorioViewPage() {
 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
-      } else {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session?.user && mounted) {
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
+      } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
           setPlanoUsuario('basico');
