@@ -45,7 +45,8 @@ function PreparatorioViewPage() {
             planoNormalizado = 'basico'; // Acesso expirado
           }
 
-          const isOwner = profile.role === 'admin' || userObj.email === 'rodrigoalmeidja@gmail.com' || userObj.email === 'teste@gmail.com';
+          const userEmail = userObj.email?.toLowerCase();
+          const isOwner = profile.role === 'admin' || userEmail === 'rodrigoalmeidja@gmail.com' || userEmail === 'teste@gmail.com';
           setIsAdmin(isOwner);
           if (isOwner) planoNormalizado = 'premium';
 

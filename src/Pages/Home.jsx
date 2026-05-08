@@ -40,7 +40,8 @@ function Home() {
           }
 
           // Se for o admin (pelo email), força o plano para premium
-          if (data.user.email === 'rodrigoalmeidja@gmail.com') {
+          const userEmail = data.user.email?.toLowerCase();
+          if (userEmail === 'rodrigoalmeidja@gmail.com' || userEmail === 'teste@gmail.com') {
             setPlanoUsuario('premium');
           } else {
             setPlanoUsuario(planoNormalizado);
@@ -144,7 +145,7 @@ function Home() {
   };
 
   // Verificar se é admin (e-mails autorizados)
-  const isAdmin = user?.email === 'rodrigoalmeidja@gmail.com' || user?.email === 'rodrigoalmeidja@gmail.com';
+  const isAdmin = user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com' || user?.email?.toLowerCase() === 'teste@gmail.com';
 
   // Carregar favoritos
   useEffect(() => {
@@ -412,8 +413,33 @@ function Home() {
                 {categoria.cursos.map((curso, idx) => (
                   <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
                     <div style={styles.cardImage}>
-                      <img src={curso.capa} alt={curso.nome} style={styles.image} />
-                      <div style={styles.cardOverlay}></div>
+                      <img 
+                        src={curso.capa} 
+                        alt={curso.nome} 
+                        style={{
+                          ...styles.image,
+                          filter: (planoUsuario === 'basico' && !isAdmin) ? 'blur(10px) grayscale(0.8)' : 'none',
+                          transition: 'filter 0.3s'
+                        }} 
+                      />
+                      <div style={styles.cardOverlay}>
+                        {(planoUsuario === 'basico' && !isAdmin) && (
+                          <div style={{
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            color: '#FFF',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            backdropFilter: 'blur(4px)'
+                          }}>
+                            🔒 PREMIUM
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div style={styles.cardInfo}>
                       <h3 style={styles.cardTitle}>{curso.nome}</h3>
