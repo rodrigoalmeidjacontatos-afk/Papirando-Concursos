@@ -303,15 +303,33 @@ function Home() {
                     </button>
                   </div>
                 </div>
-                <div 
-                  style={styles.avatar} 
+                <button 
                   onClick={() => setShowConfig(true)} 
-                  title="Configurações do Perfil"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)', 
+                    border: '1px solid #333', 
+                    color: '#FFF', 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '50%', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    transition: 'all 0.2s'
+                  }}
+                  title="Configurações"
+                >
+                  ⚙️
+                </button>
+                <div 
+                  style={{...styles.avatar, border: '2px solid #E50914'}} 
+                  title="Seu Perfil"
                 >
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                   ) : '👤'}
-                  <div style={styles.settingsBadge}>⚙️</div>
                 </div>
               </>
             )}
