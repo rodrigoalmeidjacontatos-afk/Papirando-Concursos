@@ -18,71 +18,80 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Monitor de sessão em tempo real
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        supabase.from('profiles').select('plano, display_name, role').eq('id', session.user.id).single()
-          .then(({ data: profile }) => {
-            setPlanoUsuario(profile?.plano || 'basico');
-            setUserName(profile?.display_name || session.user.email?.split('@')[0] || 'Aluno');
-            const isOwner = profile?.role === 'admin' || session.user.email?.includes('rodrigoalmeidja');
-            setIsAdmin(isOwner);
-            if (isOwner) setPlanoUsuario('premium');
-          });
-      } else {
-        setUser(null);
-        setUserName('Aluno');
-        setIsAdmin(false);
-        setPlanoUsuario('basico');
+    let mounted = true;
+
+    const inicializarSessao = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && mounted) {
+        await carregarPerfil(session.user);
+      }
+    };
+
+    const carregarPerfil = async (userObj) => {
+      if (!userObj) return;
+      const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', userObj.id).single();
+      if (mounted) {
+        setUser(userObj);
+        setPlanoUsuario(profile?.plano || 'basico');
+        setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
+        const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
+        setIsAdmin(isOwner);
+        if (isOwner) setPlanoUsuario('premium');
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user) await carregarPerfil(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          setUser(null);
+          setUserName('Aluno');
+          setPlanoUsuario('basico');
+          setIsAdmin(false);
+        }
       }
     });
+
+    inicializarSessao();
 
     const carregarDados = async () => {
       try {
         const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
-        setPreparatorio(prepData);
+        if (mounted) setPreparatorio(prepData);
 
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
-        setDisciplinas(discData || []);
+        if (mounted) setDisciplinas(discData || []);
 
         const { data: modData } = await supabase.from('modulos').select('*');
         const { data: aulaData } = await supabase.from('aulas').select('*').order('ordem', { ascending: true });
 
-        // Buscar vínculos
         const { data: vData } = await supabase.from('vinculos').select('*').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId);
 
-        if (vData && vData.length > 0) {
-          const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
-          const aulasPermitidas = vData.filter(v => v.aula_id).map(v => v.aula_id);
-          setModulos(modulosPermitidos.length > 0 ? (modData || []).filter(m => modulosPermitidos.includes(m.id)) : (modData || []));
-          setAulas(aulasPermitidas.length > 0 ? (aulaData || []).filter(a => aulasPermitidas.includes(a.id)) : (aulaData || []));
-        } else {
-          setModulos(modData || []);
-          setAulas(aulaData || []);
+        if (mounted) {
+          if (vData && vData.length > 0) {
+            const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
+            const aulasPermitidas = vData.filter(v => v.aula_id).map(v => v.aula_id);
+            setModulos(modulosPermitidos.length > 0 ? (modData || []).filter(m => modulosPermitidos.includes(m.id)) : (modData || []));
+            setAulas(aulasPermitidas.length > 0 ? (aulaData || []).filter(a => aulasPermitidas.includes(a.id)) : (aulaData || []));
+          } else {
+            setModulos(modData || []);
+            setAulas(aulaData || []);
+          }
         }
-
-        // Busca inicial de usuário (fallback)
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          setUser(currentUser);
-          const { data: profile } = await supabase.from('profiles').select('plano, display_name, role').eq('id', currentUser.id).single();
-          setPlanoUsuario(profile?.plano || 'basico');
-          setUserName(profile?.display_name || currentUser.email?.split('@')[0] || 'Aluno');
-          const isOwner = profile?.role === 'admin' || currentUser.email?.includes('rodrigoalmeidja');
-          setIsAdmin(isOwner);
-          if (isOwner) setPlanoUsuario('premium');
-        }
-
       } catch (err) {
         console.error('Erro geral:', err);
-        setErro(err.message);
+        if (mounted) setErro(err.message);
       }
-      setCarregando(false);
+      if (mounted) setCarregando(false);
     };
 
     carregarDados();
-    return () => subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [preparatorioId, carreiraId]);
 
   const toggleModulo = (moduloId) => {

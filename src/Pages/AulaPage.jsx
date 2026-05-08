@@ -79,41 +79,52 @@ function AulaPage() {
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
-  // Pegar usuário logado e monitorar sessão
+  // Pegar usuário logado e monitorar sessão com alta persistência
   useEffect(() => {
-    // Monitor de sessão em tempo real
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
+    let mounted = true;
+
+    const carregarPerfil = async (userObj) => {
+      if (!userObj) return;
+      const { data: profile } = await supabase.from('profiles').select('display_name, role, plano').eq('id', userObj.id).single();
+      if (mounted) {
+        setUserName(profile?.display_name || userObj.email?.split('@')[0] || 'Aluno');
+        const isOwner = profile?.role === 'admin' || userObj.email?.includes('rodrigoalmeidja');
+        setIsAdmin(isOwner);
+        setPlanoUsuario(profile?.plano || 'basico');
+        if (isOwner) setPlanoUsuario('premium');
+      }
+    };
+
+    const inicializarSessao = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && mounted) {
         setUser(session.user);
-        supabase.from('profiles').select('display_name, role').eq('id', session.user.id).single()
-          .then(({ data: profile }) => {
-            setUserName(profile?.display_name || session.user.email?.split('@')[0] || 'Aluno');
-            const isOwner = profile?.role === 'admin' || session.user.email?.includes('rodrigoalmeidja');
-            setIsAdmin(isOwner);
-            if (isOwner) setPlanoUsuario('premium');
-          });
-      } else {
-        setUser(null);
-        setUserName('Aluno');
-        setIsAdmin(false);
+        await carregarPerfil(session.user);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user && mounted) {
+          setUser(session.user);
+          await carregarPerfil(session.user);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          setUser(null);
+          setUserName('Aluno');
+          setIsAdmin(false);
+          setPlanoUsuario('basico');
+        }
       }
     });
 
-    // Busca inicial (fallback)
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        setUser(data.user);
-        supabase.from('profiles').select('display_name, role').eq('id', data.user.id).single()
-          .then(({ data: profile }) => {
-            setUserName(profile?.display_name || data.user.email?.split('@')[0] || 'Aluno');
-            const isOwner = profile?.role === 'admin' || data.user.email?.includes('rodrigoalmeidja');
-            setIsAdmin(isOwner);
-            if (isOwner) setPlanoUsuario('premium');
-          });
-      }
-    });
+    inicializarSessao();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
