@@ -53,9 +53,12 @@ function AdminPage() {
   const [novaAula, setNovaAula] = useState({ titulo: '', videoId: '', ordem: 1 });
   const [nivelNovaAula, setNivelNovaAula] = useState('basico');
   const [editandoAula, setEditandoAula] = useState(null);
-  const [dragAulaId, setDragAulaId] = useState(null);     // id da aula sendo arrastada
-  const [dragOverAulaId, setDragOverAulaId] = useState(null); // id do alvo do hover
+  const [dragAulaId, setDragAulaId] = useState(null);
+  const [dragOverAulaId, setDragOverAulaId] = useState(null);
   const [editandoCarreira, setEditandoCarreira] = useState(null);
+  const [draggedCarreira, setDraggedCarreira] = useState(null);
+  const [draggedDisciplina, setDraggedDisciplina] = useState(null);
+  const [draggedModulo, setDraggedModulo] = useState(null);
   const [editandoCategoria, setEditandoCategoria] = useState(null);
 
   // ========== DOCUMENTOS ==========
@@ -478,22 +481,28 @@ function AdminPage() {
     setEditandoCarreira(null);
   };
 
-  const moveCarreiraUp = (id) => {
-    const index = carreiras.findIndex(c => c.id === id);
-    if (index > 0) {
-      const newCarreiras = [...carreiras];
-      [newCarreiras[index - 1], newCarreiras[index]] = [newCarreiras[index], newCarreiras[index - 1]];
-      setCarreiras(newCarreiras);
-    }
+  const handleDragStartCarreira = (e, index) => {
+    setDraggedCarreira(index);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const moveCarreiraDown = (id) => {
-    const index = carreiras.findIndex(c => c.id === id);
-    if (index < carreiras.length - 1) {
-      const newCarreiras = [...carreiras];
-      [newCarreiras[index], newCarreiras[index + 1]] = [newCarreiras[index + 1], newCarreiras[index]];
-      setCarreiras(newCarreiras);
-    }
+  const handleDragEnterCarreira = (e, index) => {
+    if (draggedCarreira === index || draggedCarreira === null) return;
+    const items = [...carreiras];
+    const draggedItemContent = items[draggedCarreira];
+    items.splice(draggedCarreira, 1);
+    items.splice(index, 0, draggedItemContent);
+    setDraggedCarreira(index);
+    setCarreiras(items);
+  };
+
+  const handleDragEndCarreira = async () => {
+    setDraggedCarreira(null);
+    // Atualizar no banco (se a coluna existir, senão só ordena localmente por hora)
+    const updates = carreiras.map((c, i) => ({ 
+      id: c.id, nome: c.nome, icone: c.icone, capa: c.capa, categoria_id: c.categoriaId, ordem: i + 1 
+    }));
+    await supabase.from('carreiras').upsert(updates);
   };
 
 
@@ -598,6 +607,53 @@ function AdminPage() {
 
 
   // ========== CRUD MÓDULOS (SUPABASE) ========== 
+  const handleDropModulo = async (e, targetId, discId) => {
+    e.preventDefault();
+    if (!draggedModulo || draggedModulo === targetId) return;
+
+    const modsList = [...getModulosPorDisciplina(discId)];
+    const draggedIdx = modsList.findIndex(m => m.id === draggedModulo);
+    const targetIdx = modsList.findIndex(m => m.id === targetId);
+    
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const [draggedItem] = modsList.splice(draggedIdx, 1);
+    modsList.splice(targetIdx, 0, draggedItem);
+
+    const updates = modsList.map((m, i) => ({ id: m.id, ordem: i + 1 }));
+
+    setModulos(prev => prev.map(m => {
+      const update = updates.find(u => u.id === m.id);
+      return update ? { ...m, ordem: update.ordem } : m;
+    }));
+
+    await Promise.all(updates.map(u => supabase.from('modulos').update({ ordem: u.ordem }).eq('id', u.id)));
+    setDraggedModulo(null);
+  };
+  const handleDropDisciplina = async (e, targetId, prepId) => {
+    e.preventDefault();
+    if (!draggedDisciplina || draggedDisciplina === targetId) return;
+
+    const discList = [...getDisciplinasPorPrep(prepId)];
+    const draggedIdx = discList.findIndex(d => d.id === draggedDisciplina);
+    const targetIdx = discList.findIndex(d => d.id === targetId);
+    
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const [draggedItem] = discList.splice(draggedIdx, 1);
+    discList.splice(targetIdx, 0, draggedItem);
+
+    const updates = discList.map((d, i) => ({ id: d.id, ordem: i + 1 }));
+
+    setDisciplinas(prev => prev.map(d => {
+      const update = updates.find(u => u.id === d.id);
+      return update ? { ...d, ordem: update.ordem } : d;
+    }));
+
+    await Promise.all(updates.map(u => supabase.from('disciplinas').update({ ordem: u.ordem }).eq('id', u.id)));
+    setDraggedDisciplina(null);
+  };
+
   const addModulo = async (discId) => {
     if (!novoModulo.nome || !discId) return alert('Preencha o nome do módulo');
     const id = `mod_${Date.now()}`;
@@ -854,13 +910,57 @@ function AdminPage() {
 
   const isAulaVinculada = (carreiraId, prepId, moduloId, aulaId) => !!vinculos[carreiraId]?.[prepId]?.modulos?.[moduloId]?.aulas?.[aulaId];
 
+  const selecionarTudoVinculo = async (carreiraId, prepId) => {
+    const carrVinculos = vinculos[carreiraId] || {};
+    const discDoPrep = getDisciplinasPorPrep(prepId);
+    
+    const novosModulos = {};
+    const inserts = [];
+    
+    discDoPrep.forEach(disc => {
+      const mods = getModulosPorDisciplina(disc.id);
+      mods.forEach(mod => {
+        const aulasDoMod = getAulasPorModulo(mod.id);
+        const aulasObj = {};
+        aulasDoMod.forEach(aula => {
+          aulasObj[aula.id] = true;
+          if (!isAulaVinculada(carreiraId, prepId, mod.id, aula.id)) {
+            inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: mod.id, aula_id: aula.id });
+          }
+        });
+        novosModulos[mod.id] = { aulas: aulasObj };
+        if (!isModuloVinculado(carreiraId, prepId, mod.id)) {
+          inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: mod.id });
+        }
+      });
+    });
+    
+    const novoVinculos = {
+      ...vinculos,
+      [carreiraId]: {
+        ...carrVinculos,
+        [prepId]: { modulos: novosModulos }
+      }
+    };
+    setVinculos(novoVinculos);
+    
+    if (inserts.length > 0) {
+      if (!isPrepVinculado(carreiraId, prepId)) {
+        inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId });
+      }
+      // Insert all in chunks or single request
+      await supabase.from('vinculos').upsert(inserts);
+    }
+    alert('✅ Todos os módulos e aulas selecionados!');
+  };
+
   // Helpers
   const getPreparatorioNome = (id) => preparatorios.find(p => p.id === id)?.nome || '?';
   const getDisciplinaNome = (id) => disciplinas.find(d => d.id === id)?.nome || '?';
   const getModuloNome = (id) => modulos.find(m => m.id === id)?.nome || '?';
-  const getDisciplinasPorPrep = (prepId) => disciplinas.filter(d => d.preparatorioId === prepId);
-  const getModulosPorDisciplina = (discId) => modulos.filter(m => m.disciplinaId === discId);
-  const getAulasPorModulo = (modId) => aulas.filter(a => a.moduloId === modId);
+  const getDisciplinasPorPrep = (prepId) => disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
+  const getModulosPorDisciplina = (discId) => modulos.filter(m => (m.disciplinaId || m.disciplina_id) === discId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
+  const getAulasPorModulo = (modId) => aulas.filter(a => (a.moduloId || a.modulo_id) === modId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
 
   const menuItems = [
     { id: 'categorias', nome: '📁 Categorias', icone: '📁' },
@@ -960,8 +1060,16 @@ function AdminPage() {
               </div>
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {carreiras.map(carr => (
-                  <div key={carr.id} style={styles.item}>
+                {carreiras.map((carr, index) => (
+                  <div 
+                    key={carr.id} 
+                    style={{...styles.item, cursor: 'grab', opacity: draggedCarreira === index ? 0.5 : 1}}
+                    draggable
+                    onDragStart={(e) => handleDragStartCarreira(e, index)}
+                    onDragEnter={(e) => handleDragEnterCarreira(e, index)}
+                    onDragEnd={handleDragEndCarreira}
+                    onDragOver={(e) => e.preventDefault()}
+                  >
                     {editandoCarreira?.id === carr.id ? (
                       <div style={styles.editForm}>
                         <input style={styles.inputSmall} value={editandoCarreira.icone} onChange={e => setEditandoCarreira({...editandoCarreira, icone: e.target.value})} />
@@ -976,13 +1084,12 @@ function AdminPage() {
                     ) : (
                       <>
                         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                          <span style={{cursor: 'grab', fontSize: '18px', color: '#888'}}>☰</span>
                           {renderIcon(carr.icone)}
                           <span style={{color: '#fff', fontWeight: 'bold'}}>{carr.nome}</span>
                           <span style={styles.itemDetail}>({categorias.find(cat => cat.id === carr.categoriaId)?.nome})</span>
                         </div>
                         <div style={styles.actionButtons}>
-                          <button style={styles.moveButton} onClick={() => moveCarreiraUp(carr.id)}>↑</button>
-                          <button style={styles.moveButton} onClick={() => moveCarreiraDown(carr.id)}>↓</button>
                           <button style={styles.editButton} onClick={() => editCarreira(carr)}>Editar</button>
                           <button style={styles.deleteButton} onClick={() => removeCarreira(carr.id)}>Excluir</button>
                         </div>
@@ -1074,8 +1181,19 @@ function AdminPage() {
                             const isDiscExpanded = expandedDisciplina === disc.id;
                             
                             return (
-                              <div key={disc.id} style={{...styles.treeSubItem, borderLeft: '4px solid #2196F3'}}>
+                              <div 
+                                key={disc.id} 
+                                style={{...styles.treeSubItem, borderLeft: '4px solid #2196F3', cursor: 'grab', opacity: draggedDisciplina === disc.id ? 0.5 : 1}}
+                                draggable
+                                onDragStart={(e) => {
+                                  setDraggedDisciplina(disc.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => handleDropDisciplina(e, disc.id, prep.id)}
+                              >
                                 <div style={styles.treeSubHeader} onClick={() => setExpandedDisciplina(isDiscExpanded ? null : disc.id)}>
+                                  <span style={{cursor: 'grab', fontSize: '18px', color: '#888'}}>☰</span>
                                   <span>{disc.icone}</span>
                                   <span style={{...styles.treeName, fontSize: '16px'}}>{disc.nome}</span>
                                   <span style={styles.treeCount}>{modsDaDisc.length} módulos</span>
@@ -1095,8 +1213,23 @@ function AdminPage() {
                                       const isModExpanded = expandedModulo === mod.id;
                                       
                                       return (
-                                        <div key={mod.id} style={styles.treeSubSubItem}>
+                                        <div 
+                                          key={mod.id} 
+                                          style={{...styles.treeSubSubItem, cursor: 'grab', opacity: draggedModulo === mod.id ? 0.5 : 1}}
+                                          draggable
+                                          onDragStart={(e) => {
+                                            e.stopPropagation();
+                                            setDraggedModulo(mod.id);
+                                            e.dataTransfer.effectAllowed = 'move';
+                                          }}
+                                          onDragOver={(e) => e.preventDefault()}
+                                          onDrop={(e) => {
+                                            e.stopPropagation();
+                                            handleDropModulo(e, mod.id, disc.id);
+                                          }}
+                                        >
                                           <div style={styles.treeSubSubHeader} onClick={() => setExpandedModulo(isModExpanded ? null : mod.id)}>
+                                            <span style={{cursor: 'grab', fontSize: '16px', color: '#888'}}>☰</span>
                                             <span style={{...styles.treeName, fontSize: '14px', color: '#FFF'}}>📁 {mod.nome}</span>
                                             <span style={styles.treeCount}>{aulasDoMod.length} aulas</span>
                                             <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeModulo(mod.id); }}>Excluir</button>
@@ -1259,11 +1392,18 @@ function AdminPage() {
                     return (
                       <div key={prep.id} style={styles.vinculoPrepCard}>
                         <div style={styles.vinculoPrepHeader}>
-                          <label style={styles.checkboxLabel}>
-                            <input type="checkbox" checked={vinculado} onChange={() => togglePrepVinculo(selectedCarreira, prep.id)} style={{width: '18px', height: '18px'}} />
-                            <span style={styles.prepLogo}>{renderIcon(prep.logo)}</span>
-                            <span style={styles.prepNome}>{prep.nome}</span>
-                          </label>
+                          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <label style={styles.checkboxLabel}>
+                              <input type="checkbox" checked={vinculado} onChange={() => togglePrepVinculo(selectedCarreira, prep.id)} style={{width: '18px', height: '18px'}} />
+                              <span style={styles.prepLogo}>{renderIcon(prep.logo)}</span>
+                              <span style={styles.prepNome}>{prep.nome}</span>
+                            </label>
+                            {vinculado && (
+                              <button style={{...styles.smallButton, backgroundColor: '#4CAF50', marginLeft: '12px'}} onClick={(e) => { e.stopPropagation(); selecionarTudoVinculo(selectedCarreira, prep.id); }}>
+                                ☑️ Selecionar Tudo
+                              </button>
+                            )}
+                          </div>
                           {vinculado && (
                             <button style={styles.expandButton} onClick={() => setExpandedPrepVinculo(isExpanded ? null : prep.id)}>
                               {isExpanded ? 'Esconder Módulos' : 'Ver Módulos'}
