@@ -56,6 +56,7 @@ function AulaPage() {
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
   const [sidebarView, setSidebarView] = useState('main'); // 'main', 'disciplinas', 'modulos'
   const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
+  const [progressoGeral, setProgressoGeral] = useState({ disciplinas: {}, modulos: {} });
 
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
@@ -411,6 +412,70 @@ function AulaPage() {
     
     carregarProgressoModulo();
   }, [user, listaAulas, aulaId, playerReady]);
+
+  // Carregar progresso geral de todas as disciplinas e módulos do preparatório
+  useEffect(() => {
+    if (!user || !preparatorioId || listaDisciplinas.length === 0) return;
+
+    const carregarProgressoGeral = async () => {
+      try {
+        const idsDisciplinas = listaDisciplinas.map(d => d.id);
+        
+        // 1. Buscar todos os módulos das disciplinas deste curso
+        const { data: todosModulos } = await supabase
+          .from('modulos')
+          .select('id, disciplina_id')
+          .in('disciplina_id', idsDisciplinas);
+        
+        if (!todosModulos) return;
+        const idsModulos = todosModulos.map(m => m.id);
+
+        // 2. Buscar contagem de aulas por módulo
+        const { data: contagemAulas } = await supabase
+          .from('aulas')
+          .select('id, modulo_id')
+          .in('modulo_id', idsModulos);
+        
+        if (!contagemAulas) return;
+
+        // 3. Buscar progresso do usuário para essas aulas
+        const idsAulas = contagemAulas.map(a => a.id);
+        const { data: progressoUser } = await supabase
+          .from('progresso')
+          .select('aula_id')
+          .eq('user_id', user.id)
+          .eq('concluida', true)
+          .in('aula_id', idsAulas);
+        
+        const aulasConcluidasIds = new Set(progressoUser?.map(p => p.aula_id) || []);
+
+        // Calcular progresso por módulo
+        const modProgress = {};
+        idsModulos.forEach(mId => {
+          const aulasDoModulo = contagemAulas.filter(a => a.modulo_id === mId);
+          const total = aulasDoModulo.length;
+          const concluidas = aulasDoModulo.filter(a => aulasConcluidasIds.has(a.id)).length;
+          modProgress[mId] = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+        });
+
+        // Calcular progresso por disciplina
+        const discProgress = {};
+        idsDisciplinas.forEach(dId => {
+          const modulosDaDisc = todosModulos.filter(m => m.disciplina_id === dId).map(m => m.id);
+          const aulasDaDisc = contagemAulas.filter(a => modulosDaDisc.includes(a.modulo_id));
+          const total = aulasDaDisc.length;
+          const concluidas = aulasDaDisc.filter(a => aulasConcluidasIds.has(a.id)).length;
+          discProgress[dId] = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+        });
+
+        setProgressoGeral({ disciplinas: discProgress, modulos: modProgress });
+      } catch (err) {
+        console.error('Erro ao carregar progresso geral:', err);
+      }
+    };
+
+    carregarProgressoGeral();
+  }, [user, preparatorioId, listaDisciplinas]);
 
   // Salvar progresso no Supabase
   const salvarProgresso = async (tempo) => {
@@ -959,7 +1024,10 @@ function AulaPage() {
                     <span style={styles.selectorCardArrow}>›</span>
                   </div>
                   <div style={styles.progressContainer}>
-                    <div style={{...styles.progressBar, width: '15%'}}></div>
+                    {(() => {
+                      const pct = progressoGeral.disciplinas[browsingDisciplinaId] || 0;
+                      return <div style={{...styles.progressBar, width: `${pct}%`}}></div>;
+                    })()}
                   </div>
                 </div>
 
@@ -971,9 +1039,7 @@ function AulaPage() {
                   </div>
                   <div style={styles.progressContainer}>
                     {(() => {
-                      const total = listaAulas.length;
-                      const concluidas = listaAulas.filter(a => progressoAulas[a.id]?.concluida).length;
-                      const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+                      const pct = progressoGeral.modulos[browsingModuloId] || 0;
                       return <div style={{...styles.progressBar, width: `${pct}%`, backgroundColor: '#4CAF50'}}></div>;
                     })()}
                   </div>
@@ -1113,10 +1179,10 @@ function AulaPage() {
                     >
                       <div style={styles.listItemHeader}>
                         <div style={styles.listItemName}>{d.icone} {d.nome}</div>
-                        <div style={styles.listItemProgress}>12% concluído</div>
+                        <div style={styles.listItemProgress}>{progressoGeral.disciplinas[d.id] || 0}% concluído</div>
                       </div>
                       <div style={styles.progressContainer}>
-                        <div style={{...styles.progressBar, width: '12%'}}></div>
+                        <div style={{...styles.progressBar, width: `${progressoGeral.disciplinas[d.id] || 0}%`}}></div>
                       </div>
                     </div>
                   ))}
@@ -1156,10 +1222,10 @@ function AulaPage() {
                     >
                       <div style={styles.listItemHeader}>
                         <div style={styles.listItemName}>{m.nome}</div>
-                        <div style={styles.listItemProgress}>30% concluído</div>
+                        <div style={styles.listItemProgress}>{progressoGeral.modulos[m.id] || 0}% concluído</div>
                       </div>
                       <div style={styles.progressContainer}>
-                        <div style={{...styles.progressBar, width: '30%', backgroundColor: '#4CAF50'}}></div>
+                        <div style={{...styles.progressBar, width: `${progressoGeral.modulos[m.id] || 0}%`, backgroundColor: '#4CAF50'}}></div>
                       </div>
                     </div>
                   ))}
