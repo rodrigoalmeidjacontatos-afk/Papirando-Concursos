@@ -48,7 +48,7 @@ function AdminPage() {
   const [novaCarreira, setNovaCarreira] = useState({ nome: '', icone: '', capa: '', categoriaId: '' });
   const [novoPreparatorio, setNovoPreparatorio] = useState({ nome: '', logo: '', capa: '', cor: '#1a237e' });
   const [editandoPreparatorio, setEditandoPreparatorio] = useState(null);
-  const [novaDisciplina, setNovaDisciplina] = useState({ nome: '', icone: '🎬', preparatorioId: '' });
+  const [novaDisciplina, setNovaDisciplina] = useState({ nome: '', icone: '', preparatorioId: '' });
   const [novoModulo, setNovoModulo] = useState({ nome: '', disciplinaId: '' });
   const [novaAula, setNovaAula] = useState({ titulo: '', videoId: '', ordem: 1 });
   const [nivelNovaAula, setNivelNovaAula] = useState('basico');
@@ -60,6 +60,8 @@ function AdminPage() {
   const [draggedDisciplina, setDraggedDisciplina] = useState(null);
   const [draggedModulo, setDraggedModulo] = useState(null);
   const [editandoCategoria, setEditandoCategoria] = useState(null);
+  const [editandoDisciplina, setEditandoDisciplina] = useState(null);
+  const [editandoModulo, setEditandoModulo] = useState(null);
 
   // ========== DOCUMENTOS ==========
   const [documentos, setDocumentos] = useState([]);
@@ -302,6 +304,41 @@ function AdminPage() {
     alert('✅ Dados salvos com sucesso! (Os vínculos são atualizados automaticamente ao clicar)');
   };
 
+  const limparEmojisGeral = async (prepId) => {
+    if (!window.confirm('Deseja remover automaticamente os emojis do início do nome de todas as disciplinas e módulos deste curso?')) return;
+    
+    const emojiRegex = /^\p{Emoji_Presentation}\s*|^\p{Emoji}\s*/u;
+    
+    const discParaLimpar = disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepId);
+    let alterados = 0;
+
+    for (const disc of discParaLimpar) {
+      let novoNome = disc.nome.replace(emojiRegex, '').trim();
+      let novoIcone = disc.icone?.replace(emojiRegex, '').trim() || '';
+      
+      if (novoNome !== disc.nome || novoIcone !== disc.icone) {
+        await supabase.from('disciplinas').update({ nome: novoNome, icone: novoIcone }).eq('id', disc.id);
+        alterados++;
+      }
+
+      const modsDaDisc = modulos.filter(m => (m.disciplinaId || m.disciplina_id) === disc.id);
+      for (const mod of modsDaDisc) {
+        let novoNomeMod = mod.nome.replace(emojiRegex, '').trim();
+        if (novoNomeMod !== mod.nome) {
+          await supabase.from('modulos').update({ nome: novoNomeMod }).eq('id', mod.id);
+          alterados++;
+        }
+      }
+    }
+
+    if (alterados > 0) {
+      alert(`✅ Limpeza concluída! ${alterados} itens foram atualizados. Recarregando dados...`);
+      window.location.reload();
+    } else {
+      alert('Nenhum emoji detectado para remoção.');
+    }
+  };
+
   const importarDados = async () => {
     if (window.confirm('Isso vai importar TODOS os dados locais (Categorias, Carreiras, Preparatórios e Vínculos) para o Supabase. Deseja continuar?')) {
       let storedCat = JSON.parse(localStorage.getItem('app_categorias') || '[]');
@@ -353,7 +390,7 @@ function AdminPage() {
   const addCategoria = async () => {
     if (!novaCategoria.nome) return alert('Digite o nome');
     const id = novaCategoria.nome.toLowerCase().replace(/ /g, '_');
-    const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '📁' };
+    const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '' };
     const { error } = await supabase.from('categorias').upsert([nova]);
     if (!error) {
       setCategorias([...categorias, nova]);
@@ -395,7 +432,7 @@ function AdminPage() {
     const nova = {
       id,
       nome: novaCarreira.nome,
-      icone: novaCarreira.icone || '📌',
+      icone: novaCarreira.icone || '',
       capa: novaCarreira.capa || '',
       categoriaId: novaCarreira.categoriaId
     };
@@ -541,14 +578,13 @@ function AdminPage() {
     const { error } = await supabase.from('disciplinas').upsert([dbNova]);
     if (!error) {
       setDisciplinas([...disciplinas, nova]);
-      setNovaDisciplina({ nome: '', icone: '📚', preparatorioId: '' });
+      setNovaDisciplina({ nome: '', icone: '', preparatorioId: '' });
     } else {
       alert('Erro ao adicionar disciplina');
     }
   };
 
   const removeDisciplina = async (id) => {
-    // Remove módulos e aulas relacionados
     const modulosDaDisc = modulos.filter(m => String(m.disciplinaId || m.disciplina_id) === String(id));
     for (const mod of modulosDaDisc) {
       await supabase.from('aulas').delete().eq('modulo_id', mod.id);
@@ -559,6 +595,23 @@ function AdminPage() {
     setDisciplinas(disciplinas.filter(d => d.id !== id));
     setModulos(modulos.filter(m => String(m.disciplinaId || m.disciplina_id) !== String(id)));
     setAulas(aulas.filter(a => !modulosDaDisc.some(mod => mod.id === (a.moduloId || a.modulo_id))));
+  };
+
+  const saveEditDisciplina = async () => {
+    if (!editandoDisciplina.nome) return alert('Preencha o nome');
+    const dbUpdate = {
+      id: editandoDisciplina.id,
+      nome: editandoDisciplina.nome,
+      icone: editandoDisciplina.icone,
+      preparatorio_id: editandoDisciplina.preparatorioId || editandoDisciplina.preparatorio_id
+    };
+    const { error } = await supabase.from('disciplinas').update(dbUpdate).eq('id', editandoDisciplina.id);
+    if (!error) {
+      setDisciplinas(disciplinas.map(d => d.id === editandoDisciplina.id ? editandoDisciplina : d));
+      setEditandoDisciplina(null);
+    } else {
+      alert('Erro ao editar disciplina');
+    }
   };
 
 
@@ -632,6 +685,22 @@ function AdminPage() {
       setModulos(modulos.filter(m => m.id !== id));
     } else {
       alert('Erro ao remover módulo');
+    }
+  };
+
+  const saveEditModulo = async () => {
+    if (!editandoModulo.nome) return alert('Preencha o nome');
+    const dbUpdate = {
+      id: editandoModulo.id,
+      nome: editandoModulo.nome,
+      disciplina_id: editandoModulo.disciplinaId || editandoModulo.disciplina_id
+    };
+    const { error } = await supabase.from('modulos').update(dbUpdate).eq('id', editandoModulo.id);
+    if (!error) {
+      setModulos(modulos.map(m => m.id === editandoModulo.id ? editandoModulo : m));
+      setEditandoModulo(null);
+    } else {
+      alert('Erro ao editar módulo');
     }
   };
 
@@ -1087,7 +1156,7 @@ function AdminPage() {
                             </div>
                             <div style={{display: 'flex', gap: '8px'}}>
                               <button style={{...styles.editButton, padding: '6px 12px'}} onClick={(e) => { e.stopPropagation(); setSelectedPrepId(prep.id); }}>Conteúdo →</button>
-                              <button style={{...styles.editButton, padding: '6px 12px', backgroundColor: '#4CAF50'}} onClick={(e) => { e.stopPropagation(); editPreparatorio(prep); }}>Editar</button>
+                              <button style={{...styles.editButton, padding: '6px 12px', backgroundColor: '#2196F3'}} onClick={(e) => { e.stopPropagation(); editPreparatorio(prep); }}>Editar</button>
                               <button style={{...styles.deleteButtonSmall, padding: '6px 12px'}} onClick={(e) => { e.stopPropagation(); removePreparatorio(prep.id); }}>Excluir</button>
                             </div>
                           </div>
@@ -1114,6 +1183,13 @@ function AdminPage() {
                             <button onClick={() => setSelectedPrepId(null)} style={styles.backButton}>← Voltar</button>
                             {renderIcon(prep.logo)}
                             <h2 style={{color: '#fff', margin: 0}}>{prep.nome}</h2>
+                            <button 
+                              style={{...styles.miniButton, backgroundColor: '#555', marginLeft: '10px'}} 
+                              onClick={() => limparEmojisGeral(prep.id)}
+                              title="Remove emojis do início dos nomes automaticamente"
+                            >
+                              ✨ Limpar Emojis
+                            </button>
                           </div>
                           <span style={styles.treeCount}>{discDoPrep.length} disciplinas</span>
                         </div>
@@ -1121,7 +1197,7 @@ function AdminPage() {
                         <div style={{...styles.formCard, marginBottom: '24px'}}>
                           <h3 style={{color: '#F5F5F5', marginBottom: '12px'}}>Nova Disciplina</h3>
                           <div style={styles.addForm}>
-                            <input style={styles.inputSmall} placeholder="Ícone (🎬)" value={novaDisciplina.icone} onChange={e => setNovaDisciplina({...novaDisciplina, icone: e.target.value})} />
+                            <input style={{...styles.inputSmall, width: '120px'}} placeholder="Ícone ou URL" value={novaDisciplina.icone} onChange={e => setNovaDisciplina({...novaDisciplina, icone: e.target.value})} />
                             <input style={styles.input} placeholder="Nome da Disciplina" value={novaDisciplina.nome} onChange={e => setNovaDisciplina({...novaDisciplina, nome: e.target.value})} />
                             <button style={styles.addButton} onClick={() => addDisciplina(prep.id)}>Adicionar</button>
                           </div>
@@ -1146,10 +1222,24 @@ function AdminPage() {
                               >
                                 <div style={styles.treeSubHeader} onClick={() => setExpandedDisciplina(isDiscExpanded ? null : disc.id)}>
                                   <span style={{cursor: 'grab', fontSize: '18px', color: '#888'}}>☰</span>
-                                  <span>{disc.icone}</span>
-                                  <span style={{...styles.treeName, fontSize: '16px'}}>{disc.nome}</span>
-                                  <span style={styles.treeCount}>{modsDaDisc.length} módulos</span>
-                                  <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeDisciplina(disc.id); }}>Excluir</button>
+                                  {editandoDisciplina?.id === disc.id ? (
+                                    <div style={{...styles.addForm, flex: 1, gap: '4px'}} onClick={e => e.stopPropagation()}>
+                                      <input style={{...styles.inputSmall, width: '60px'}} placeholder="Ícone" value={editandoDisciplina.icone} onChange={e => setEditandoDisciplina({...editandoDisciplina, icone: e.target.value})} />
+                                      <input style={styles.inputSmall} placeholder="Nome" value={editandoDisciplina.nome} onChange={e => setEditandoDisciplina({...editandoDisciplina, nome: e.target.value})} />
+                                      <button style={styles.saveButtonSmall} onClick={saveEditDisciplina}>✓</button>
+                                      <button style={styles.cancelButtonSmall} onClick={() => setEditandoDisciplina(null)}>X</button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span>{renderIcon(disc.icone)}</span>
+                                      <span style={{...styles.treeName, fontSize: '16px'}}>{disc.nome}</span>
+                                      <span style={styles.treeCount}>{modsDaDisc.length} módulos</span>
+                                      <div style={{display: 'flex', gap: '4px'}}>
+                                        <button style={styles.editButtonSmall} onClick={(e) => { e.stopPropagation(); setEditandoDisciplina(disc); }}>Editar</button>
+                                        <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeDisciplina(disc.id); }}>Excluir</button>
+                                      </div>
+                                    </>
+                                  )}
                                   <span style={styles.treeArrow}>{isDiscExpanded ? '▼' : '▶'}</span>
                                 </div>
                                 
@@ -1182,9 +1272,22 @@ function AdminPage() {
                                         >
                                           <div style={styles.treeSubSubHeader} onClick={() => setExpandedModulo(isModExpanded ? null : mod.id)}>
                                             <span style={{cursor: 'grab', fontSize: '16px', color: '#888'}}>☰</span>
-                                            <span style={{...styles.treeName, fontSize: '14px', color: '#FFF'}}>📁 {mod.nome}</span>
-                                            <span style={styles.treeCount}>{aulasDoMod.length} aulas</span>
-                                            <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeModulo(mod.id); }}>Excluir</button>
+                                            {editandoModulo?.id === mod.id ? (
+                                              <div style={{...styles.addForm, flex: 1, gap: '4px'}} onClick={e => e.stopPropagation()}>
+                                                <input style={styles.inputSmall} placeholder="Nome do Módulo" value={editandoModulo.nome} onChange={e => setEditandoModulo({...editandoModulo, nome: e.target.value})} />
+                                                <button style={styles.saveButtonSmall} onClick={saveEditModulo}>✓</button>
+                                                <button style={styles.cancelButtonSmall} onClick={() => setEditandoModulo(null)}>X</button>
+                                              </div>
+                                            ) : (
+                                              <>
+                                                <span style={{...styles.treeName, fontSize: '14px', color: '#FFF'}}>📁 {mod.nome}</span>
+                                                <span style={styles.treeCount}>{aulasDoMod.length} aulas</span>
+                                                <div style={{display: 'flex', gap: '4px'}}>
+                                                  <button style={styles.editButtonSmall} onClick={(e) => { e.stopPropagation(); setEditandoModulo(mod); }}>Editar</button>
+                                                  <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeModulo(mod.id); }}>Excluir</button>
+                                                </div>
+                                              </>
+                                            )}
                                             <span style={styles.treeArrow}>{isModExpanded ? '▼' : '▶'}</span>
                                           </div>
                                           
@@ -1792,7 +1895,7 @@ function getStyles(isDark) {
     miniButton: { padding: '4px 8px', backgroundColor: '#555', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' },
     saveButtonSmall: { padding: '8px 12px', backgroundColor: '#2196F3', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer' },
     cancelButtonSmall: { padding: '8px 12px', backgroundColor: '#666', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer' },
-    editButtonSmall: { padding: '4px 8px', backgroundColor: '#FF9800', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', marginRight: '4px' },
+    editButtonSmall: { padding: '4px 8px', backgroundColor: '#2196F3', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', marginRight: '4px' },
     deleteButton: { padding: '4px 12px', backgroundColor: '#E53935', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' },
     deleteButtonSmall: { padding: '2px 8px', backgroundColor: '#E53935', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', marginLeft: '8px' },
     item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: cardBg, borderRadius: '8px', border: `1px solid ${border}`, marginBottom: '8px', flexWrap: 'wrap', gap: '8px' },
