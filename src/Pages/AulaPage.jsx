@@ -54,6 +54,8 @@ function AulaPage() {
   const [browsingModulo, setBrowsingModulo] = useState(null);
   const [anotacao, setAnotacao] = useState('');
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
+  const [sidebarView, setSidebarView] = useState('main'); // 'main', 'disciplinas', 'modulos'
+  const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
 
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
@@ -907,220 +909,263 @@ function AulaPage() {
         </div>
 
         <div style={styles.listaSection}>
-          <div style={styles.sidebarHeader}>
-            <h2 style={styles.sidebarTitle}>Selecione o conteúdo</h2>
-            
-            <div style={styles.tabsContainer}>
-              <button 
-                onClick={() => setActiveTab('curso')} 
-                style={{...styles.tabButton, ...(activeTab === 'curso' ? styles.tabButtonActive : {})}}
-              >
-                Aulas Curso
-              </button>
-              <button 
-                onClick={() => setActiveTab('cronograma')} 
-                style={{...styles.tabButton, ...(activeTab === 'cronograma' ? styles.tabButtonActive : {})}}
-              >
-                Aulas Cronograma
-              </button>
-            </div>
-
-            <div style={styles.subTabsContainer}>
-              <button 
-                onClick={() => setActiveSubTab('video')} 
-                style={{...styles.subTabButton, ...(activeSubTab === 'video' ? styles.subTabActive : {})}}
-              >
-                <span style={styles.subTabIcon}>▶</span> Vídeo
-              </button>
-              <button 
-                onClick={() => setActiveSubTab('pdf')} 
-                style={{...styles.subTabButton, ...(activeSubTab === 'pdf' ? styles.subTabActive : {})}}
-              >
-                PDF
-              </button>
-              <button 
-                onClick={() => setActiveSubTab('anotacoes')} 
-                style={{...styles.subTabButton, ...(activeSubTab === 'anotacoes' ? styles.subTabActive : {})}}
-              >
-                Anotações
-              </button>
-            </div>
-          </div>
-
-          <div style={{...styles.infoBox, cursor: 'pointer'}} onClick={() => setShowDisciplinasMenu(!showDisciplinasMenu)}>
-            <div style={styles.infoRow}>
-              <div style={styles.infoLabel}>DISCIPLINA</div>
-              <button style={styles.verTudo}>{showDisciplinasMenu ? 'fechar' : 'ver todas'} <span>›</span></button>
-            </div>
-            <div style={styles.infoValue}>{browsingDisciplina?.nome || 'Carregando...'}</div>
-          </div>
-
-          {showDisciplinasMenu && (
-            <div style={styles.modulosMenu}>
-              {listaDisciplinas.map(d => (
-                <div 
-                  key={d.id} 
-                  style={{...styles.moduloItem, ...(d.id === browsingDisciplinaId ? styles.moduloItemActive : {})}}
-                  onClick={async () => {
-                    setBrowsingDisciplinaId(d.id);
-                    // Ao trocar disciplina, precisamos buscar o primeiro módulo dela para browsing também
-                    const { data: firstM } = await supabase.from('modulos').select('id').eq('disciplina_id', d.id).order('id', { ascending: true }).limit(1).single();
-                    if (firstM) setBrowsingModuloId(firstM.id);
-                    setShowDisciplinasMenu(false);
-                  }}
-                >
-                  {d.icone} {d.nome}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{...styles.infoBox, borderBottom: '1px solid #222', cursor: 'pointer'}} onClick={() => setShowModulosMenu(!showModulosMenu)}>
-            <div style={styles.infoRow}>
-              <div style={styles.infoLabel}>TÓPICO</div>
-              <button style={styles.verTudo}>{showModulosMenu ? 'fechar' : 'ver todos'} <span>›</span></button>
-            </div>
-            <div style={styles.infoValue}>{browsingModulo?.nome || 'Carregando...'}</div>
-          </div>
-
-          {showModulosMenu && (
-            <div style={styles.modulosMenu}>
-              {listaModulos.map(m => (
-                <div 
-                  key={m.id} 
-                  style={{...styles.moduloItem, ...(m.id === browsingModuloId ? styles.moduloItemActive : {})}}
-                  onClick={() => {
-                    setBrowsingModuloId(m.id);
-                    setShowModulosMenu(false);
-                  }}
-                >
-                  {m.nome}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={styles.searchContainer}>
-            <div style={styles.searchWrapper}>
-              <input 
-                type="text" 
-                placeholder="Pesquisar por aula" 
-                style={styles.searchInput}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <span style={styles.searchIcon}>🔍</span>
-            </div>
-          </div>
-
-          <div style={styles.listaAulas}>
-            {activeSubTab === 'video' && listaAulas
-              .filter(a => a.titulo.toLowerCase().includes(searchTerm.toLowerCase()))
-              .map((aula, index) => {
-                const isSelected = String(aula.id) === String(aulaId);
-                const progresso = progressoAulas[aula.id];
-                const concluida = progresso?.concluida;
-
-                return (
-                  <div
-                    key={aula.id}
-                    style={{...styles.itemAula, ...(isSelected ? styles.itemAulaSelected : {})}}
-                    onClick={() => {
-                      // Ao clicar na aula, aí sim navegamos de verdade e mudamos o vídeo
-                      navigate(`/aula/${carreiraId}/${preparatorioId}/${browsingDisciplinaId}/${browsingModuloId}/${aula.id}`);
-                    }}
+          {sidebarView === 'main' ? (
+            <>
+              <div style={styles.sidebarHeaderMain}>
+                <h2 style={styles.sidebarTitle}>Selecione o conteúdo</h2>
+                
+                <div style={styles.tabsContainer}>
+                  <button 
+                    onClick={() => setActiveTab('curso')} 
+                    style={{...styles.tabButton, ...(activeTab === 'curso' ? styles.tabButtonActive : {})}}
                   >
-                    <div style={styles.itemAulaLeft}>
-                      <div style={{...styles.checkCircle, ...(concluida ? styles.checkCircleActive : {})}}>
-                        {concluida && '✓'}
-                      </div>
-                      <div style={styles.itemAulaInfo}>
-                        <span style={{...styles.itemAulaTitulo, ...(isSelected ? styles.itemAulaTituloSelected : {})}}>
-                          {index + 1} - {aula.titulo}
-                        </span>
-                        <span style={styles.itemAulaDuracao}>
-                          {aula.duracao
-                            ? (typeof aula.duracao === 'number'
-                                ? formatarTempo(aula.duracao)
-                                : aula.duracao)
-                            : '--:--'}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={styles.itemAulaRight}>
-                      <button style={styles.moreButton}>⋮</button>
-                    </div>
-                  </div>
-                );
-              })}
+                    Aulas Curso
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('cronograma')} 
+                    style={{...styles.tabButton, ...(activeTab === 'cronograma' ? styles.tabButtonActive : {})}}
+                  >
+                    Aulas Cronograma
+                  </button>
+                </div>
 
-            {activeSubTab === 'pdf' && (
-              <div style={{padding: '20px'}}>
-                <h3 style={{fontSize: '16px', marginBottom: '15px'}}>Material em PDF</h3>
-                {aulaPlaying?.pdf_url ? (
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
-                    <a 
-                      href={aulaPlaying.pdf_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{
-                        padding: '12px', backgroundColor: '#E50914', color: '#FFF', 
-                        borderRadius: '8px', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold'
-                      }}
-                    >
-                      📄 Abrir PDF da Aula
-                    </a>
-                    {planoUsuario === 'premium' && (
-                      <button 
-                        onClick={() => {
-                          const nova = prompt('Editar link do PDF:', aulaPlaying.pdf_url);
-                          if (nova !== null) salvarPdfUrl(nova);
-                        }}
-                        style={{backgroundColor: 'transparent', border: '1px solid #444', color: '#AAA', padding: '8px', borderRadius: '4px', cursor: 'pointer'}}
-                      >
-                        Editar Link
-                      </button>
-                    )}
+                <div style={styles.subTabsContainer}>
+                  <button 
+                    onClick={() => setActiveSubTab('video')} 
+                    style={{...styles.subTabButton, ...(activeSubTab === 'video' ? styles.subTabActive : {})}}
+                  >
+                    <span style={styles.subTabIcon}>▶</span> Vídeo
+                  </button>
+                  <button 
+                    onClick={() => setActiveSubTab('pdf')} 
+                    style={{...styles.subTabButton, ...(activeSubTab === 'pdf' ? styles.subTabActive : {})}}
+                  >
+                    PDF
+                  </button>
+                  <button 
+                    onClick={() => setActiveSubTab('anotacoes')} 
+                    style={{...styles.subTabButton, ...(activeSubTab === 'anotacoes' ? styles.subTabActive : {})}}
+                  >
+                    Anotações
+                  </button>
+                </div>
+              </div>
+
+              <div style={styles.selectionCardsContainer}>
+                <div className="selector-card" onClick={() => setSidebarView('disciplinas')}>
+                  <div style={styles.selectorCardLabel}>DISCIPLINA</div>
+                  <div style={styles.selectorCardValue}>
+                    <span>{browsingDisciplina?.nome || 'Carregando...'}</span>
+                    <span style={styles.selectorCardArrow}>›</span>
                   </div>
-                ) : (
-                  <div style={{textAlign: 'center', color: '#666', padding: '20px'}}>
-                    <p>Nenhum PDF disponível para esta aula.</p>
-                    {planoUsuario === 'premium' && (
-                      <button 
+                  <div style={styles.progressContainer}>
+                    <div style={{...styles.progressBar, width: '15%'}}></div>
+                  </div>
+                </div>
+
+                <div className="selector-card" onClick={() => setSidebarView('modulos')}>
+                  <div style={styles.selectorCardLabel}>TÓPICO</div>
+                  <div style={styles.selectorCardValue}>
+                    <span>{browsingModulo?.nome || 'Carregando...'}</span>
+                    <span style={styles.selectorCardArrow}>›</span>
+                  </div>
+                  <div style={styles.progressContainer}>
+                    {(() => {
+                      const total = listaAulas.length;
+                      const concluidas = listaAulas.filter(a => progressoAulas[a.id]?.concluida).length;
+                      const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+                      return <div style={{...styles.progressBar, width: `${pct}%`, backgroundColor: '#4CAF50'}}></div>;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.searchContainer}>
+                <div style={styles.searchWrapper}>
+                  <input 
+                    type="text" 
+                    placeholder="Pesquisar por aula" 
+                    style={styles.searchInput}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <span style={styles.searchIcon}>🔍</span>
+                </div>
+              </div>
+
+              <div style={styles.listaAulas}>
+                {activeSubTab === 'video' && listaAulas
+                  .filter(a => a.titulo.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map((aula, index) => {
+                    const isSelected = String(aula.id) === String(aulaId);
+                    const progresso = progressoAulas[aula.id];
+                    const concluida = progresso?.concluida;
+
+                    return (
+                      <div
+                        key={aula.id}
+                        className="aula-item-modern"
+                        style={{...styles.itemAula, ...(isSelected ? styles.itemAulaSelected : {})}}
                         onClick={() => {
-                          const nova = prompt('Insira o link do PDF:');
-                          if (nova) salvarPdfUrl(nova);
+                          navigate(`/aula/${carreiraId}/${preparatorioId}/${browsingDisciplinaId}/${browsingModuloId}/${aula.id}`);
                         }}
-                        style={{marginTop: '15px', padding: '10px 20px', backgroundColor: '#333', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer'}}
                       >
-                        + Importar PDF
-                      </button>
+                        <div style={styles.itemAulaLeft}>
+                          <div style={{...styles.checkCircle, ...(concluida ? styles.checkCircleActive : {})}}>
+                            {concluida && '✓'}
+                          </div>
+                          <div style={styles.itemAulaInfo}>
+                            <span style={{...styles.itemAulaTitulo, ...(isSelected ? styles.itemAulaTituloSelected : {})}}>
+                              {index + 1} - {aula.titulo}
+                            </span>
+                            <span style={styles.itemAulaDuracao}>
+                              {aula.duracao
+                                ? (typeof aula.duracao === 'number'
+                                    ? formatarTempo(aula.duracao)
+                                    : aula.duracao)
+                                : '--:--'}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={styles.itemAulaRight}>
+                          <button style={styles.moreButton}>⋮</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {activeSubTab === 'pdf' && (
+                  <div style={{padding: '20px'}}>
+                    <h3 style={{fontSize: '16px', marginBottom: '15px'}}>Material em PDF</h3>
+                    {aulaPlaying?.pdf_url ? (
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+                        <a 
+                          href={aulaPlaying.pdf_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '12px', backgroundColor: '#E50914', color: '#FFF', 
+                            borderRadius: '8px', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold'
+                          }}
+                        >
+                          📄 Abrir PDF da Aula
+                        </a>
+                      </div>
+                    ) : (
+                      <div style={{textAlign: 'center', color: '#666', padding: '20px'}}>
+                        <p>Nenhum PDF disponível para esta aula.</p>
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {activeSubTab === 'anotacoes' && (
-              <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', height: '100%'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                  <h3 style={{color: '#FFF', fontSize: '14px', margin: 0}}>Suas Anotações</h3>
-                  <span style={{fontSize: '10px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
-                    {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
-                  </span>
-                </div>
-                <textarea 
-                  style={styles.anotacoesTextArea}
-                  value={anotacao}
-                  onChange={(e) => setAnotacao(e.target.value)}
-                  placeholder="Digite aqui suas observações sobre esta aula..."
-                />
-                <p style={{fontSize: '11px', color: '#666', margin: 0}}>
-                  As anotações são salvas automaticamente enquanto você digita.
-                </p>
+                {activeSubTab === 'anotacoes' && (
+                  <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', height: '100%'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <h3 style={{color: '#FFF', fontSize: '14px', margin: 0}}>Suas Anotações</h3>
+                      <span style={{fontSize: '10px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
+                        {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
+                      </span>
+                    </div>
+                    <textarea 
+                      style={styles.anotacoesTextArea}
+                      value={anotacao}
+                      onChange={(e) => setAnotacao(e.target.value)}
+                      placeholder="Digite aqui suas observações sobre esta aula..."
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : sidebarView === 'disciplinas' ? (
+            <>
+              <div style={styles.sidebarHeaderSub}>
+                <button className="back-button-sub-modern" onClick={() => setSidebarView('main')}>
+                  <span style={{fontSize: '20px'}}>‹</span> Voltar
+                </button>
+                <h2 style={styles.sidebarViewTitle}>Disciplinas</h2>
+              </div>
+              <div style={styles.searchContainer}>
+                <div style={styles.searchWrapper}>
+                  <input 
+                    type="text" 
+                    placeholder="Pesquisar por disciplina" 
+                    style={styles.searchInput}
+                    value={sidebarSearchTerm}
+                    onChange={(e) => setSidebarSearchTerm(e.target.value)}
+                  />
+                  <span style={styles.searchIcon}>🔍</span>
+                </div>
+              </div>
+              <div className="lista-section-container" style={styles.scrollableList}>
+                {listaDisciplinas
+                  .filter(d => d.nome.toLowerCase().includes(sidebarSearchTerm.toLowerCase()))
+                  .map(d => (
+                    <div 
+                      key={d.id} 
+                      className={`list-item-modern ${d.id === browsingDisciplinaId ? 'active' : ''}`}
+                      onClick={async () => {
+                        setBrowsingDisciplinaId(d.id);
+                        const { data: firstM } = await supabase.from('modulos').select('id').eq('disciplina_id', d.id).order('id', { ascending: true }).limit(1).single();
+                        if (firstM) setBrowsingModuloId(firstM.id);
+                        setSidebarView('main');
+                      }}
+                    >
+                      <div style={styles.listItemHeader}>
+                        <div style={styles.listItemName}>{d.icone} {d.nome}</div>
+                        <div style={styles.listItemProgress}>12% concluído</div>
+                      </div>
+                      <div style={styles.progressContainer}>
+                        <div style={{...styles.progressBar, width: '12%'}}></div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={styles.sidebarHeaderSub}>
+                <button className="back-button-sub-modern" onClick={() => setSidebarView('main')}>
+                  <span style={{fontSize: '20px'}}>‹</span> Voltar
+                </button>
+                <h2 style={styles.sidebarViewTitle}>Tópicos</h2>
+              </div>
+              <div style={styles.searchContainer}>
+                <div style={styles.searchWrapper}>
+                  <input 
+                    type="text" 
+                    placeholder="Pesquisar por tópico" 
+                    style={styles.searchInput}
+                    value={sidebarSearchTerm}
+                    onChange={(e) => setSidebarSearchTerm(e.target.value)}
+                  />
+                  <span style={styles.searchIcon}>🔍</span>
+                </div>
+              </div>
+              <div className="lista-section-container" style={styles.scrollableList}>
+                {listaModulos
+                  .filter(m => m.nome.toLowerCase().includes(sidebarSearchTerm.toLowerCase()))
+                  .map(m => (
+                    <div 
+                      key={m.id} 
+                      className={`list-item-modern ${m.id === browsingModuloId ? 'active' : ''}`}
+                      onClick={() => {
+                        setBrowsingModuloId(m.id);
+                        setSidebarView('main');
+                      }}
+                    >
+                      <div style={styles.listItemHeader}>
+                        <div style={styles.listItemName}>{m.nome}</div>
+                        <div style={styles.listItemProgress}>30% concluído</div>
+                      </div>
+                      <div style={styles.progressContainer}>
+                        <div style={{...styles.progressBar, width: '30%', backgroundColor: '#4CAF50'}}></div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1128,6 +1173,81 @@ function AulaPage() {
         iframe { width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; }
         .ytp-gradient-top, .ytp-gradient-bottom, .ytp-chrome-top, .ytp-chrome-bottom, .ytp-title, .ytp-watermark, .ytp-youtube-button, .ytp-share-button { display: none !important; pointer-events: none !important; }
         .ytp-pause-overlay { display: none !important; } /* Esconde sugestões ao pausar */
+
+        /* Estilos do Redesign da Barra Lateral */
+        .selector-card {
+          margin: 10px 20px;
+          padding: 18px;
+          background-color: #111;
+          border-radius: 14px;
+          cursor: pointer !important;
+          border: 1px solid #222;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
+        }
+        .selector-card:hover {
+          background-color: #1A1A1A;
+          border-color: #444;
+          transform: translateY(-2px);
+          box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .selector-card:active {
+          transform: translateY(0);
+        }
+        
+        .list-item-modern {
+          padding: 20px 24px;
+          border-bottom: 1px solid #111;
+          cursor: pointer !important;
+          transition: all 0.2s;
+          user-select: none;
+        }
+        .list-item-modern:hover {
+          background-color: #151515;
+        }
+        .list-item-modern.active {
+          background-color: #1A1A1A;
+          border-left: 4px solid #2196F3;
+        }
+
+        .back-button-sub-modern {
+          background: transparent;
+          border: none;
+          color: #2196F3;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer !important;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 0;
+          transition: opacity 0.2s;
+        }
+        .back-button-sub-modern:hover {
+          opacity: 0.8;
+        }
+
+        .aula-item-modern {
+          cursor: pointer !important;
+        }
+        .aula-item-modern * {
+          cursor: pointer !important;
+        }
+
+        /* Custom scrollbar for sidebar */
+        .lista-section-container::-webkit-scrollbar {
+          width: 6px;
+        }
+        .lista-section-container::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .lista-section-container::-webkit-scrollbar-thumb {
+          background: #333;
+          border-radius: 10px;
+        }
+        .lista-section-container::-webkit-scrollbar-thumb:hover {
+          background: #444;
+        }
       `}</style>
     </div>
   );
@@ -1415,7 +1535,7 @@ const styles = {
     borderBottom: '1px solid #333'
   },
   listaSection: { 
-    flex: 1, 
+    flex: 1.2, // Aumentado ligeiramente para dar mais espaço
     backgroundColor: '#000', 
     borderRadius: '0', 
     overflow: 'hidden', 
@@ -1427,8 +1547,32 @@ const styles = {
     flexDirection: 'column',
     maxHeight: 'calc(100vh - 80px)'
   },
-  sidebarHeader: {
+  sidebarHeaderMain: {
     padding: '24px 20px 10px 20px',
+  },
+  sidebarHeaderSub: {
+    padding: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    borderBottom: '1px solid #222',
+  },
+  sidebarViewTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#FFF',
+    margin: 0,
+  },
+  backButtonSub: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#AAA',
+    fontSize: '14px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    padding: '5px 0',
   },
   sidebarTitle: {
     margin: '0 0 20px 0',
@@ -1628,6 +1772,83 @@ const styles = {
     resize: 'none',
     outline: 'none',
     boxSizing: 'border-box'
+  },
+  // Novos Estilos para o Redesign
+  selectionCardsContainer: {
+    padding: '0 0 10px 0',
+  },
+  selectorCard: {
+    margin: '10px 20px',
+    padding: '16px',
+    backgroundColor: '#111',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    border: '1px solid #222',
+    transition: 'all 0.2s',
+    ":hover": {
+      backgroundColor: '#1A1A1A',
+      borderColor: '#333',
+    }
+  },
+  selectorCardLabel: {
+    fontSize: '10px',
+    color: '#666',
+    fontWeight: '700',
+    marginBottom: '6px',
+    letterSpacing: '1px',
+  },
+  selectorCardValue: {
+    fontSize: '14px',
+    color: '#FFF',
+    fontWeight: '600',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectorCardArrow: {
+    color: '#2196F3',
+    fontSize: '18px',
+  },
+  progressContainer: {
+    marginTop: '12px',
+    height: '3px',
+    backgroundColor: '#222',
+    borderRadius: '2px',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#2196F3',
+    borderRadius: '2px',
+  },
+  scrollableList: {
+    flex: 1,
+    overflowY: 'auto',
+  },
+  listItem: {
+    padding: '20px',
+    borderBottom: '1px solid #111',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  },
+  listItemHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
+  listItemName: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#EEE',
+    flex: 1,
+    paddingRight: '15px',
+  },
+  listItemProgress: {
+    fontSize: '12px',
+    color: '#AAA',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
   }
 };
 
