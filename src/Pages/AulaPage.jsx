@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Mapeamento dos vídeos (SUBSTITUA PELOS SEUS IDs SE NECESSÁRIO)
 // Agora usaremos preferencialmente o videoId que vem do banco de dados
@@ -786,14 +787,7 @@ function AulaPage() {
 
   // Tela de carregamento
   if (carregandoAcesso || planoUsuario === 'carregando') {
-    return (
-      <div style={{...styles.appContainer, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#050505'}}>
-        <div style={{textAlign: 'center', color: '#FFF'}}>
-          <div style={{fontSize: '40px', marginBottom: '16px'}}>⏳</div>
-          <div style={{fontSize: '18px', fontWeight: '500'}}>Verificando seu acesso...</div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen text="Verificando seu acesso..." />;
   }
 
   // Verificação de bloqueio baseada no nível da aula

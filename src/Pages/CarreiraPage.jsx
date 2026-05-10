@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import LoadingScreen from '../components/LoadingScreen';
 
 function CarreiraPage() {
   const { carreiraId } = useParams();
@@ -90,8 +91,8 @@ function CarreiraPage() {
     carregarDados();
   }, [carreiraId]);
 
-  if (carregando || planoUsuario === 'carregando') return <div style={styles.loading}>Verificando acesso...</div>;
-  if (!carreira) return <div style={styles.loading}>Carreira não encontrada</div>;
+  if (carregando || planoUsuario === 'carregando') return <LoadingScreen text="Verificando seu acesso..." />;
+  if (!carreira) return <LoadingScreen />;
 
   const isBasico = planoUsuario === 'basico';
 

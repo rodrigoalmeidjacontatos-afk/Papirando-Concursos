@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import LoadingScreen from '../components/LoadingScreen';
 
 function PreparatorioViewPage() {
   const { carreiraId, preparatorioId } = useParams();
@@ -202,9 +203,9 @@ function PreparatorioViewPage() {
     return <span style={{fontSize: '24px'}}>{iconStr}</span>;
   };
 
-  if (carregando || planoUsuario === 'carregando') return <div style={styles.loading}>Verificando acesso...</div>;
+  if (carregando || planoUsuario === 'carregando') return <LoadingScreen text="Verificando seu acesso..." />;
   if (erro) return <div style={styles.loading}>Erro: {erro}</div>;
-  if (!preparatorio) return <div style={styles.loading}>Preparatório não encontrado</div>;
+  if (!preparatorio) return <LoadingScreen />;
 
   // Filtrar disciplinas que possuem módulos permitidos
   const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import LoadingScreen from '../components/LoadingScreen';
 
 function CategoriaPage() {
   const { categoriaId } = useParams();
@@ -34,7 +35,7 @@ function CategoriaPage() {
     return preparatorios.filter(p => prepIds.includes(p.id));
   };
 
-  if (!categoria) return <div style={styles.loading}>Carregando...</div>;
+  if (!categoria) return <LoadingScreen />;
 
   return (
     <div style={styles.container}>
