@@ -66,6 +66,7 @@ function AulaPage() {
   const progressIntervalRef = useRef(null);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
+  const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
 
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -867,12 +868,11 @@ function AulaPage() {
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
           {isIOS ? (
-            /* ── iOS Safari: iframe nativo sem barra de controles do YouTube ── */
-            /* controls=0 remove a barra inferior (link "Assistir no YouTube")   */
-            /* O usuário toca no CENTRO do vídeo para dar play (gesto nativo iOS)*/
+            /* ── iOS Safari: iframe nativo — controls=0 remove barra com links do YouTube ── */
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
               {videoId ? (
                 <iframe
+                  ref={iosIframeRef}
                   key={videoId}
                   src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0`}
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
@@ -886,45 +886,49 @@ function AulaPage() {
                 </div>
               )}
 
-              {/*
-                ══════════════════════════════════════════════════════════
-                OVERLAYS DE PROTEÇÃO — faixas horizontais completas
-                Funciona igual em modo retrato (vertical) e paisagem (horizontal)
-                ══════════════════════════════════════════════════════════
-
-                Layout de proteção:
-                ┌──────────────────────────────────────────────────────┐
-                │  🛡️  FAIXA TOPO — 100% largura × 25% altura         │ ← canal + título
-                │──────────────────────────────────────────────────────│
-                │                                                      │
-                │              CENTRO LIVRE  ▶️                        │ ← tap para play
-                │                                                      │
-                │──────────────────────────────────────────────────────│
-                │  🛡️  FAIXA BAIXO — 100% largura × 25% altura        │ ← logo YT + copiar
-                └──────────────────────────────────────────────────────┘
-              */}
-
-              {/* 1) FAIXA SUPERIOR COMPLETA — bloqueia canal + título */}
+              {/* 1) TOPO — bloqueia e esconde canal + título */}
               <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0,
+                position: 'absolute', top: 0, left: 0, right: 0,
                 height: '25%',
-                backgroundColor: 'transparent',
-                zIndex: 20,
-                pointerEvents: 'auto',
-                cursor: 'default',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 60%, transparent)',
+                zIndex: 20, pointerEvents: 'auto', cursor: 'default',
               }} />
 
-              {/* 2) FAIXA INFERIOR COMPLETA — bloqueia logo YouTube + ícone copiar link */}
+              {/* 2) FAIXA INFERIOR — gradiente escuro que ESCONDE o logo visualmente + bloqueia clique */}
               <div style={{
-                position: 'absolute',
-                bottom: 0, left: 0, right: 0,
-                height: '25%',
-                backgroundColor: 'transparent',
-                zIndex: 20,
-                pointerEvents: 'auto',
-                cursor: 'default',
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                height: '28%',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.92) 55%, transparent)',
+                zIndex: 20, pointerEvents: 'auto', cursor: 'default',
               }} />
+
+              {/* 3) PATCH EXTRA sobre a marca d'água do YouTube (canto inferior direito) */}
+              <div style={{
+                position: 'absolute', bottom: '4%', right: '2%',
+                width: '20%', height: '18%',
+                backgroundColor: 'rgba(0,0,0,0.95)',
+                zIndex: 21, pointerEvents: 'auto', borderRadius: '4px',
+              }} />
+
+              {/* 4) BOTÃO DE TELA CHEIA customizado para iOS */}
+              <button
+                onClick={() => {
+                  const el = iosIframeRef.current;
+                  if (!el) return;
+                  if (el.requestFullscreen) el.requestFullscreen();
+                  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                }}
+                style={{
+                  position: 'absolute', bottom: '30%', right: '3%',
+                  zIndex: 25,
+                  background: 'rgba(0,0,0,0.65)',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  color: '#FFF', fontSize: '18px',
+                  borderRadius: '6px', padding: '7px 11px',
+                  cursor: 'pointer', lineHeight: 1,
+                }}
+                title="Tela Cheia"
+              >⛶</button>
             </div>
           ) : (
             /* ── Desktop/Android: player customizado com controles próprios ── */
