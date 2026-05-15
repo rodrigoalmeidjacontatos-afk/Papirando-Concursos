@@ -867,7 +867,7 @@ function AulaPage() {
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
           {isIOS ? (
-            /* ── iOS Safari: iframe nativo com controles do YouTube ── */
+            /* ── iOS Safari: iframe nativo + overlays cirúrgicos de proteção ── */
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
               {videoId ? (
                 <iframe
@@ -883,6 +883,39 @@ function AulaPage() {
                   Carregando vídeo...
                 </div>
               )}
+
+              {/* ── Overlays de proteção: bloqueiam navegação para o YouTube ── */}
+              {/* Bloco TOPO: cobre o título e o link do canal do YouTube */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                height: '18%',           /* ~primeiros 10% do vídeo */
+                backgroundColor: 'transparent',
+                zIndex: 10,
+                pointerEvents: 'auto',   /* intercepta cliques nessa faixa */
+                cursor: 'default',
+              }} />
+
+              {/* Bloco CANTO INFERIOR DIREITO: cobre o logo do YouTube */}
+              <div style={{
+                position: 'absolute', bottom: 0, right: 0,
+                width: '20%',            /* ~últimos 20% da largura */
+                height: '18%',           /* ~últimos 18% da altura */
+                backgroundColor: 'transparent',
+                zIndex: 10,
+                pointerEvents: 'auto',   /* intercepta cliques no logo */
+                cursor: 'default',
+              }} />
+
+              {/* Bloco CANTO INFERIOR ESQUERDO: cobre eventual link de canal */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0,
+                width: '15%',
+                height: '12%',
+                backgroundColor: 'transparent',
+                zIndex: 10,
+                pointerEvents: 'auto',
+                cursor: 'default',
+              }} />
             </div>
           ) : (
             /* ── Desktop/Android: player customizado com controles próprios ── */
