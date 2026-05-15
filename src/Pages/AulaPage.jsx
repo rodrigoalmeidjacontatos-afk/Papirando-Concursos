@@ -902,7 +902,7 @@ function AulaPage() {
               <style>{`
                 .ios-blocker-top {
                   position: absolute; top: 0; left: 0; right: 0;
-                  height: 18%; background-color: transparent;
+                  height: 25%; background-color: transparent;
                   z-index: 20; pointer-events: auto;
                 }
                 .ios-blocker-bottom-right {
