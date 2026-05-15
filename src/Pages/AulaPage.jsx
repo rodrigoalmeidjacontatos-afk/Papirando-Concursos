@@ -869,7 +869,7 @@ function AulaPage() {
           {isIOS ? (
             /* ── iOS Safari: iframe nativo sem barra de controles do YouTube ── */
             /* controls=0 remove a barra inferior (que contém "Assistir no YouTube") */
-            /* O usuário toca no centro do iframe para dar play (gesto nativo iOS) */
+            /* O usuário toca no CENTRO do iframe para dar play (gesto nativo iOS)  */
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
               {videoId ? (
                 <iframe
@@ -886,26 +886,39 @@ function AulaPage() {
                 </div>
               )}
 
-              {/* ── Overlays de proteção: bloqueiam os únicos elementos clicáveis restantes ── */}
+              {/* ════════════════════════════════════════════════════
+                  OVERLAYS DE PROTEÇÃO — bloqueiam os 3 pontos de fuga
+                  Centro do vídeo fica LIVRE para o tap nativo de play
+                  ════════════════════════════════════════════════════ */}
 
-              {/* Bloco TOPO: cobre o título e eventual link do canal (aparece ao iniciar) */}
+              {/* 1) TOPO COMPLETO — cobre canal + título do YouTube */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
-                height: '20%',
+                height: '25%',               /* faixa superior */
                 backgroundColor: 'transparent',
-                zIndex: 10,
+                zIndex: 20,
                 pointerEvents: 'auto',
                 cursor: 'default',
               }} />
 
-              {/* Bloco CANTO INFERIOR DIREITO: cobre a marca d'água do YouTube */}
-              {/* (pequeno logo que aparece mesmo com controls=0) */}
+              {/* 2) CANTO INFERIOR DIREITO — cobre logo do YouTube */}
               <div style={{
                 position: 'absolute', bottom: 0, right: 0,
-                width: '25%',
-                height: '20%',
+                width: '30%',
+                height: '25%',
                 backgroundColor: 'transparent',
-                zIndex: 10,
+                zIndex: 20,
+                pointerEvents: 'auto',
+                cursor: 'default',
+              }} />
+
+              {/* 3) CANTO INFERIOR ESQUERDO — cobre ícone de copiar link / compartilhar */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0,
+                width: '30%',
+                height: '25%',
+                backgroundColor: 'transparent',
+                zIndex: 20,
                 pointerEvents: 'auto',
                 cursor: 'default',
               }} />
