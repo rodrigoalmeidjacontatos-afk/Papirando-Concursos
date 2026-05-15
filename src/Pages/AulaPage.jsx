@@ -576,9 +576,11 @@ function AulaPage() {
           fs: 0,
           iv_load_policy: 3,
           cc_load_policy: 0,
-          autoplay: 1,
-          playsinline: 1
+          autoplay: 0,
+          playsinline: 1,
+          origin: window.location.origin
         },
+        host: 'https://www.youtube-nocookie.com',
         events: {
           onReady: (event) => {
             setPlayerReady(true);
