@@ -27,6 +27,8 @@ function AulaPage() {
   const [iosFullscreen, setIosFullscreen] = useState(false); // fullscreen CSS para iOS
   const [volume, setVolume] = useState(100);
   const [showControls, setShowControls] = useState(true);
+  const [showIosControls, setShowIosControls] = useState(true); // Auto-hide for iOS controls
+  const iosControlsTimeoutRef = useRef(null);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [muted, setMuted] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
@@ -652,6 +654,28 @@ function AulaPage() {
       }
     };
   }, [videoId === null]); // Só inicializa na primeira vez que o videoId deixa de ser null
+
+  // Efeito para esconder os controles do iOS automaticamente quando está tocando
+  useEffect(() => {
+    if (isIOS) {
+      if (isPlaying) {
+        if (iosControlsTimeoutRef.current) clearTimeout(iosControlsTimeoutRef.current);
+        iosControlsTimeoutRef.current = setTimeout(() => setShowIosControls(false), 3000);
+      } else {
+        setShowIosControls(true);
+        if (iosControlsTimeoutRef.current) clearTimeout(iosControlsTimeoutRef.current);
+      }
+    }
+    return () => { if (iosControlsTimeoutRef.current) clearTimeout(iosControlsTimeoutRef.current); }
+  }, [isPlaying, isIOS]);
+
+  const handleShowIosControls = () => {
+    setShowIosControls(true);
+    if (iosControlsTimeoutRef.current) clearTimeout(iosControlsTimeoutRef.current);
+    if (isPlaying) {
+      iosControlsTimeoutRef.current = setTimeout(() => setShowIosControls(false), 3000);
+    }
+  };
   
   // Efeito para trocar de vídeo sem destruir o player (mais rápido)
   useEffect(() => {
@@ -932,17 +956,20 @@ function AulaPage() {
               `}</style>
 
               {/* 1) TOPO: bloqueia título/canal */}
-              <div className="ios-blocker-top" />
+              <div className="ios-blocker-top" onClick={handleShowIosControls} onTouchStart={handleShowIosControls} />
 
               {/* 2) CANTO INFERIOR DIREITO: bloqueia logo do YouTube (expande para 50% na vertical) */}
-              <div className="ios-blocker-bottom-right" />
+              <div className="ios-blocker-bottom-right" onClick={handleShowIosControls} onTouchStart={handleShowIosControls} />
 
               {/* 3) CANTO INFERIOR ESQUERDO: bloqueia ícone de copiar link */}
-              <div className="ios-blocker-bottom-left" />
+              <div className="ios-blocker-bottom-left" onClick={handleShowIosControls} onTouchStart={handleShowIosControls} />
 
               {/* 4) BOTÃO TELA CHEIA — fake fullscreen via CSS (iOS não suporta iframe.requestFullscreen) */}
               <button
-                onClick={() => setIosFullscreen(f => !f)}
+                onClick={() => {
+                  setIosFullscreen(f => !f);
+                  handleShowIosControls();
+                }}
                 style={{
                   position: 'absolute',
                   top: '12px',
@@ -956,6 +983,9 @@ function AulaPage() {
                   padding: '7px 11px',
                   cursor: 'pointer',
                   lineHeight: 1,
+                  opacity: showIosControls ? 1 : 0,
+                  pointerEvents: showIosControls ? 'auto' : 'none',
+                  transition: 'opacity 0.3s ease-in-out',
                 }}
                 title={iosFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
               >
@@ -963,22 +993,28 @@ function AulaPage() {
               </button>
 
               {/* 5) BARRA DE NAVEGAÇÃO CUSTOMIZADA PARA IOS */}
-              <div style={{
-                position: 'absolute',
-                bottom: iosFullscreen ? '8%' : '4%', // Fica um pouco acima do bloqueador gigante
-                left: '2%',
-                right: '2%',
-                zIndex: 30,
-                background: 'rgba(0,0,0,0.85)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '8px',
-                padding: '10px 15px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                pointerEvents: 'auto',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-              }}>
+              <div 
+                onClick={handleShowIosControls}
+                onTouchStart={handleShowIosControls}
+                style={{
+                  position: 'absolute',
+                  bottom: iosFullscreen ? '8%' : '4%', // Fica um pouco acima do bloqueador gigante
+                  left: '2%',
+                  right: '2%',
+                  zIndex: 30,
+                  background: 'rgba(0,0,0,0.85)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  padding: '10px 15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  pointerEvents: showIosControls ? 'auto' : 'none',
+                  opacity: showIosControls ? 1 : 0,
+                  transition: 'opacity 0.3s ease-in-out',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                }}
+              >
                 <button 
                   onClick={handleBackward} 
                   style={{...styles.modernControlButton, background: 'rgba(255,255,255,0.1)', padding: '5px 10px'}}
