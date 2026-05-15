@@ -529,9 +529,6 @@ function AulaPage() {
   };
 
   useEffect(() => {
-    // No iOS usamos iframe nativo — a API programática do YouTube bloqueia no Safari
-    if (isIOS) return;
-
     // Carregar a API do YouTube se ainda não estiver carregada
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -564,8 +561,11 @@ function AulaPage() {
     };
 
     const initPlayer = () => {
-      if (!videoId) return; // Não inicializa sem ID real
+      if (!videoId) return; 
       
+      const targetEl = isIOS ? iosIframeRef.current : playerRef.current;
+      if (!targetEl) return;
+
       setPlayerReady(false);
       stopProgressTracking();
       
@@ -573,22 +573,7 @@ function AulaPage() {
         try { player.destroy(); } catch (e) {}
       }
 
-      const newPlayer = new window.YT.Player(playerRef.current, {
-        videoId: videoId,
-        playerVars: {
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          showinfo: 0,
-          disablekb: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          cc_load_policy: 0,
-          autoplay: 0,
-          playsinline: 1,
-          origin: window.location.origin
-        },
-        host: 'https://www.youtube-nocookie.com',
+      const config = {
         events: {
           onReady: (event) => {
             setPlayerReady(true);
@@ -628,7 +613,27 @@ function AulaPage() {
             }
           }
         }
-      });
+      };
+
+      if (!isIOS) {
+        config.videoId = videoId;
+        config.host = 'https://www.youtube-nocookie.com';
+        config.playerVars = {
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
+          autoplay: 0,
+          playsinline: 1,
+          origin: window.location.origin
+        };
+      }
+
+      const newPlayer = new window.YT.Player(targetEl, config);
       setPlayer(newPlayer);
     };
 
@@ -886,7 +891,7 @@ function AulaPage() {
                 <iframe
                   ref={iosIframeRef}
                   key={videoId}
-                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0`}
+                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -940,8 +945,8 @@ function AulaPage() {
                 onClick={() => setIosFullscreen(f => !f)}
                 style={{
                   position: 'absolute',
-                  bottom: iosFullscreen ? '4%' : '20%',
-                  right: '3%',
+                  top: '12px',
+                  right: '12px',
                   zIndex: 30,
                   background: 'rgba(0,0,0,0.60)',
                   border: '1px solid rgba(255,255,255,0.4)',
@@ -956,6 +961,58 @@ function AulaPage() {
               >
                 {iosFullscreen ? '❐' : '⛶'}
               </button>
+
+              {/* 5) BARRA DE NAVEGAÇÃO CUSTOMIZADA PARA IOS */}
+              <div style={{
+                position: 'absolute',
+                bottom: iosFullscreen ? '8%' : '4%', // Fica um pouco acima do bloqueador gigante
+                left: '2%',
+                right: '2%',
+                zIndex: 30,
+                background: 'rgba(0,0,0,0.85)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '8px',
+                padding: '10px 15px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                pointerEvents: 'auto',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+              }}>
+                <button 
+                  onClick={handleBackward} 
+                  style={{...styles.modernControlButton, background: 'rgba(255,255,255,0.1)', padding: '5px 10px'}}
+                >
+                  ⏪ 10s
+                </button>
+                
+                <div style={{...styles.modernProgressContainer, flex: 1, margin: 0}}>
+                  <input
+                    type="range"
+                    min="0"
+                    max={duracao || 0}
+                    value={tempoAtual}
+                    onMouseDown={handleSeekStart}
+                    onChange={handleSeekChange}
+                    onMouseUp={handleSeekEnd}
+                    onTouchStart={handleSeekStart}
+                    onTouchEnd={handleSeekEnd}
+                    style={{...styles.modernProgressSlider, height: '24px'}}
+                    step="0.1"
+                  />
+                  <div style={styles.modernProgressBase}>
+                    <div style={{ ...styles.modernProgressFill, width: `${(tempoAtual / duracao) * 100 || 0}%` }} />
+                    <div style={{ ...styles.modernProgressHandle, left: `${(tempoAtual / duracao) * 100 || 0}%` }} />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleForward} 
+                  style={{...styles.modernControlButton, background: 'rgba(255,255,255,0.1)', padding: '5px 10px'}}
+                >
+                  10s ⏩
+                </button>
+              </div>
             </div>
           ) : (
             /* ── Desktop/Android: player customizado com controles próprios ── */
