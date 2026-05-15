@@ -215,9 +215,45 @@ function PreparatorioViewPage() {
   // Filtrar disciplinas que possuem módulos permitidos
   const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0);
 
+  // Imagem de fundo: preferir capa, senão logo (apenas URLs)
+  const bgImage = preparatorio.capa ||
+    (typeof preparatorio.logo === 'string' && (preparatorio.logo.startsWith('http') || preparatorio.logo.startsWith('data:'))
+      ? preparatorio.logo : null);
+
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
+      {/* Fundo cinematográfico */}
+      {bgImage && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, width: '100vw', height: '100vh',
+          zIndex: 0, pointerEvents: 'none'
+        }}>
+          {/* Imagem posicionada à esquerda */}
+          <div style={{
+            position: 'absolute',
+            top: 0, left: 0,
+            width: '55%', height: '100%',
+            backgroundImage: `url(${bgImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+            filter: 'grayscale(30%) brightness(0.45)'
+          }} />
+          {/* Degradê da direita sobreposindo */}
+          <div style={{
+            position: 'absolute',
+            top: 0, left: 0, width: '100%', height: '100%',
+            background: 'linear-gradient(to right, rgba(20,20,20,0.1) 0%, rgba(20,20,20,0.6) 40%, #141414 70%)'
+          }} />
+          {/* Degradê do fundo (baixo) */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0, left: 0, width: '100%', height: '40%',
+            background: 'linear-gradient(to top, #141414 0%, transparent 100%)'
+          }} />
+        </div>
+      )}
+      <header style={{...styles.header, position: 'relative', zIndex: 10}}>
         {/* Branding Papirando Concursos no canto esquerdo (padrão) */}
         <div style={{display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer'}} onClick={() => navigate('/')}>
           <img src="/logos/PNG.png" alt="Logo Papirando" style={{width: '40px', height: '40px', borderRadius: '50%'}} />
@@ -239,7 +275,7 @@ function PreparatorioViewPage() {
         </div>
       </header>
 
-      <main style={{...styles.main, position: 'relative'}}>
+      <main style={{...styles.main, position: 'relative', zIndex: 10}}>
         {/* Overlay de bloqueio apenas se for explicitamente básico e não admin */}
         {planoUsuario === 'basico' && !isAdmin && (
           <div style={{
@@ -390,15 +426,16 @@ function PreparatorioViewPage() {
 }
 
 const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#141414' },
+  container: { minHeight: '100vh', backgroundColor: '#141414', position: 'relative' },
   header: { 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'space-between',
     gap: '24px', 
     padding: '20px 40px', 
-    backgroundColor: '#1A1A1A', 
-    borderBottom: '1px solid #333' 
+    backgroundColor: 'rgba(20,20,20,0.85)', 
+    backdropFilter: 'blur(12px)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)'
   },
   backButton: { padding: '8px 20px', backgroundColor: '#333', border: 'none', color: '#F5F5F5', borderRadius: '8px', cursor: 'pointer' },
   title: { color: '#F5F5F5', fontSize: '24px', margin: 0 },
