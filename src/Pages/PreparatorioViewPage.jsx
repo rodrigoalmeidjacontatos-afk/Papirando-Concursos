@@ -226,31 +226,33 @@ function PreparatorioViewPage() {
         top: 0, left: 0, width: '100vw', height: '100vh',
         zIndex: 0, pointerEvents: 'none'
       }}>
-        {/* Imagem cobrindo o lado esquerdo */}
+        {/* Figura posicionada à esquerda com proporções mantidas */}
         <div style={{
           position: 'absolute',
           top: 0, left: 0,
-          width: '55%', height: '100%',
+          width: '35%', height: '100%',
           backgroundImage: `url(${bgImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
+          backgroundSize: 'contain',
+          backgroundPosition: 'left bottom',
+          backgroundRepeat: 'no-repeat',
+          filter: 'brightness(0.65)',
         }} />
-        {/* Camada escura suave sobre a imagem */}
+        {/* Camada escura suave sobre a figura */}
         <div style={{
           position: 'absolute',
-          top: 0, left: 0, width: '55%', height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.35)'
+          top: 0, left: 0, width: '35%', height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.25)'
         }} />
-        {/* Degradê ESQUERDA → DIREITA: imagem some para o fundo */}
+        {/* Degradê ESQUERDA → DIREITA: figura some para o fundo */}
         <div style={{
           position: 'absolute',
           top: 0, left: 0, width: '100%', height: '100%',
-          background: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(13,13,13,0.5) 45%, #0d0d0d 62%)'
+          background: 'linear-gradient(to right, transparent 0%, transparent 20%, rgba(13,13,13,0.55) 32%, #0d0d0d 48%)'
         }} />
-        {/* Degradê vertical: baixo da imagem some para o fundo */}
+        {/* Degradê vertical: base da figura some para o fundo */}
         <div style={{
           position: 'absolute',
-          bottom: 0, left: 0, width: '60%', height: '40%',
+          bottom: 0, left: 0, width: '40%', height: '30%',
           background: 'linear-gradient(to top, #0d0d0d 0%, transparent 100%)'
         }} />
       </div>
