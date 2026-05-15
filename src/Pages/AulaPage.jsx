@@ -9,6 +9,9 @@ const videosPorAula = {
   'projeto_caveira_portugues_aula1': 'Uph9feF6C38',
 };
 
+// Detecta iOS (iPhone/iPad) para usar iframe nativo em vez da API do YouTube
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 function AulaPage() {
   const { carreiraId, preparatorioId, disciplinaId, moduloId, aulaId } = useParams();
   const navigate = useNavigate();
@@ -524,6 +527,9 @@ function AulaPage() {
   };
 
   useEffect(() => {
+    // No iOS usamos iframe nativo — a API programática do YouTube bloqueia no Safari
+    if (isIOS) return;
+
     // Carregar a API do YouTube se ainda não estiver carregada
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -860,113 +866,142 @@ function AulaPage() {
 
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
-          <div 
-            ref={containerRef} 
-            style={styles.playerContainer}
-            className="player-container"
-            onMouseEnter={() => setShowControls(true)}
-            onMouseLeave={() => !isFullscreen && setShowControls(false)}
-          >
-            <div ref={playerRef} style={styles.player}></div>
-            
-            {/* Camadas de bloqueio para evitar saída para o YouTube */}
-            <div style={isFullscreen ? styles.blockTopFullscreen : styles.blockTop}></div>
-            <div style={styles.blockBottomRight}></div>
-            <div style={styles.blockFull} onClick={togglePlayPause}></div>
-            
-            {/* Overlay de Controles Moderno */}
+          {isIOS ? (
+            /* ── iOS Safari: iframe nativo com controles do YouTube ── */
+            <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+              {videoId ? (
+                <iframe
+                  key={videoId}
+                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=1&iv_load_policy=3`}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  title="Vídeo da Aula"
+                />
+              ) : (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '14px' }}>
+                  Carregando vídeo...
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Desktop/Android: player customizado com controles próprios ── */
             <div 
-              style={{
-                ...styles.controlsOverlay,
-                opacity: showControls || !isPlaying ? 1 : 0,
-                pointerEvents: showControls || !isPlaying ? 'auto' : 'none'
-              }}
-              onClick={(e) => {
-                // Se clicar no fundo do overlay (não em um botão), dá play/pause
-                if (e.target === e.currentTarget) togglePlayPause();
-              }}
+              ref={containerRef} 
+              style={styles.playerContainer}
+              className="player-container"
+              onMouseEnter={() => setShowControls(true)}
+              onMouseLeave={() => !isFullscreen && setShowControls(false)}
             >
-              {/* Botão Central de Play/Pause (opcional, dá um toque premium) */}
-              <div style={styles.centerPlayButton} onClick={togglePlayPause}>
-                {isPlaying ? null : <span style={styles.centerPlayIcon}>▶</span>}
-              </div>
-
-              {/* Barra de Controles Inferior */}
-              <div style={styles.bottomControlsBar}>
-                {/* Barra de Progresso */}
-                <div style={styles.modernProgressContainer}>
-                  <input
-                    type="range"
-                    min="0"
-                    max={duracao || 0}
-                    value={tempoAtual}
-                    onMouseDown={handleSeekStart}
-                    onChange={handleSeekChange}
-                    onMouseUp={handleSeekEnd}
-                    style={styles.modernProgressSlider}
-                    step="0.1"
-                  />
-                  <div style={styles.modernProgressBase}>
-                    <div style={{ ...styles.modernProgressFill, width: `${progressoPercentual}%` }} />
-                    <div style={{ ...styles.modernProgressHandle, left: `${progressoPercentual}%` }} />
-                  </div>
+              <div ref={playerRef} style={styles.player}></div>
+              
+              {/* Camadas de bloqueio para evitar saída para o YouTube */}
+              <div style={isFullscreen ? styles.blockTopFullscreen : styles.blockTop}></div>
+              <div style={styles.blockBottomRight}></div>
+              <div 
+                style={{
+                  ...styles.blockFull,
+                  pointerEvents: isPlaying ? 'auto' : 'none'
+                }} 
+                onClick={togglePlayPause}
+              ></div>
+              
+              {/* Overlay de Controles Moderno */}
+              <div 
+                style={{
+                  ...styles.controlsOverlay,
+                  opacity: showControls || !isPlaying ? 1 : 0,
+                  pointerEvents: 'none'
+                }}
+              >
+                {/* Botão Central de Play/Pause */}
+                <div 
+                  style={{
+                    ...styles.centerPlayButton, 
+                    pointerEvents: isPlaying ? 'auto' : 'none'
+                  }} 
+                  onClick={togglePlayPause}
+                >
+                  {isPlaying ? null : <span style={styles.centerPlayIcon}>▶</span>}
                 </div>
 
-                <div style={styles.controlsRow}>
-                  <div style={styles.controlsGroupLeft}>
-                    <button onClick={togglePlayPause} style={styles.modernControlButton} title={isPlaying ? 'Pausar' : 'Reproduzir'}>
-                      {isPlaying ? '⏸' : '▶'}
-                    </button>
-                    
-                    <button onClick={handleBackward} style={styles.modernControlButton} title="-10 segundos">↺</button>
-                    <button onClick={handleForward} style={styles.modernControlButton} title="+10 segundos">↻</button>
+                {/* Barra de Controles Inferior */}
+                <div style={{...styles.bottomControlsBar, pointerEvents: 'auto'}}>
+                  {/* Barra de Progresso */}
+                  <div style={styles.modernProgressContainer}>
+                    <input
+                      type="range"
+                      min="0"
+                      max={duracao || 0}
+                      value={tempoAtual}
+                      onMouseDown={handleSeekStart}
+                      onChange={handleSeekChange}
+                      onMouseUp={handleSeekEnd}
+                      style={styles.modernProgressSlider}
+                      step="0.1"
+                    />
+                    <div style={styles.modernProgressBase}>
+                      <div style={{ ...styles.modernProgressFill, width: `${progressoPercentual}%` }} />
+                      <div style={{ ...styles.modernProgressHandle, left: `${progressoPercentual}%` }} />
+                    </div>
+                  </div>
 
-                    <div 
-                      style={styles.modernVolumeGroup}
-                      onMouseEnter={() => setIsVolumeHovered(true)}
-                      onMouseLeave={() => setIsVolumeHovered(false)}
-                    >
-                      <button onClick={handleMute} style={styles.modernControlButton}>
-                        {muted || volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊'}
+                  <div style={styles.controlsRow}>
+                    <div style={styles.controlsGroupLeft}>
+                      <button onClick={togglePlayPause} style={styles.modernControlButton} title={isPlaying ? 'Pausar' : 'Reproduzir'}>
+                        {isPlaying ? '⏸' : '▶'}
                       </button>
-                      <div style={{
-                        ...styles.volumeSliderWrapper,
-                        width: isVolumeHovered ? '80px' : '0px',
-                        opacity: isVolumeHovered ? 1 : 0
-                      }}>
-                        <input type="range" min="0" max="100" value={volume} onChange={handleVolumeChange} style={styles.modernVolumeSlider} />
+                      
+                      <button onClick={handleBackward} style={styles.modernControlButton} title="-10 segundos">↺</button>
+                      <button onClick={handleForward} style={styles.modernControlButton} title="+10 segundos">↻</button>
+
+                      <div 
+                        style={styles.modernVolumeGroup}
+                        onMouseEnter={() => setIsVolumeHovered(true)}
+                        onMouseLeave={() => setIsVolumeHovered(false)}
+                      >
+                        <button onClick={handleMute} style={styles.modernControlButton}>
+                          {muted || volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊'}
+                        </button>
+                        <div style={{
+                          ...styles.volumeSliderWrapper,
+                          width: isVolumeHovered ? '80px' : '0px',
+                          opacity: isVolumeHovered ? 1 : 0
+                        }}>
+                          <input type="range" min="0" max="100" value={volume} onChange={handleVolumeChange} style={styles.modernVolumeSlider} />
+                        </div>
+                      </div>
+
+                      <div style={styles.modernTimeDisplay}>
+                        <span style={styles.timeCurrent}>{formatarTempo(tempoAtual)}</span>
+                        <span style={styles.timeDivider}>/</span>
+                        <span style={styles.timeTotal}>{formatarTempo(duracao)}</span>
                       </div>
                     </div>
 
-                    <div style={styles.modernTimeDisplay}>
-                      <span style={styles.timeCurrent}>{formatarTempo(tempoAtual)}</span>
-                      <span style={styles.timeDivider}>/</span>
-                      <span style={styles.timeTotal}>{formatarTempo(duracao)}</span>
-                    </div>
-                  </div>
+                    <div style={styles.controlsGroupRight}>
+                      <div style={styles.speedSelectorWrapper}>
+                        <span style={styles.speedLabel}>{velocidade}x</span>
+                        <select 
+                          value={velocidade} 
+                          onChange={(e) => mudarVelocidade(parseFloat(e.target.value))} 
+                          style={styles.hiddenSpeedSelect}
+                        >
+                          {velocidades.map(v => <option key={v} value={v}>{v}x</option>)}
+                        </select>
+                      </div>
 
-                  <div style={styles.controlsGroupRight}>
-                    <div style={styles.speedSelectorWrapper}>
-                      <span style={styles.speedLabel}>{velocidade}x</span>
-                      <select 
-                        value={velocidade} 
-                        onChange={(e) => mudarVelocidade(parseFloat(e.target.value))} 
-                        style={styles.hiddenSpeedSelect}
-                      >
-                        {velocidades.map(v => <option key={v} value={v}>{v}x</option>)}
-                      </select>
+                      {!isFullscreen ? (
+                        <button onClick={entrarTelaCheia} style={styles.modernControlButton} title="Tela Cheia">⛶</button>
+                      ) : (
+                        <button onClick={sairTelaCheia} style={styles.modernControlButton} title="Sair da Tela Cheia">❐</button>
+                      )}
                     </div>
-
-                    {!isFullscreen ? (
-                      <button onClick={entrarTelaCheia} style={styles.modernControlButton} title="Tela Cheia">⛶</button>
-                    ) : (
-                      <button onClick={sairTelaCheia} style={styles.modernControlButton} title="Sair da Tela Cheia">❐</button>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div style={styles.listaSection}>
