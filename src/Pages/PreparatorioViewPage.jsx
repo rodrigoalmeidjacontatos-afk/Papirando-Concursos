@@ -230,28 +230,28 @@ function PreparatorioViewPage() {
         <div style={{
           position: 'absolute',
           top: 0, left: 0,
-          width: '50%', height: '100%',
+          width: '55%', height: '100%',
           backgroundImage: `url(${bgImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
         }} />
-        {/* Camada escura com baixa opacidade por cima da imagem */}
+        {/* Camada escura suave sobre a imagem */}
         <div style={{
           position: 'absolute',
-          top: 0, left: 0, width: '50%', height: '100%',
-          backgroundColor: 'rgba(10, 10, 10, 0.45)'
+          top: 0, left: 0, width: '55%', height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.35)'
         }} />
-        {/* Degradê horizontal: imagem funde para o fundo escuro */}
+        {/* Degradê ESQUERDA → DIREITA: imagem some para o fundo */}
         <div style={{
           position: 'absolute',
           top: 0, left: 0, width: '100%', height: '100%',
-          background: 'linear-gradient(to right, transparent 0%, transparent 30%, rgba(20,20,20,0.7) 50%, #141414 65%)'
+          background: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(13,13,13,0.5) 45%, #0d0d0d 62%)'
         }} />
-        {/* Degradê vertical de baixo */}
+        {/* Degradê vertical: baixo da imagem some para o fundo */}
         <div style={{
           position: 'absolute',
-          bottom: 0, left: 0, width: '55%', height: '35%',
-          background: 'linear-gradient(to top, #141414 0%, transparent 100%)'
+          bottom: 0, left: 0, width: '60%', height: '40%',
+          background: 'linear-gradient(to top, #0d0d0d 0%, transparent 100%)'
         }} />
       </div>
       <header style={{...styles.header, position: 'relative', zIndex: 10}}>
@@ -427,7 +427,7 @@ function PreparatorioViewPage() {
 }
 
 const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#141414', position: 'relative' },
+  container: { minHeight: '100vh', backgroundColor: '#0d0d0d', position: 'relative' },
   header: { 
     display: 'flex', 
     alignItems: 'center', 
