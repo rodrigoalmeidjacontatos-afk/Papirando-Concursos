@@ -867,12 +867,14 @@ function AulaPage() {
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
           {isIOS ? (
-            /* ── iOS Safari: iframe nativo + overlays cirúrgicos de proteção ── */
+            /* ── iOS Safari: iframe nativo sem barra de controles do YouTube ── */
+            /* controls=0 remove a barra inferior (que contém "Assistir no YouTube") */
+            /* O usuário toca no centro do iframe para dar play (gesto nativo iOS) */
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
               {videoId ? (
                 <iframe
                   key={videoId}
-                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=1&iv_load_policy=3`}
+                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0`}
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
@@ -884,33 +886,24 @@ function AulaPage() {
                 </div>
               )}
 
-              {/* ── Overlays de proteção: bloqueiam navegação para o YouTube ── */}
-              {/* Bloco TOPO: cobre o título e o link do canal do YouTube */}
+              {/* ── Overlays de proteção: bloqueiam os únicos elementos clicáveis restantes ── */}
+
+              {/* Bloco TOPO: cobre o título e eventual link do canal (aparece ao iniciar) */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
-                height: '18%',           /* ~primeiros 10% do vídeo */
+                height: '20%',
                 backgroundColor: 'transparent',
                 zIndex: 10,
-                pointerEvents: 'auto',   /* intercepta cliques nessa faixa */
+                pointerEvents: 'auto',
                 cursor: 'default',
               }} />
 
-              {/* Bloco CANTO INFERIOR DIREITO: cobre o logo do YouTube */}
+              {/* Bloco CANTO INFERIOR DIREITO: cobre a marca d'água do YouTube */}
+              {/* (pequeno logo que aparece mesmo com controls=0) */}
               <div style={{
                 position: 'absolute', bottom: 0, right: 0,
-                width: '20%',            /* ~últimos 20% da largura */
-                height: '18%',           /* ~últimos 18% da altura */
-                backgroundColor: 'transparent',
-                zIndex: 10,
-                pointerEvents: 'auto',   /* intercepta cliques no logo */
-                cursor: 'default',
-              }} />
-
-              {/* Bloco CANTO INFERIOR ESQUERDO: cobre eventual link de canal */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0,
-                width: '15%',
-                height: '12%',
+                width: '25%',
+                height: '20%',
                 backgroundColor: 'transparent',
                 zIndex: 10,
                 pointerEvents: 'auto',
