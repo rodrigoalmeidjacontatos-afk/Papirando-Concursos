@@ -215,42 +215,45 @@ function PreparatorioViewPage() {
   // Filtrar disciplinas que possuem módulos permitidos
   const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0);
 
-  // Imagem de fundo fixa (soldado SWAT)
-  const bgImage = '/images/bg-swat.png';
+  // Imagem de fundo fixa (soldado SWAT - Pinterest)
+  const bgImage = '/images/bg-swat.jpg';
 
   return (
     <div style={styles.container}>
       {/* Fundo cinematográfico */}
-      {bgImage && (
+      <div style={{
+        position: 'fixed',
+        top: 0, left: 0, width: '100vw', height: '100vh',
+        zIndex: 0, pointerEvents: 'none'
+      }}>
+        {/* Imagem cobrindo o lado esquerdo */}
         <div style={{
-          position: 'fixed',
-          top: 0, left: 0, width: '100vw', height: '100vh',
-          zIndex: 0, pointerEvents: 'none'
-        }}>
-          {/* Imagem posicionada à esquerda */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: 0,
-            width: '55%', height: '100%',
-            backgroundImage: `url(${bgImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center top',
-            filter: 'grayscale(30%) brightness(0.45)'
-          }} />
-          {/* Degradê da direita sobreposindo */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: 0, width: '100%', height: '100%',
-            background: 'linear-gradient(to right, rgba(20,20,20,0.1) 0%, rgba(20,20,20,0.6) 40%, #141414 70%)'
-          }} />
-          {/* Degradê do fundo (baixo) */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0, left: 0, width: '100%', height: '40%',
-            background: 'linear-gradient(to top, #141414 0%, transparent 100%)'
-          }} />
-        </div>
-      )}
+          position: 'absolute',
+          top: 0, left: 0,
+          width: '50%', height: '100%',
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center top',
+        }} />
+        {/* Camada escura com baixa opacidade por cima da imagem */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, width: '50%', height: '100%',
+          backgroundColor: 'rgba(10, 10, 10, 0.45)'
+        }} />
+        {/* Degradê horizontal: imagem funde para o fundo escuro */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, width: '100%', height: '100%',
+          background: 'linear-gradient(to right, transparent 0%, transparent 30%, rgba(20,20,20,0.7) 50%, #141414 65%)'
+        }} />
+        {/* Degradê vertical de baixo */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0, left: 0, width: '55%', height: '35%',
+          background: 'linear-gradient(to top, #141414 0%, transparent 100%)'
+        }} />
+      </div>
       <header style={{...styles.header, position: 'relative', zIndex: 10}}>
         {/* Branding Papirando Concursos no canto esquerdo (padrão) */}
         <div style={{display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer'}} onClick={() => navigate('/')}>
