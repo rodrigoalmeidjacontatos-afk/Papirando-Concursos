@@ -221,7 +221,7 @@ const styles = {
   },
 
   // Grid
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '30px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 320px))', gap: '30px', justifyContent: 'center' },
   card: { backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '32px', textAlign: 'center', transition: 'transform 0.3s', border: '1px solid #333', cursor: 'pointer' },
   cardIcon: { fontSize: '48px', marginBottom: '16px' },
   cardImage: { height: '160px', marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F0F', borderRadius: '12px', overflow: 'hidden', position: 'relative' },
