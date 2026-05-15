@@ -868,8 +868,8 @@ function AulaPage() {
         <div style={styles.playerSection} className="player-section">
           {isIOS ? (
             /* ── iOS Safari: iframe nativo sem barra de controles do YouTube ── */
-            /* controls=0 remove a barra inferior (que contém "Assistir no YouTube") */
-            /* O usuário toca no CENTRO do iframe para dar play (gesto nativo iOS)  */
+            /* controls=0 remove a barra inferior (link "Assistir no YouTube")   */
+            /* O usuário toca no CENTRO do vídeo para dar play (gesto nativo iOS)*/
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
               {videoId ? (
                 <iframe
@@ -886,25 +886,28 @@ function AulaPage() {
                 </div>
               )}
 
-              {/* ════════════════════════════════════════════════════
-                  OVERLAYS DE PROTEÇÃO — bloqueiam os 3 pontos de fuga
-                  Centro do vídeo fica LIVRE para o tap nativo de play
-                  ════════════════════════════════════════════════════ */}
+              {/*
+                ══════════════════════════════════════════════════════════
+                OVERLAYS DE PROTEÇÃO — faixas horizontais completas
+                Funciona igual em modo retrato (vertical) e paisagem (horizontal)
+                ══════════════════════════════════════════════════════════
 
-              {/* 1) TOPO COMPLETO — cobre canal + título do YouTube */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                height: '25%',               /* faixa superior */
-                backgroundColor: 'transparent',
-                zIndex: 20,
-                pointerEvents: 'auto',
-                cursor: 'default',
-              }} />
+                Layout de proteção:
+                ┌──────────────────────────────────────────────────────┐
+                │  🛡️  FAIXA TOPO — 100% largura × 25% altura         │ ← canal + título
+                │──────────────────────────────────────────────────────│
+                │                                                      │
+                │              CENTRO LIVRE  ▶️                        │ ← tap para play
+                │                                                      │
+                │──────────────────────────────────────────────────────│
+                │  🛡️  FAIXA BAIXO — 100% largura × 25% altura        │ ← logo YT + copiar
+                └──────────────────────────────────────────────────────┘
+              */}
 
-              {/* 2) CANTO INFERIOR DIREITO — cobre logo do YouTube */}
+              {/* 1) FAIXA SUPERIOR COMPLETA — bloqueia canal + título */}
               <div style={{
-                position: 'absolute', bottom: 0, right: 0,
-                width: '30%',
+                position: 'absolute',
+                top: 0, left: 0, right: 0,
                 height: '25%',
                 backgroundColor: 'transparent',
                 zIndex: 20,
@@ -912,10 +915,10 @@ function AulaPage() {
                 cursor: 'default',
               }} />
 
-              {/* 3) CANTO INFERIOR ESQUERDO — cobre ícone de copiar link / compartilhar */}
+              {/* 2) FAIXA INFERIOR COMPLETA — bloqueia logo YouTube + ícone copiar link */}
               <div style={{
-                position: 'absolute', bottom: 0, left: 0,
-                width: '30%',
+                position: 'absolute',
+                bottom: 0, left: 0, right: 0,
                 height: '25%',
                 backgroundColor: 'transparent',
                 zIndex: 20,
