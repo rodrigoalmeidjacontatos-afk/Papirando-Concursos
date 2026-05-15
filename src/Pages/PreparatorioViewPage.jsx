@@ -215,10 +215,8 @@ function PreparatorioViewPage() {
   // Filtrar disciplinas que possuem módulos permitidos
   const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0);
 
-  // Imagem de fundo: preferir capa, senão logo (apenas URLs)
-  const bgImage = preparatorio.capa ||
-    (typeof preparatorio.logo === 'string' && (preparatorio.logo.startsWith('http') || preparatorio.logo.startsWith('data:'))
-      ? preparatorio.logo : null);
+  // Imagem de fundo fixa (soldado SWAT)
+  const bgImage = '/images/bg-swat.png';
 
   return (
     <div style={styles.container}>
