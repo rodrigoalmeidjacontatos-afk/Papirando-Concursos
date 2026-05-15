@@ -898,29 +898,42 @@ function AulaPage() {
                 </div>
               )}
 
-              {/* 1) TOPO: bloqueia título/canal — totalmente transparente, só intercepta toque */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                height: '18%',
-                backgroundColor: 'transparent',
-                zIndex: 20, pointerEvents: 'auto',
-              }} />
+              {/* Estilos dinâmicos para orientação: na vertical (portrait) o logo fica gigante, então bloqueamos a metade de baixo inteira */}
+              <style>{`
+                .ios-blocker-top {
+                  position: absolute; top: 0; left: 0; right: 0;
+                  height: 18%; background-color: transparent;
+                  z-index: 20; pointer-events: auto;
+                }
+                .ios-blocker-bottom-right {
+                  position: absolute; bottom: 0; right: 0;
+                  width: 30%; height: 20%; background-color: transparent;
+                  z-index: 20; pointer-events: auto;
+                }
+                .ios-blocker-bottom-left {
+                  position: absolute; bottom: 0; left: 0;
+                  width: 30%; height: 20%; background-color: transparent;
+                  z-index: 20; pointer-events: auto;
+                }
+                @media (orientation: portrait) {
+                  .ios-blocker-bottom-right {
+                    width: 100%;
+                    height: 50%; /* Bloqueia da metade para baixo na vertical */
+                  }
+                  .ios-blocker-bottom-left {
+                    display: none;
+                  }
+                }
+              `}</style>
 
-              {/* 2) CANTO INFERIOR DIREITO: bloqueia logo do YouTube */}
-              <div style={{
-                position: 'absolute', bottom: 0, right: 0,
-                width: '28%', height: '18%',
-                backgroundColor: 'transparent',
-                zIndex: 20, pointerEvents: 'auto',
-              }} />
+              {/* 1) TOPO: bloqueia título/canal */}
+              <div className="ios-blocker-top" />
+
+              {/* 2) CANTO INFERIOR DIREITO: bloqueia logo do YouTube (expande para 50% na vertical) */}
+              <div className="ios-blocker-bottom-right" />
 
               {/* 3) CANTO INFERIOR ESQUERDO: bloqueia ícone de copiar link */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0,
-                width: '28%', height: '18%',
-                backgroundColor: 'transparent',
-                zIndex: 20, pointerEvents: 'auto',
-              }} />
+              <div className="ios-blocker-bottom-left" />
 
               {/* 4) BOTÃO TELA CHEIA — fake fullscreen via CSS (iOS não suporta iframe.requestFullscreen) */}
               <button
