@@ -11,6 +11,7 @@ function PreparatorioViewPage() {
   const [modulos, setModulos] = useState([]);
   const [aulas, setAulas] = useState([]);
   const [modulosExpandidos, setModulosExpandidos] = useState({});
+  const [disciplinasExpandidas, setDisciplinasExpandidas] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
@@ -170,6 +171,10 @@ function PreparatorioViewPage() {
     setModulosExpandidos(prev => ({ ...prev, [moduloId]: !prev[moduloId] }));
   };
 
+  const toggleDisciplina = (disciplinaId) => {
+    setDisciplinasExpandidas(prev => ({ ...prev, [disciplinaId]: !prev[disciplinaId] }));
+  };
+
   const getModulosDaDisciplina = (disciplinaId) => {
     return modulos.filter(m => m.disciplina_id === disciplinaId);
   };
@@ -267,87 +272,112 @@ function PreparatorioViewPage() {
           </div>
         )}
 
-        {disciplinasFiltradas.map(disciplina => (
-          <div key={disciplina.id} style={styles.disciplinaCard}>
-            <div style={styles.disciplinaHeader}>
-              <span style={styles.disciplinaIcon}>{disciplina.icone}</span>
-              <h2 style={styles.disciplinaTitle}>{disciplina.nome}</h2>
-            </div>
+        {disciplinasFiltradas.map(disciplina => {
+          const isDisciplinaExpanded = disciplinasExpandidas[disciplina.id] || false;
+          const totalAulas = getModulosDaDisciplina(disciplina.id).reduce(
+            (acc, m) => acc + getAulasDoModulo(m.id).length, 0
+          );
+          return (
+            <div key={disciplina.id} style={styles.disciplinaCard}>
+              {/* Header clicável da disciplina */}
+              <div
+                style={{
+                  ...styles.disciplinaHeader,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'background-color 0.2s'
+                }}
+                onClick={() => toggleDisciplina(disciplina.id)}
+              >
+                <span style={styles.disciplinaIcon}>{disciplina.icone}</span>
+                <h2 style={{...styles.disciplinaTitle, flex: 1}}>{disciplina.nome}</h2>
+                <span style={{ color: '#888', fontSize: '12px', marginRight: '12px' }}>
+                  {getModulosDaDisciplina(disciplina.id).length} módulos · {totalAulas} aulas
+                </span>
+                <span style={{
+                  color: '#AAA',
+                  fontSize: '18px',
+                  transition: 'transform 0.3s',
+                  transform: isDisciplinaExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  display: 'inline-block'
+                }}>▾</span>
+              </div>
 
-            {getModulosDaDisciplina(disciplina.id).map(modulo => {
-              const aulasModulo = getAulasDoModulo(modulo.id);
-              const isExpanded = modulosExpandidos[modulo.id];
-              return (
-                <div key={modulo.id} style={styles.moduloContainer}>
-                  <div style={styles.moduloHeader} onClick={() => toggleModulo(modulo.id)}>
-                    <span style={styles.moduloIcon}>{isExpanded ? '📖' : '📁'}</span>
-                    <span style={styles.moduloTitle}>{modulo.nome}</span>
-                    <span style={styles.moduloCount}>{aulasModulo.length} aulas</span>
-                    <span style={styles.moduloToggle}>{isExpanded ? '▲' : '▼'}</span>
-                  </div>
+              {/* Conteúdo colapsável */}
+              {isDisciplinaExpanded && getModulosDaDisciplina(disciplina.id).map(modulo => {
+                const aulasModulo = getAulasDoModulo(modulo.id);
+                const isExpanded = modulosExpandidos[modulo.id];
+                return (
+                  <div key={modulo.id} style={styles.moduloContainer}>
+                    <div style={styles.moduloHeader} onClick={() => toggleModulo(modulo.id)}>
+                      <span style={styles.moduloIcon}>{isExpanded ? '📖' : '📁'}</span>
+                      <span style={styles.moduloTitle}>{modulo.nome}</span>
+                      <span style={styles.moduloCount}>{aulasModulo.length} aulas</span>
+                      <span style={styles.moduloToggle}>{isExpanded ? '▲' : '▼'}</span>
+                    </div>
 
-                  {isExpanded && (
-                    <div style={styles.aulasList}>
-                      {aulasModulo.map((aula, idx) => {
-                        const nivelAula = aula.nivel || 'basico';
-                        // Bloqueio 3 níveis: basico só vê basico, medio vê basico+medio, premium vê tudo
-                        const bloqueada =
-                          (nivelAula === 'premium' && planoUsuario !== 'premium') ||
-                          (nivelAula === 'medio' && planoUsuario === 'basico');
+                    {isExpanded && (
+                      <div style={styles.aulasList}>
+                        {aulasModulo.map((aula, idx) => {
+                          const nivelAula = aula.nivel || 'basico';
+                          const bloqueada =
+                            (nivelAula === 'premium' && planoUsuario !== 'premium') ||
+                            (nivelAula === 'medio' && planoUsuario === 'basico');
 
-                        const badgeColor =
-                          nivelAula === 'premium' ? { bg: 'rgba(229,9,20,0.15)', color: '#E50914', border: '#E50914', label: 'PREMIUM' } :
-                          nivelAula === 'medio'   ? { bg: 'rgba(33,150,243,0.15)', color: '#2196F3', border: '#2196F3', label: 'MÉDIO' } :
-                          null;
+                          const badgeColor =
+                            nivelAula === 'premium' ? { bg: 'rgba(229,9,20,0.15)', color: '#E50914', border: '#E50914', label: 'PREMIUM' } :
+                            nivelAula === 'medio'   ? { bg: 'rgba(33,150,243,0.15)', color: '#2196F3', border: '#2196F3', label: 'MÉDIO' } :
+                            null;
 
-                        return (
-                          <div
-                            key={aula.id}
-                            style={{
-                              ...styles.aulaItem,
-                              opacity: bloqueada ? 0.5 : 1,
-                              cursor: bloqueada ? 'not-allowed' : 'pointer',
-                              position: 'relative'
-                            }}
-                            onClick={() => {
-                              if (bloqueada) {
-                                const planoNecessario = nivelAula === 'premium' ? 'Premium' : 'Médio';
-                                alert(`🔒 Esta aula requer o plano ${planoNecessario}.\n\nFaça o upgrade para acessar este conteúdo!`);
-                                return;
-                              }
-                              navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplina.id}/${modulo.id}/${aula.id}`);
-                            }}
-                          >
-                            <div style={styles.aulaLeft}>
-                              <span style={styles.aulaNumero}>{String(idx + 1).padStart(2, '0')}</span>
-                              <div>
-                                <div style={{...styles.aulaTitulo, display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                  {bloqueada && <span style={{fontSize: '12px'}}>🔒</span>}
-                                  {aula.titulo}
-                                  {badgeColor && (
-                                    <span style={{
-                                      fontSize: '9px', padding: '1px 5px', borderRadius: '999px',
-                                      backgroundColor: badgeColor.bg, color: badgeColor.color,
-                                      border: `1px solid ${badgeColor.border}`, fontWeight: 'bold'
-                                    }}>{badgeColor.label}</span>
-                                  )}
-                                </div>
+                          return (
+                            <div
+                              key={aula.id}
+                              style={{
+                                ...styles.aulaItem,
+                                opacity: bloqueada ? 0.5 : 1,
+                                cursor: bloqueada ? 'not-allowed' : 'pointer',
+                                position: 'relative'
+                              }}
+                              onClick={() => {
+                                if (bloqueada) {
+                                  const planoNecessario = nivelAula === 'premium' ? 'Premium' : 'Médio';
+                                  alert(`🔒 Esta aula requer o plano ${planoNecessario}.\n\nFaça o upgrade para acessar este conteúdo!`);
+                                  return;
+                                }
+                                navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplina.id}/${modulo.id}/${aula.id}`);
+                              }}
+                            >
+                              <div style={styles.aulaLeft}>
+                                <span style={styles.aulaNumero}>{String(idx + 1).padStart(2, '0')}</span>
+                                <div>
+                                  <div style={{...styles.aulaTitulo, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                    {bloqueada && <span style={{fontSize: '12px'}}>🔒</span>}
+                                    {aula.titulo}
+                                    {badgeColor && (
+                                      <span style={{
+                                        fontSize: '9px', padding: '1px 5px', borderRadius: '999px',
+                                        backgroundColor: badgeColor.bg, color: badgeColor.color,
+                                        border: `1px solid ${badgeColor.border}`, fontWeight: 'bold'
+                                      }}>{badgeColor.label}</span>
+                                    )}
+                                  </div>
                                   <div style={styles.aulaDuracao}>🎦 {formatarTempo(aula.duracao) || '--:--'}</div>
+                                </div>
+                              </div>
+                              <div style={{color: bloqueada ? '#555' : '#AAA', fontSize: '14px'}}>
+                                {bloqueada ? '🔒' : '▶'}
                               </div>
                             </div>
-                            <div style={{color: bloqueada ? '#555' : '#AAA', fontSize: '14px'}}>
-                              {bloqueada ? '🔒' : '▶'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
 
         {disciplinasFiltradas.length === 0 && (
           <div style={styles.emptyMessage}>
