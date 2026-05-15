@@ -24,6 +24,7 @@ function AulaPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [velocidade, setVelocidade] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iosFullscreen, setIosFullscreen] = useState(false); // fullscreen CSS para iOS
   const [volume, setVolume] = useState(100);
   const [showControls, setShowControls] = useState(true);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
@@ -868,8 +869,19 @@ function AulaPage() {
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
           {isIOS ? (
-            /* ── iOS Safari: iframe nativo — controls=0 remove barra com links do YouTube ── */
-            <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+            /* ── iOS Safari: iframe nativo com fake-fullscreen via CSS ── */
+            <div style={{
+              position: iosFullscreen ? 'fixed' : 'relative',
+              top: iosFullscreen ? 0 : 'auto',
+              left: iosFullscreen ? 0 : 'auto',
+              width: iosFullscreen ? '100vw' : '100%',
+              height: iosFullscreen ? '100vh' : undefined,
+              paddingBottom: iosFullscreen ? '0' : '56.25%',
+              zIndex: iosFullscreen ? 9999 : 'auto',
+              backgroundColor: '#000',
+              borderRadius: iosFullscreen ? 0 : '12px',
+              overflow: 'hidden',
+            }}>
               {videoId ? (
                 <iframe
                   ref={iosIframeRef}
@@ -886,49 +898,51 @@ function AulaPage() {
                 </div>
               )}
 
-              {/* 1) TOPO — bloqueia e esconde canal + título */}
+              {/* 1) TOPO: bloqueia título/canal — totalmente transparente, só intercepta toque */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
-                height: '25%',
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 60%, transparent)',
-                zIndex: 20, pointerEvents: 'auto', cursor: 'default',
+                height: '18%',
+                backgroundColor: 'transparent',
+                zIndex: 20, pointerEvents: 'auto',
               }} />
 
-              {/* 2) FAIXA INFERIOR — gradiente escuro que ESCONDE o logo visualmente + bloqueia clique */}
+              {/* 2) CANTO INFERIOR DIREITO: bloqueia logo do YouTube */}
               <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                height: '28%',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.92) 55%, transparent)',
-                zIndex: 20, pointerEvents: 'auto', cursor: 'default',
+                position: 'absolute', bottom: 0, right: 0,
+                width: '28%', height: '18%',
+                backgroundColor: 'transparent',
+                zIndex: 20, pointerEvents: 'auto',
               }} />
 
-              {/* 3) PATCH EXTRA sobre a marca d'água do YouTube (canto inferior direito) */}
+              {/* 3) CANTO INFERIOR ESQUERDO: bloqueia ícone de copiar link */}
               <div style={{
-                position: 'absolute', bottom: '4%', right: '2%',
-                width: '20%', height: '18%',
-                backgroundColor: 'rgba(0,0,0,0.95)',
-                zIndex: 21, pointerEvents: 'auto', borderRadius: '4px',
+                position: 'absolute', bottom: 0, left: 0,
+                width: '28%', height: '18%',
+                backgroundColor: 'transparent',
+                zIndex: 20, pointerEvents: 'auto',
               }} />
 
-              {/* 4) BOTÃO DE TELA CHEIA customizado para iOS */}
+              {/* 4) BOTÃO TELA CHEIA — fake fullscreen via CSS (iOS não suporta iframe.requestFullscreen) */}
               <button
-                onClick={() => {
-                  const el = iosIframeRef.current;
-                  if (!el) return;
-                  if (el.requestFullscreen) el.requestFullscreen();
-                  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-                }}
+                onClick={() => setIosFullscreen(f => !f)}
                 style={{
-                  position: 'absolute', bottom: '30%', right: '3%',
-                  zIndex: 25,
-                  background: 'rgba(0,0,0,0.65)',
-                  border: '1px solid rgba(255,255,255,0.35)',
-                  color: '#FFF', fontSize: '18px',
-                  borderRadius: '6px', padding: '7px 11px',
-                  cursor: 'pointer', lineHeight: 1,
+                  position: 'absolute',
+                  bottom: iosFullscreen ? '4%' : '20%',
+                  right: '3%',
+                  zIndex: 30,
+                  background: 'rgba(0,0,0,0.60)',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  color: '#FFF',
+                  fontSize: '18px',
+                  borderRadius: '6px',
+                  padding: '7px 11px',
+                  cursor: 'pointer',
+                  lineHeight: 1,
                 }}
-                title="Tela Cheia"
-              >⛶</button>
+                title={iosFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
+              >
+                {iosFullscreen ? '❐' : '⛶'}
+              </button>
             </div>
           ) : (
             /* ── Desktop/Android: player customizado com controles próprios ── */
