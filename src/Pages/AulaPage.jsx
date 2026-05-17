@@ -315,9 +315,8 @@ function AulaPage() {
         const { data: todasDisciplinas } = await supabase
           .from('disciplinas')
           .select('*')
-          .eq('preparatorio_id', preparatorioId)
-          .order('nome', { ascending: true });
-        setListaDisciplinas(todasDisciplinas || []);
+          .eq('preparatorio_id', preparatorioId);
+        setListaDisciplinas((todasDisciplinas || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
 
         // BUSCA DE AULAS DO MÓDULO EXPLORADO
         let aulasFinais = [];
@@ -335,9 +334,8 @@ function AulaPage() {
         const { data: todosModulos } = await supabase
           .from('modulos')
           .select('*')
-          .eq('disciplina_id', browsingDisciplinaId)
-          .order('id', { ascending: true });
-        setListaModulos(todosModulos || []);
+          .eq('disciplina_id', browsingDisciplinaId);
+        setListaModulos((todosModulos || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
 
         if (todosModulos && todosModulos.length > 0) {
           const { data: aulasData } = await supabase
@@ -346,7 +344,7 @@ function AulaPage() {
             .eq('modulo_id', browsingModuloId)
             .order('ordem', { ascending: true });
           
-          aulasFinais = normalizar(aulasData);
+          aulasFinais = normalizar(aulasData).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
         }
         setListaAulas(aulasFinais);
 

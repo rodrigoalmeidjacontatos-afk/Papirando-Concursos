@@ -979,9 +979,9 @@ function AdminPage() {
   const getPreparatorioNome = (id) => preparatorios.find(p => p.id === id)?.nome || '?';
   const getDisciplinaNome = (id) => disciplinas.find(d => d.id === id)?.nome || '?';
   const getModuloNome = (id) => modulos.find(m => m.id === id)?.nome || '?';
-  const getDisciplinasPorPrep = (prepId) => disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
-  const getModulosPorDisciplina = (discId) => modulos.filter(m => (m.disciplinaId || m.disciplina_id) === discId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
-  const getAulasPorModulo = (modId) => aulas.filter(a => (a.moduloId || a.modulo_id) === modId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999));
+  const getDisciplinasPorPrep = (prepId) => disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+  const getModulosPorDisciplina = (discId) => modulos.filter(m => (m.disciplinaId || m.disciplina_id) === discId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+  const getAulasPorModulo = (modId) => aulas.filter(a => (a.moduloId || a.modulo_id) === modId).sort((a,b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
 
   const menuItems = [
     { id: 'categorias', nome: '📁 Categorias', icone: '📁' },

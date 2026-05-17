@@ -176,11 +176,11 @@ function PreparatorioViewPage() {
   };
 
   const getModulosDaDisciplina = (disciplinaId) => {
-    return modulos.filter(m => m.disciplina_id === disciplinaId);
+    return modulos.filter(m => m.disciplina_id === disciplinaId).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
   };
 
   const getAulasDoModulo = (moduloId) => {
-    return aulas.filter(a => a.modulo_id === moduloId);
+    return aulas.filter(a => a.modulo_id === moduloId).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
   };
 
   const formatarTempo = (segundos) => {
@@ -213,7 +213,7 @@ function PreparatorioViewPage() {
   if (!preparatorio) return <LoadingScreen />;
 
   // Filtrar disciplinas que possuem módulos permitidos
-  const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0);
+  const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
 
   // Imagem de fundo fixa (soldado SWAT - Pinterest)
   const bgImage = '/images/bg-swat.jpg';
