@@ -528,6 +528,29 @@ function AulaPage() {
     */
   };
 
+  const stopProgressTracking = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  };
+
+  const startProgressTracking = (currentPlayer) => {
+    stopProgressTracking();
+    progressIntervalRef.current = setInterval(() => {
+      if (currentPlayer && typeof currentPlayer.getCurrentTime === 'function') {
+        try {
+          const tempo = currentPlayer.getCurrentTime();
+          setTempoAtual(tempo);
+          salvarProgresso(tempo);
+        } catch (e) {
+          console.error('Erro no tracking de progresso:', e);
+          stopProgressTracking();
+        }
+      }
+    }, 5000);
+  };
+
   useEffect(() => {
     // Carregar a API do YouTube se ainda não estiver carregada
     if (!window.YT) {
@@ -536,29 +559,6 @@ function AulaPage() {
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
-
-    const stopProgressTracking = () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-    };
-
-    const startProgressTracking = (currentPlayer) => {
-      stopProgressTracking();
-      progressIntervalRef.current = setInterval(() => {
-        if (currentPlayer && typeof currentPlayer.getCurrentTime === 'function') {
-          try {
-            const tempo = currentPlayer.getCurrentTime();
-            setTempoAtual(tempo);
-            salvarProgresso(tempo);
-          } catch (e) {
-            console.error('Erro no tracking de progresso:', e);
-            stopProgressTracking();
-          }
-        }
-      }, 5000);
-    };
 
     const initPlayer = () => {
       if (!videoId) return; 
@@ -723,6 +723,7 @@ function AulaPage() {
 
   const handleSeekStart = () => {
     setIsSeeking(true);
+    stopProgressTracking();
   };
 
   const handleSeekChange = (e) => {
@@ -734,6 +735,9 @@ function AulaPage() {
     if (player && typeof player.seekTo === 'function') {
       player.seekTo(tempoAtual, true);
       salvarProgresso(tempoAtual);
+      if (isPlaying) {
+        startProgressTracking(player);
+      }
     }
     setIsSeeking(false);
   };
@@ -1101,6 +1105,8 @@ function AulaPage() {
                       onMouseDown={handleSeekStart}
                       onChange={handleSeekChange}
                       onMouseUp={handleSeekEnd}
+                      onTouchStart={handleSeekStart}
+                      onTouchEnd={handleSeekEnd}
                       style={styles.modernProgressSlider}
                       step="0.1"
                     />
@@ -1663,7 +1669,7 @@ const styles = {
   modernProgressContainer: {
     position: 'relative',
     width: '100%',
-    height: '6px',
+    height: '24px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1694,8 +1700,10 @@ const styles = {
   },
   modernProgressSlider: {
     position: 'absolute',
+    left: 0,
+    top: 0,
     width: '100%',
-    height: '20px',
+    height: '100%',
     margin: 0,
     opacity: 0,
     zIndex: 5,
