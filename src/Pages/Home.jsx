@@ -12,6 +12,14 @@ function Home() {
   const [planoUsuario, setPlanoUsuario] = useState('basico'); 
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [continueAssistindo, setContinueAssistindo] = useState([]);
+  const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
+  const [estatisticasEstudo, setEstatisticasEstudo] = useState({
+    horasLiquidas: '0.0',
+    aulasConcluidas: 0,
+    aulasEmProgresso: 0,
+    streak: 0,
+    historicoCursos: []
+  });
 
   // Helper para não deixar requisições penduradas para sempre
   const withTimeout = (promise, ms = 8000) => {
@@ -328,95 +336,165 @@ function Home() {
     carregarESincronizarDados();
   }, []);
 
-  // Buscar progresso recente (Continue Assistindo)
+  // Buscar progresso recente e Estatísticas de Estudo (Netflix Style)
   useEffect(() => {
-    async function carregarProgressoRecente() {
+    async function carregarDadosProgresso() {
       if (!user) return;
       try {
-        const { data: recentProgress } = await supabase
+        // 1. Buscar todo o histórico de progresso do usuário
+        const { data: todosProgressos } = await supabase
           .from('progresso')
           .select('*')
           .eq('user_id', user.id)
-          .order('ultimo_acesso', { ascending: false })
-          .limit(8);
+          .order('ultimo_acesso', { ascending: false });
 
-        if (recentProgress && recentProgress.length > 0) {
-          const aulaIds = recentProgress.map(p => p.aula_id);
-          const { data: aulasData } = await supabase.from('aulas').select('*').in('id', aulaIds);
+        if (!todosProgressos || todosProgressos.length === 0) return;
+
+        // --- CÁLCULO DE ESTATÍSTICAS ---
+        // A. Tempo total assistido
+        const totalSegundos = todosProgressos.reduce((acc, curr) => acc + (curr.tempo_assistido || 0), 0);
+        const horasLiquidas = (totalSegundos / 3600).toFixed(1);
+
+        // B. Aulas Concluídas e Em Progresso
+        const aulasConcluidas = todosProgressos.filter(p => p.concluida).length;
+        const aulasEmProgresso = todosProgressos.filter(p => !p.concluida).length;
+
+        // C. Ofensiva / Streak 🔥
+        let streak = 0;
+        const datasUnicas = Array.from(new Set(
+          todosProgressos
+            .map(p => {
+              if (!p.ultimo_acesso) return null;
+              const d = new Date(p.ultimo_acesso);
+              return d.toISOString().split('T')[0];
+            })
+            .filter(Boolean)
+        )).sort((a, b) => b.localeCompare(a));
+
+        if (datasUnicas.length > 0) {
+          const hojeStr = new Date().toISOString().split('T')[0];
+          const ontem = new Date();
+          ontem.setDate(ontem.getDate() - 1);
+          const ontemStr = ontem.toISOString().split('T')[0];
           
-          if (aulasData && aulasData.length > 0) {
-            const moduloIds = aulasData.map(a => a.modulo_id || a.moduloId).filter(Boolean);
-            const { data: modulosData } = await supabase.from('modulos').select('*').in('id', moduloIds);
-            
-            if (modulosData && modulosData.length > 0) {
-              const disciplinaIds = modulosData.map(m => m.disciplina_id || m.disciplinaId).filter(Boolean);
-              const { data: disciplinasData } = await supabase.from('disciplinas').select('*').in('id', disciplinaIds);
-              
-              if (disciplinasData && disciplinasData.length > 0) {
-                const preparatorioIds = disciplinasData.map(d => d.preparatorio_id || d.preparatorioId).filter(Boolean);
-                const { data: preparatoriosData } = await supabase.from('preparatorios').select('*').in('id', preparatorioIds);
-                
-                const { data: vinculosData } = await supabase.from('vinculos').select('*');
-                
-                // Mapeia tudo
-                const list = recentProgress.map(p => {
-                  const aula = aulasData.find(a => a.id === p.aula_id);
-                  if (!aula) return null;
-                  
-                  const modulo = modulosData.find(m => m.id === (aula.modulo_id || aula.moduloId));
-                  if (!modulo) return null;
-                  
-                  const disciplina = disciplinasData.find(d => d.id === (modulo.disciplina_id || modulo.disciplinaId));
-                  if (!disciplina) return null;
-                  
-                  const preparatorio = preparatoriosData.find(prep => prep.id === (disciplina.preparatorio_id || disciplina.preparatorioId));
-                  if (!preparatorio) return null;
-                  
-                  // Acha a carreira correspondente
-                  let carreiraId = null;
-                  if (vinculosData) {
-                    const individual = vinculosData.find(v => !v.data && v.preparatorio_id === preparatorio.id);
-                    if (individual) {
-                      carreiraId = individual.carreira_id;
-                    } else {
-                      const legadoRow = vinculosData.find(v => v.data);
-                      if (legadoRow && legadoRow.data) {
-                        for (const [cId, prepsMap] of Object.entries(legadoRow.data)) {
-                          if (prepsMap && prepsMap[preparatorio.id]) {
-                            carreiraId = cId;
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  }
-                  
-                  // Fallback se não achar carreira
-                  if (!carreiraId) carreiraId = 'policiais'; // fallback seguro
-
-                  return {
-                    id: p.id,
-                    aula,
-                    modulo,
-                    disciplina,
-                    preparatorio,
-                    carreiraId,
-                    tempo: p.tempo_assistido,
-                    concluida: p.concluida,
-                    ultimoAcesso: p.ultimo_acesso
-                  };
-                }).filter(Boolean);
-                
-                setContinueAssistindo(list);
+          const temHoje = datasUnicas.includes(hojeStr);
+          const temOntem = datasUnicas.includes(ontemStr);
+          
+          if (temHoje || temOntem) {
+            streak = 1;
+            let dataRef = temHoje ? new Date() : ontem;
+            while (true) {
+              dataRef.setDate(dataRef.getDate() - 1);
+              const refStr = dataRef.toISOString().split('T')[0];
+              if (datasUnicas.includes(refStr)) {
+                streak++;
+              } else {
+                break;
               }
             }
           }
         }
+
+        // --- CARREGAR INFOS COMPLEMENTARES ---
+        const aulaIds = todosProgressos.map(p => p.aula_id);
+        const { data: aulasData } = await supabase.from('aulas').select('*').in('id', aulaIds);
+        
+        if (aulasData && aulasData.length > 0) {
+          const moduloIds = aulasData.map(a => a.modulo_id || a.moduloId).filter(Boolean);
+          const { data: modulosData } = await supabase.from('modulos').select('*').in('id', moduloIds);
+          
+          if (modulosData && modulosData.length > 0) {
+            const disciplinaIds = modulosData.map(m => m.disciplina_id || m.disciplinaId).filter(Boolean);
+            const { data: disciplinasData } = await supabase.from('disciplinas').select('*').in('id', disciplinaIds);
+            
+            if (disciplinasData && disciplinasData.length > 0) {
+              const preparatorioIds = disciplinasData.map(d => d.preparatorio_id || d.preparatorioId).filter(Boolean);
+              const { data: preparatoriosData } = await supabase.from('preparatorios').select('*').in('id', preparatorioIds);
+              
+              const { data: vinculosData } = await supabase.from('vinculos').select('*');
+
+              // Mapeia todos os progressos enriquecidos
+              const progressoCompleto = todosProgressos.map(p => {
+                const aula = aulasData.find(a => a.id === p.aula_id);
+                if (!aula) return null;
+                const modulo = modulosData.find(m => m.id === (aula.modulo_id || aula.moduloId));
+                if (!modulo) return null;
+                const disciplina = disciplinasData.find(d => d.id === (modulo.disciplina_id || modulo.disciplinaId));
+                if (!disciplina) return null;
+                const preparatorio = preparatoriosData.find(prep => prep.id === (disciplina.preparatorio_id || disciplina.preparatorioId));
+                if (!preparatorio) return null;
+
+                let carreiraId = null;
+                if (vinculosData) {
+                  const individual = vinculosData.find(v => !v.data && v.preparatorio_id === preparatorio.id);
+                  if (individual) {
+                    carreiraId = individual.carreira_id;
+                  } else {
+                    const legadoRow = vinculosData.find(v => v.data);
+                    if (legadoRow && legadoRow.data) {
+                      for (const [cId, prepsMap] of Object.entries(legadoRow.data)) {
+                        if (prepsMap && prepsMap[preparatorio.id]) {
+                          carreiraId = cId;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+                if (!carreiraId) carreiraId = 'policiais';
+
+                return {
+                  id: p.id,
+                  aula,
+                  modulo,
+                  disciplina,
+                  preparatorio,
+                  carreiraId,
+                  tempo: p.tempo_assistido,
+                  concluida: p.concluida,
+                  ultimoAcesso: p.ultimo_acesso
+                };
+              }).filter(Boolean);
+
+              // 1. Filtrar os primeiros 8 para o "Continue Assistindo"
+              setContinueAssistindo(progressoCompleto.slice(0, 8));
+
+              // 2. Agrupar progresso por preparatório para o "Histórico de Cursos"
+              const cursosMap = {};
+              progressoCompleto.forEach(item => {
+                const pId = item.preparatorio.id;
+                if (!cursosMap[pId]) {
+                  cursosMap[pId] = {
+                    preparatorio: item.preparatorio,
+                    totalAulas: 0,
+                    concluidas: 0,
+                    ultimoAcesso: item.ultimoAcesso
+                  };
+                }
+                cursosMap[pId].totalAulas++;
+                if (item.concluida) {
+                  cursosMap[pId].concluidas++;
+                }
+              });
+
+              const historicoCursos = Object.values(cursosMap).sort((a, b) => new Date(b.ultimoAcesso) - new Date(a.ultimoAcesso));
+
+              // 3. Atualizar Estado Geral de Estatísticas
+              setEstatisticasEstudo({
+                horasLiquidas,
+                aulasConcluidas,
+                aulasEmProgresso,
+                streak,
+                historicoCursos
+              });
+            }
+          }
+        }
       } catch (err) {
-        console.error("Erro ao carregar progresso recente:", err);
+        console.error("Erro ao carregar dados de progresso e estatísticas:", err);
       }
     }
-    carregarProgressoRecente();
+    carregarDadosProgresso();
   }, [user]);
 
   const scrollHorizontal = (categoriaId, direction) => {
@@ -590,227 +668,457 @@ function Home() {
       </div>
 
       <main style={styles.main}>
-        {/* CONTINUE ASSISTINDO (Netflix-Style) */}
-        {continueAssistindo.length > 0 && (
-          <div style={{ marginBottom: '50px', padding: '0 10px' }}>
-            <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '20px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              🍿 CONTINUE ASSISTINDO
-            </h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-              gap: '25px',
-              justifyContent: 'flex-start'
-            }}>
-              {continueAssistindo.map((item) => {
-                // Calcular porcentagem do progresso
-                let pct = 50;
-                if (item.tempo && item.aula?.duracao) {
-                  const durStr = String(item.aula.duracao);
-                  if (!isNaN(durStr)) {
-                    const sec = Number(durStr);
-                    if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
-                  } else {
-                    try {
-                      const parts = durStr.split(':').map(Number);
-                      let sec = 0;
-                      if (parts.length === 2) sec = parts[0] * 60 + parts[1];
-                      else if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
-                      if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
-                    } catch(e) {}
-                  }
-                }
-                if (item.concluida) pct = 100;
+        {/* NAVEGAÇÃO DE TABS DA HOME */}
+        <div style={{
+          display: 'flex',
+          gap: '15px',
+          borderBottom: '1px solid #1c1c1f',
+          paddingBottom: '15px',
+          marginBottom: '35px',
+          paddingLeft: '10px'
+        }}>
+          <button
+            onClick={() => setActiveHomeTab('inicio')}
+            style={{
+              background: activeHomeTab === 'inicio' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
+              border: activeHomeTab === 'inicio' ? '1px solid #E50914' : '1px solid #333',
+              color: activeHomeTab === 'inicio' ? '#FFF' : '#888',
+              padding: '10px 22px',
+              borderRadius: '999px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s',
+              boxShadow: activeHomeTab === 'inicio' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none'
+            }}
+          >
+            🏠 Início
+          </button>
+          <button
+            onClick={() => setActiveHomeTab('evolucao')}
+            style={{
+              background: activeHomeTab === 'evolucao' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
+              border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : '1px solid #333',
+              color: activeHomeTab === 'evolucao' ? '#FFF' : '#888',
+              padding: '10px 22px',
+              borderRadius: '999px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s',
+              boxShadow: activeHomeTab === 'evolucao' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none'
+            }}
+          >
+            📊 Minha Evolução
+          </button>
+        </div>
 
-                return (
-                  <div 
-                    key={item.id} 
-                    className="card-hover continue-assistindo-card"
-                    style={{
-                      backgroundColor: 'rgba(20, 20, 25, 0.75)',
-                      border: '1px solid #1c1c1f',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'all 0.25s',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                      boxSizing: 'border-box'
-                    }}
-                    onClick={() => navigate(`/aula/${item.carreiraId}/${item.preparatorio.id}/${item.disciplina.id}/${item.modulo.id}/${item.aula.id}`)}
-                  >
-                    {/* Imagem de Capa do Curso */}
-                    <div style={{ height: '140px', position: 'relative', overflow: 'hidden', backgroundColor: '#070708' }}>
-                      {item.preparatorio.capa ? (
-                        <img 
-                          src={item.preparatorio.capa} 
-                          alt="Capa" 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} 
-                        />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '32px' }}>
-                          📚
+        {/* TAB INÍCIO (Netflix Shelves & Continue Watching) */}
+        {activeHomeTab === 'inicio' && (
+          <>
+            {/* CONTINUE ASSISTINDO (Netflix-Style) */}
+            {continueAssistindo.length > 0 && (
+              <div style={{ marginBottom: '50px', padding: '0 10px' }}>
+                <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '20px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🍿 CONTINUE ASSISTINDO
+                </h2>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                  gap: '25px',
+                  justifyContent: 'flex-start'
+                }}>
+                  {continueAssistindo.map((item) => {
+                    // Calcular porcentagem do progresso
+                    let pct = 50;
+                    if (item.tempo && item.aula?.duracao) {
+                      const durStr = String(item.aula.duracao);
+                      if (!isNaN(durStr)) {
+                        const sec = Number(durStr);
+                        if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
+                      } else {
+                        try {
+                          const parts = durStr.split(':').map(Number);
+                          let sec = 0;
+                          if (parts.length === 2) sec = parts[0] * 60 + parts[1];
+                          else if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                          if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
+                        } catch(e) {}
+                      }
+                    }
+                    if (item.concluida) pct = 100;
+
+                    return (
+                      <div 
+                        key={item.id} 
+                        className="card-hover continue-assistindo-card"
+                        style={{
+                          backgroundColor: 'rgba(20, 20, 25, 0.75)',
+                          border: '1px solid #1c1c1f',
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          transition: 'all 0.25s',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                          boxSizing: 'border-box'
+                        }}
+                        onClick={() => navigate(`/aula/${item.carreiraId}/${item.preparatorio.id}/${item.disciplina.id}/${item.modulo.id}/${item.aula.id}`)}
+                      >
+                        {/* Imagem de Capa do Curso */}
+                        <div style={{ height: '140px', position: 'relative', overflow: 'hidden', backgroundColor: '#070708' }}>
+                          {item.preparatorio.capa ? (
+                            <img 
+                              src={item.preparatorio.capa} 
+                              alt="Capa" 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} 
+                            />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '32px' }}>
+                              📚
+                            </div>
+                          )}
+                          
+                          {/* Play Button Overlay */}
+                          <div style={{
+                            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                            zIndex: 2
+                          }}>
+                            <span style={{
+                              fontSize: '36px',
+                              color: '#FFF',
+                              filter: 'drop-shadow(0 0 8px rgba(229, 9, 20, 0.9))'
+                            }} className="play-icon-glow">▶️</span>
+                          </div>
+                          
+                          {/* Badge do Curso / Preparatório */}
+                          <span style={{
+                            position: 'absolute',
+                            top: '12px',
+                            left: '12px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            color: '#ffb300',
+                            fontSize: '9px',
+                            fontWeight: '900',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255,179,0,0.3)',
+                            zIndex: 3,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {item.preparatorio.nome}
+                          </span>
                         </div>
-                      )}
-                      
-                      {/* Play Button Overlay */}
+                        
+                        {/* Detalhes da Aula */}
+                        <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#101012' }}>
+                          <span style={{ fontSize: '9px', color: '#777', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            {item.disciplina.nome} • {item.modulo.nome}
+                          </span>
+                          <h3 style={{ fontSize: '13px', color: '#FFF', margin: 0, fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {item.aula.titulo}
+                          </h3>
+                        </div>
+                        
+                        {/* Netflix-style red progress bar */}
+                        <div style={{ height: '4px', backgroundColor: '#2b2b30', width: '100%', position: 'relative' }}>
+                          <div style={{ 
+                            height: '100%', 
+                            backgroundColor: '#E50914', 
+                            width: `${pct}%`,
+                            boxShadow: '0 0 8px rgba(229, 9, 20, 0.8)'
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {categorias.map((categoria) => {
+              // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
+              const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              const isPrep = nomeNorm.includes('preparatorio');
+              const bloqueado = isPrep && planoUsuario !== 'premium';
+
+              return (
+                <div key={categoria.id} style={styles.category}>
+                  <div style={styles.categoryHeader}>
+                    <h2 style={styles.categoryTitle}>{categoria.nome}</h2>
+                    {!bloqueado && <button style={styles.seeAllButton}>Ver todos →</button>}
+                    {bloqueado && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 'bold', color: '#E50914',
+                        backgroundColor: 'rgba(229,9,20,0.1)',
+                        border: '1px solid rgba(229,9,20,0.3)',
+                        padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
+                      }}>🔒 ACESSO RESTRITO</span>
+                    )}
+                  </div>
+
+                  {/* Wrapper relativo para posicionar o overlay */}
+                  <div style={{ position: 'relative' }}>
+
+                    {/* Carrossel — com blur forte se bloqueado */}
+                    <div style={{ position: 'relative' }}>
+                      <div style={{
+                        ...styles.carouselContainer,
+                        filter: bloqueado ? 'blur(22px) brightness(0.1) saturate(0.2)' : 'none',
+                        pointerEvents: bloqueado ? 'none' : 'auto',
+                        userSelect: bloqueado ? 'none' : 'auto',
+                      }}>
+                        <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft}>‹</button>
+                        <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
+                          {categoria.cursos.map((curso, idx) => (
+                            <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
+                              <div style={styles.cardImage}>
+                                <img src={curso.capa} alt={curso.nome} style={styles.image} />
+                                <div style={styles.cardOverlay}></div>
+                              </div>
+                              <div style={styles.cardInfo}>
+                                <h3 style={styles.cardTitle}>{curso.nome}</h3>
+                                <div style={styles.cardDetails}></div>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Cards fantasma para quando lista vazia mas bloqueado */}
+                          {bloqueado && categoria.cursos.length === 0 && [1,2,3,4].map(i => (
+                            <div key={i} style={{...styles.card, minWidth: '200px'}}>
+                              <div style={{...styles.cardImage, backgroundColor: '#1A1A1A'}} />
+                              <div style={{...styles.cardInfo}}>
+                                <div style={{height: '14px', backgroundColor: '#222', borderRadius: '4px', marginBottom: '8px'}} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight}>›</button>
+                      </div>
+                    </div>
+
+                    {/* OVERLAY DE BLOQUEIO — só aparece para básico na seção de preparatórios */}
+                    {bloqueado && (
                       <div style={{
                         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                        zIndex: 2
+                        zIndex: 10, minHeight: '200px'
                       }}>
-                        <span style={{
-                          fontSize: '36px',
-                          color: '#FFF',
-                          filter: 'drop-shadow(0 0 8px rgba(229, 9, 20, 0.9))'
-                        }} className="play-icon-glow">▶️</span>
+                        <div style={{
+                          backgroundColor: 'rgba(8,8,8,0.93)',
+                          borderRadius: '20px', padding: '36px 48px',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center',
+                          border: '1px solid rgba(229,9,20,0.25)',
+                          boxShadow: '0 0 50px rgba(229,9,20,0.1), 0 20px 60px rgba(0,0,0,0.9)',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '48px', marginBottom: '8px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
+                          <div style={{
+                            fontSize: '10px', fontWeight: 'bold', letterSpacing: '3px',
+                            color: '#E50914', border: '1px solid rgba(229,9,20,0.4)',
+                            backgroundColor: 'rgba(229,9,20,0.08)',
+                            padding: '3px 14px', borderRadius: '999px', marginBottom: '12px'
+                          }}>ACESSO RESTRITO</div>
+                          <h3 style={{ color: '#FFF', margin: '0 0 8px', fontSize: '20px', fontWeight: 'bold' }}>
+                            Área de Preparatórios
+                          </h3>
+                          <p style={{ color: '#888', margin: '0', fontSize: '13px', lineHeight: '1.7', maxWidth: '280px' }}>
+                            Esta área é exclusiva para usuários<br />com acesso habilitado pelo administrador.
+                          </p>
+                        </div>
                       </div>
-                      
-                      {/* Badge do Curso / Preparatório */}
-                      <span style={{
-                        position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        color: '#ffb300',
-                        fontSize: '9px',
-                        fontWeight: '900',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(255,179,0,0.3)',
-                        zIndex: 3,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {item.preparatorio.nome}
-                      </span>
-                    </div>
-                    
-                    {/* Detalhes da Aula */}
-                    <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#101012' }}>
-                      <span style={{ fontSize: '9px', color: '#777', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        {item.disciplina.nome} • {item.modulo.nome}
-                      </span>
-                      <h3 style={{ fontSize: '13px', color: '#FFF', margin: 0, fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {item.aula.titulo}
-                      </h3>
-                    </div>
-                    
-                    {/* Netflix-style red progress bar */}
-                    <div style={{ height: '4px', backgroundColor: '#2b2b30', width: '100%', position: 'relative' }}>
-                      <div style={{ 
-                        height: '100%', 
-                        backgroundColor: '#E50914', 
-                        width: `${pct}%`,
-                        boxShadow: '0 0 8px rgba(229, 9, 20, 0.8)'
-                      }} />
-                    </div>
+                    )}
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* TAB MINHA EVOLUÇÃO (Student Stats Dashboard) */}
+        {activeHomeTab === 'evolucao' && (
+          <div style={{ padding: '0 10px', animation: 'fadeIn 0.4s' }}>
+            <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '25px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              📊 DESEMPENHO E EVOLUÇÃO
+            </h2>
+
+            {/* Grid de Cards de Estatísticas */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '20px',
+              marginBottom: '40px'
+            }}>
+              {/* Card Streak/Ofensiva */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(229, 9, 20, 0.15) 0%, rgba(20, 20, 25, 0.85) 100%)',
+                border: '1px solid rgba(229, 9, 20, 0.3)',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                boxShadow: '0 8px 24px rgba(229, 9, 20, 0.15)'
+              }}>
+                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(229,9,20,0.6))' }}>🔥</span>
+                <div>
+                  <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
+                    {estatisticasEstudo.streak}
+                  </h3>
+                  <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Dias Seguidos (Ofensiva)
+                  </p>
+                </div>
+              </div>
+
+              {/* Card Horas Estudadas */}
+              <div style={{
+                background: 'rgba(20, 20, 25, 0.75)',
+                border: '1px solid #1c1c1f',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+              }}>
+                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.1))' }}>⏳</span>
+                <div>
+                  <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
+                    {estatisticasEstudo.horasLiquidas}h
+                  </h3>
+                  <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Tempo Estudado
+                  </p>
+                </div>
+              </div>
+
+              {/* Card Aulas Concluídas */}
+              <div style={{
+                background: 'rgba(20, 20, 25, 0.75)',
+                border: '1px solid #1c1c1f',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+              }}>
+                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(76,175,80,0.3))' }}>✅</span>
+                <div>
+                  <h3 style={{ fontSize: '28px', color: '#4CAF50', margin: '0 0 4px', fontWeight: '900' }}>
+                    {estatisticasEstudo.aulasConcluidas}
+                  </h3>
+                  <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Aulas Concluídas
+                  </p>
+                </div>
+              </div>
+
+              {/* Card Aulas Iniciadas */}
+              <div style={{
+                background: 'rgba(20, 20, 25, 0.75)',
+                border: '1px solid #1c1c1f',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+              }}>
+                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(33,150,243,0.3))' }}>🍿</span>
+                <div>
+                  <h3 style={{ fontSize: '28px', color: '#2196F3', margin: '0 0 4px', fontWeight: '900' }}>
+                    {estatisticasEstudo.aulasEmProgresso}
+                  </h3>
+                  <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Aulas Em Andamento
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Listagem de Preparatórios Estudados */}
+            <div style={{
+              backgroundColor: 'rgba(20, 20, 25, 0.75)',
+              border: '1px solid #1c1c1f',
+              borderRadius: '16px',
+              padding: '25px',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)'
+            }}>
+              <h3 style={{ fontSize: '16px', color: '#FFF', fontWeight: '700', marginBottom: '20px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                🎓 Meus Cursos em Andamento
+              </h3>
+              
+              {estatisticasEstudo.historicoCursos.length === 0 ? (
+                <div style={{ color: '#666', textAlign: 'center', padding: '30px 0', fontSize: '14px' }}>
+                  Nenhum curso iniciado ainda. Comece a assistir uma aula para registrar seu progresso!
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {estatisticasEstudo.historicoCursos.map((item) => {
+                    const pctCurso = Math.round((item.concluidas / item.totalAulas) * 100) || 0;
+                    return (
+                      <div key={item.preparatorio.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '20px',
+                        borderBottom: '1px solid #16161a',
+                        paddingBottom: '20px',
+                        flexWrap: 'wrap'
+                      }}>
+                        {/* Capa miniaturizada */}
+                        <div style={{ width: '100px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000' }}>
+                          {item.preparatorio.capa ? (
+                            <img src={item.preparatorio.capa} alt="Capa" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📚</div>
+                          )}
+                        </div>
+
+                        {/* Detalhes do Curso */}
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <h4 style={{ fontSize: '15px', color: '#FFF', margin: '0 0 6px', fontWeight: '700' }}>
+                            {item.preparatorio.nome}
+                          </h4>
+                          <span style={{ fontSize: '12px', color: '#888', fontWeight: '500' }}>
+                            {item.concluidas} de {item.totalAulas} aulas concluídas • Último estudo em: {new Date(item.ultimoAcesso).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+
+                        {/* Barra de Progresso do Curso */}
+                        <div style={{ width: '180px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ flex: 1, height: '6px', backgroundColor: '#2b2b30', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              backgroundColor: '#E50914',
+                              width: `${pctCurso}%`,
+                              borderRadius: '3px',
+                              boxShadow: '0 0 8px rgba(229, 9, 20, 0.6)'
+                            }} />
+                          </div>
+                          <span style={{ fontSize: '13px', color: '#FFF', fontWeight: 'bold', minWidth: '35px', textAlign: 'right' }}>
+                            {pctCurso}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
-
-        {categorias.map((categoria) => {
-          // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
-          const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const isPrep = nomeNorm.includes('preparatorio');
-          // Apenas PREMIUM tem acesso — básico e médio são bloqueados (como solicitado)
-          const bloqueado = isPrep && planoUsuario !== 'premium';
-
-          return (
-            <div key={categoria.id} style={styles.category}>
-              <div style={styles.categoryHeader}>
-                <h2 style={styles.categoryTitle}>{categoria.nome}</h2>
-                {!bloqueado && <button style={styles.seeAllButton}>Ver todos →</button>}
-                {bloqueado && (
-                  <span style={{
-                    fontSize: '11px', fontWeight: 'bold', color: '#E50914',
-                    backgroundColor: 'rgba(229,9,20,0.1)',
-                    border: '1px solid rgba(229,9,20,0.3)',
-                    padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
-                  }}>🔒 ACESSO RESTRITO</span>
-                )}
-              </div>
-
-              {/* Wrapper relativo para posicionar o overlay */}
-              <div style={{ position: 'relative' }}>
-
-                {/* Carrossel — com blur forte se bloqueado */}
-                <div style={{ position: 'relative' }}>
-                  <div style={{
-                    ...styles.carouselContainer,
-                    filter: bloqueado ? 'blur(22px) brightness(0.1) saturate(0.2)' : 'none',
-                    pointerEvents: bloqueado ? 'none' : 'auto',
-                    userSelect: bloqueado ? 'none' : 'auto',
-                  }}>
-                    <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft}>‹</button>
-                    <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
-                      {categoria.cursos.map((curso, idx) => (
-                        <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
-                          <div style={styles.cardImage}>
-                            <img src={curso.capa} alt={curso.nome} style={styles.image} />
-                            <div style={styles.cardOverlay}></div>
-                          </div>
-                          <div style={styles.cardInfo}>
-                            <h3 style={styles.cardTitle}>{curso.nome}</h3>
-                            <div style={styles.cardDetails}></div>
-                          </div>
-                        </div>
-                      ))}
-                      {/* Cards fantasma para quando lista vazia mas bloqueado */}
-                      {bloqueado && categoria.cursos.length === 0 && [1,2,3,4].map(i => (
-                        <div key={i} style={{...styles.card, minWidth: '200px'}}>
-                          <div style={{...styles.cardImage, backgroundColor: '#1A1A1A'}} />
-                          <div style={{...styles.cardInfo}}>
-                            <div style={{height: '14px', backgroundColor: '#222', borderRadius: '4px', marginBottom: '8px'}} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight}>›</button>
-                  </div>
-                </div>
-
-                {/* OVERLAY DE BLOQUEIO — só aparece para básico na seção de preparatórios */}
-                {bloqueado && (
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 10, minHeight: '200px'
-                  }}>
-                    <div style={{
-                      backgroundColor: 'rgba(8,8,8,0.93)',
-                      borderRadius: '20px', padding: '36px 48px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      border: '1px solid rgba(229,9,20,0.25)',
-                      boxShadow: '0 0 50px rgba(229,9,20,0.1), 0 20px 60px rgba(0,0,0,0.9)',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{ fontSize: '48px', marginBottom: '8px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
-                      <div style={{
-                        fontSize: '10px', fontWeight: 'bold', letterSpacing: '3px',
-                        color: '#E50914', border: '1px solid rgba(229,9,20,0.4)',
-                        backgroundColor: 'rgba(229,9,20,0.08)',
-                        padding: '3px 14px', borderRadius: '999px', marginBottom: '12px'
-                      }}>ACESSO RESTRITO</div>
-                      <h3 style={{ color: '#FFF', margin: '0 0 8px', fontSize: '20px', fontWeight: 'bold' }}>
-                        Área de Preparatórios
-                      </h3>
-                      <p style={{ color: '#888', margin: '0', fontSize: '13px', lineHeight: '1.7', maxWidth: '280px' }}>
-                        Esta área é exclusiva para usuários<br />com acesso habilitado pelo administrador.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
       </main>
 
       <footer style={styles.footer}>

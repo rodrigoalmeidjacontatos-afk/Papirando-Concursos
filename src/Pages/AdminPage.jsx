@@ -32,6 +32,14 @@ function AdminPage() {
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(false);
   const [novosUsuariosBadge, setNovosUsuariosBadge] = useState(0);
   
+  // ========== MÉTRICAS DE NEGÓCIO (NOVO) ==========
+  const [metricasNegocio, setMetricasNegocio] = useState({
+    usuariosPorPlano: { basico: 0, medio: 0, premium: 0 },
+    topAlunos: [],
+    rankingCursos: [],
+    carregandoMetricas: false
+  });
+  
   // ========== CONTROLE DE EXPANSÃO ==========
   const [selectedPrepId, setSelectedPrepId] = useState(null);
   const [expandedPreparatorio, setExpandedPreparatorio] = useState(null);
@@ -90,6 +98,93 @@ function AdminPage() {
       setUsuarios(data || []);
     }
     setCarregandoUsuarios(false);
+  };
+
+  const carregarMetricasNegocio = async () => {
+    setMetricasNegocio(prev => ({ ...prev, carregandoMetricas: true }));
+    try {
+      console.log("[Admin] Buscando métricas de negócios...");
+      // 1. Carrega todos os perfis do Supabase
+      const { data: perfis, error: perfisErr } = await supabase.from('profiles').select('id, email, nome, plano');
+      if (perfisErr) throw perfisErr;
+
+      // 2. Agrupa assinantes por planos
+      const planos = { basico: 0, medio: 0, premium: 0 };
+      perfis.forEach(p => {
+        const pl = String(p.plano || 'basico').toLowerCase();
+        if (pl === 'premium' || pl === 'vip') planos.premium++;
+        else if (pl === 'medio' || pl === 'intermediario') planos.medio++;
+        else planos.basico++;
+      });
+
+      // 3. Carrega todo o progresso de estudos
+      const { data: progressos, error: progErr } = await supabase.from('progresso').select('user_id, aula_id, tempo_assistido, concluida');
+      if (progErr) throw progErr;
+
+      // 4. Calcula Top Alunos (Engajamento por aulas estudadas/concluídas)
+      const alunosMap = {};
+      progressos.forEach(p => {
+        const uid = p.user_id;
+        if (!uid) return;
+        if (!alunosMap[uid]) {
+          const perfil = perfis.find(perf => perf.id === uid);
+          alunosMap[uid] = {
+            nome: perfil?.nome || perfil?.email || 'Estudante Anônimo',
+            email: perfil?.email || 'sem-email@plataforma.com.br',
+            plano: perfil?.plano || 'basico',
+            totalAulas: 0,
+            concluidas: 0,
+            tempoSegundos: 0
+          };
+        }
+        alunosMap[uid].totalAulas++;
+        if (p.concluida) alunosMap[uid].concluidas++;
+        alunosMap[uid].tempoSegundos += (p.tempo_assistido || 0);
+      });
+
+      const topAlunos = Object.values(alunosMap)
+        .sort((a, b) => b.concluidas - a.concluidas)
+        .slice(0, 5);
+
+      // 5. Ranking de Cursos
+      const rankingMap = {};
+      progressos.forEach(p => {
+        const aula = aulas.find(a => a.id === p.aula_id);
+        if (!aula) return;
+        const modulo = modulos.find(m => m.id === (aula.moduloId || aula.modulo_id));
+        if (!modulo) return;
+        const disciplina = disciplinas.find(d => d.id === (modulo.disciplinaId || modulo.disciplina_id));
+        if (!disciplina) return;
+        const prepId = disciplina.preparatorioId || disciplina.preparatorio_id;
+        const prep = preparatorios.find(pr => pr.id === prepId);
+        if (!prep) return;
+
+        if (!rankingMap[prepId]) {
+          rankingMap[prepId] = {
+            nome: prep.nome,
+            capa: prep.capa,
+            acessos: 0,
+            horasTotais: 0
+          };
+        }
+        rankingMap[prepId].acessos++;
+        rankingMap[prepId].horasTotais += ((p.tempo_assistido || 0) / 3600);
+      });
+
+      const rankingCursos = Object.values(rankingMap)
+        .sort((a, b) => b.acessos - a.acessos)
+        .slice(0, 5);
+
+      setMetricasNegocio({
+        usuariosPorPlano: planos,
+        topAlunos,
+        rankingCursos,
+        carregandoMetricas: false
+      });
+    } catch (err) {
+      console.error("Erro ao carregar métricas de negócios:", err);
+      setMetricasNegocio(prev => ({ ...prev, carregandoMetricas: false }));
+    }
   };
 
   const atualizarPlano = async (userId, novoPlano) => {
@@ -203,6 +298,8 @@ function AdminPage() {
   useEffect(() => {
     if (activeMenu === 'usuarios') {
       buscarUsuarios();
+    } else if (activeMenu === 'metricas') {
+      carregarMetricasNegocio();
     }
   }, [activeMenu]);
 
@@ -997,6 +1094,7 @@ function AdminPage() {
     { id: 'vincular', nome: '🔗 Vincular', icone: '🔗' },
     { id: 'documentos', nome: '📄 Documentos', icone: '📄' },
     { id: 'usuarios', nome: '👥 Usuários', icone: '👥' },
+    { id: 'metricas', nome: '📈 Indicadores', icone: '📈' },
   ];
 
   if (!authChecked) {
@@ -1854,6 +1952,198 @@ function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeMenu === 'metricas' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+                <h2 style={{ color: '#fff', margin: 0, fontWeight: '800' }}>📈 Indicadores de Desempenho</h2>
+                <button
+                  onClick={carregarMetricasNegocio}
+                  style={{
+                    backgroundColor: 'rgba(229, 9, 20, 0.1)',
+                    border: '1px solid #E50914',
+                    color: '#FFF',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🔄 Atualizar Dados
+                </button>
+              </div>
+
+              {metricasNegocio.carregandoMetricas ? (
+                <div style={{ color: '#AAA', padding: '40px 0', textAlign: 'center', fontSize: '15px' }}>
+                  ⏳ Calculando indicadores e processando banco de dados...
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  
+                  {/* Row de KPIs de Assinantes */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '20px'
+                  }}>
+                    {/* Premium Card */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(255, 179, 0, 0.15) 0%, rgba(26, 26, 26, 0.9) 100%)',
+                      border: '1px solid rgba(255, 179, 0, 0.3)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      boxShadow: '0 8px 24px rgba(255, 179, 0, 0.05)'
+                    }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#ffb300', textTransform: 'uppercase', letterSpacing: '1px' }}>⭐ Alunos Premium</span>
+                      <h3 style={{ fontSize: '36px', color: '#FFF', margin: '12px 0 0', fontWeight: '900' }}>
+                        {metricasNegocio.usuariosPorPlano.premium}
+                      </h3>
+                    </div>
+
+                    {/* Médio Card */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.15) 0%, rgba(26, 26, 26, 0.9) 100%)',
+                      border: '1px solid rgba(33, 150, 243, 0.3)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      boxShadow: '0 8px 24px rgba(33, 150, 243, 0.05)'
+                    }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2196F3', textTransform: 'uppercase', letterSpacing: '1px' }}>🥈 Alunos Médio</span>
+                      <h3 style={{ fontSize: '36px', color: '#FFF', margin: '12px 0 0', fontWeight: '900' }}>
+                        {metricasNegocio.usuariosPorPlano.medio}
+                      </h3>
+                    </div>
+
+                    {/* Básico Card */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(26, 26, 26, 0.9) 100%)',
+                      border: '1px solid rgba(255, 152, 0, 0.25)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      boxShadow: '0 8px 24px rgba(255, 152, 0, 0.05)'
+                    }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#FF9800', textTransform: 'uppercase', letterSpacing: '1px' }}>🔒 Alunos Básico</span>
+                      <h3 style={{ fontSize: '36px', color: '#FFF', margin: '12px 0 0', fontWeight: '900' }}>
+                        {metricasNegocio.usuariosPorPlano.basico}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Grid de Tabelas Analíticas */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+                    gap: '25px'
+                  }}>
+                    {/* Preparatórios mais populares */}
+                    <div style={{
+                      backgroundColor: '#1A1A1A',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid #333'
+                    }}>
+                      <h3 style={{ color: '#FFF', margin: '0 0 20px', fontSize: '16px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        🔥 Cursos Preparatórios Mais Assistidos
+                      </h3>
+
+                      {metricasNegocio.rankingCursos.length === 0 ? (
+                        <div style={{ color: '#666', textAlign: 'center', padding: '30px 0' }}>
+                          Nenhum acesso de estudo registrado ainda.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                          {metricasNegocio.rankingCursos.map((curso, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '15px',
+                              borderBottom: idx !== metricasNegocio.rankingCursos.length - 1 ? '1px solid #2A2A2A' : 'none',
+                              paddingBottom: idx !== metricasNegocio.rankingCursos.length - 1 ? '15px' : '0'
+                            }}>
+                              <div style={{
+                                width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'rgba(229, 9, 20, 0.15)',
+                                color: '#E50914', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{ width: '60px', height: '36px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#000' }}>
+                                {curso.capa ? (
+                                  <img src={curso.capa} alt="Capa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>📚</div>
+                                )}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '14px' }}>{curso.nome}</div>
+                                <div style={{ color: '#888', fontSize: '12px', marginTop: '3px' }}>
+                                  {curso.acessos} vídeoaulas acessadas • {curso.horasTotais.toFixed(1)} horas assistidas
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* TOP 5 Estudantes Engajados */}
+                    <div style={{
+                      backgroundColor: '#1A1A1A',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid #333'
+                    }}>
+                      <h3 style={{ color: '#FFF', margin: '0 0 20px', fontSize: '16px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        🏆 Alunos de Alta Performance
+                      </h3>
+
+                      {metricasNegocio.topAlunos.length === 0 ? (
+                        <div style={{ color: '#666', textAlign: 'center', padding: '30px 0' }}>
+                          Nenhum progresso de estudante registrado no banco de dados.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                          {metricasNegocio.topAlunos.map((aluno, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '15px',
+                              borderBottom: idx !== metricasNegocio.topAlunos.length - 1 ? '1px solid #2A2A2A' : 'none',
+                              paddingBottom: idx !== metricasNegocio.topAlunos.length - 1 ? '15px' : '0'
+                            }}>
+                              <div style={{
+                                width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                                color: '#4CAF50', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {aluno.nome}
+                                  <span style={{
+                                    fontSize: '9px', padding: '2px 6px', borderRadius: '4px',
+                                    backgroundColor: aluno.plano === 'premium' ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)',
+                                    color: aluno.plano === 'premium' ? '#4CAF50' : '#FF9800'
+                                  }}>
+                                    {String(aluno.plano).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div style={{ color: '#888', fontSize: '12px', marginTop: '3px' }}>
+                                  {aluno.concluidas} concluídas de {aluno.totalAulas} assistidas • {((aluno.tempoSegundos || 0) / 3600).toFixed(1)} horas líquidas
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
