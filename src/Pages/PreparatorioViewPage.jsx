@@ -25,7 +25,7 @@ function PreparatorioViewPage() {
     const dataAula = new Date(createdAtString);
     const agora = new Date();
     const diferencaMs = agora - dataAula;
-    return diferencaMs > 0 && diferencaMs < 48 * 60 * 60 * 1000; // 48 horas
+    return diferencaMs > 0 && diferencaMs < 12 * 60 * 60 * 1000; // 12 horas
   };
 
   useEffect(() => {

@@ -328,9 +328,9 @@ function Home() {
       } else {
         setCategorias(categoriasComCursos);
         
-        // Buscar novas vídeoaulas adicionadas nas últimas 48 horas para destacar cursos atualizados
+        // Buscar novas vídeoaulas adicionadas nas últimas 12 horas para destacar cursos atualizados
         try {
-          const limiteRecente = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+          const limiteRecente = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
           const { data: novasAulas } = await supabase
             .from('aulas')
             .select('id, modulo_id, created_at')
