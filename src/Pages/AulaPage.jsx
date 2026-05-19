@@ -1648,8 +1648,6 @@ function AulaPage() {
                     </div>
                   </div>
                 )}
-                  </div>
-                )}
               </div>
             </>
           ) : sidebarView === 'disciplinas' ? (
