@@ -1013,6 +1013,40 @@ function AulaPage() {
 
       <div style={styles.mainContainer} className="aula-main-container">
         <div style={styles.playerSection} className="player-section">
+
+          {/* Título da Aula acima do player */}
+          {aulaPlaying?.titulo && (
+            <div style={{
+              marginBottom: '14px',
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <p style={{
+                margin: 0,
+                fontSize: '11px',
+                color: '#E50914',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '1.5px'
+              }}>
+                {disciplina?.nome || ''}
+              </p>
+              <h2 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: '800',
+                color: '#F5F5F5',
+                lineHeight: '1.35',
+                letterSpacing: '0.2px'
+              }}>
+                {aulaPlaying.titulo}
+              </h2>
+            </div>
+          )}
+
           {isIOS ? (
             /* ── iOS Safari: iframe nativo com fake-fullscreen via CSS ── */
             <div style={{
