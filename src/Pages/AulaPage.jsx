@@ -1864,8 +1864,7 @@ const styles = {
     gap: '0',
     padding: '0',
     width: '100%',
-    height: 'calc(100vh - 80px)', // Altura fixa descontando o header
-    overflow: 'hidden'
+    minHeight: 'calc(100vh - 80px)', // Altura mínima para preencher a tela
   },
   playerSection: { 
     flex: 3, 
@@ -1874,12 +1873,12 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    overflowY: 'auto'
   },
   playerContainer: {
     position: 'relative',
     width: '100%',
     maxWidth: '1000px',
+    flexShrink: 0,
     aspectRatio: '16 / 9',
     backgroundColor: '#000',
     borderRadius: '16px',
@@ -2114,13 +2113,13 @@ const styles = {
     backgroundColor: '#000', 
     borderRadius: '0', 
     overflow: 'hidden', 
-    alignSelf: 'stretch', 
+    alignSelf: 'flex-start', 
     position: 'sticky', 
     top: '80px', 
     borderLeft: '1px solid #222',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: 'calc(100vh - 80px)'
+    height: 'calc(100vh - 80px)'
   },
   sidebarHeaderMain: {
     padding: '24px 20px 10px 20px',
