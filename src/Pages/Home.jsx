@@ -403,21 +403,29 @@ function Home() {
 
         // C. Ofensiva / Streak 🔥
         let streak = 0;
+        
+        // Helper para formatar a data local em YYYY-MM-DD
+        const obterDataLocalStr = (dateObj) => {
+          const y = dateObj.getFullYear();
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const d = String(dateObj.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        };
+
         const datasUnicas = Array.from(new Set(
           todosProgressos
             .map(p => {
               if (!p.ultimo_acesso) return null;
-              const d = new Date(p.ultimo_acesso);
-              return d.toISOString().split('T')[0];
+              return obterDataLocalStr(new Date(p.ultimo_acesso));
             })
             .filter(Boolean)
         )).sort((a, b) => b.localeCompare(a));
 
         if (datasUnicas.length > 0) {
-          const hojeStr = new Date().toISOString().split('T')[0];
+          const hojeStr = obterDataLocalStr(new Date());
           const ontem = new Date();
           ontem.setDate(ontem.getDate() - 1);
-          const ontemStr = ontem.toISOString().split('T')[0];
+          const ontemStr = obterDataLocalStr(ontem);
           
           const temHoje = datasUnicas.includes(hojeStr);
           const temOntem = datasUnicas.includes(ontemStr);
@@ -427,7 +435,7 @@ function Home() {
             let dataRef = temHoje ? new Date() : ontem;
             while (true) {
               dataRef.setDate(dataRef.getDate() - 1);
-              const refStr = dataRef.toISOString().split('T')[0];
+              const refStr = obterDataLocalStr(dataRef);
               if (datasUnicas.includes(refStr)) {
                 streak++;
               } else {
