@@ -751,8 +751,8 @@ function Home() {
             onClick={() => setActiveHomeTab('evolucao')}
             style={{
               background: activeHomeTab === 'evolucao' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
-              border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : '1px solid #333',
-              color: activeHomeTab === 'evolucao' ? '#FFF' : '#888',
+              border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : planoUsuario === 'basico' ? '1px solid rgba(255,179,0,0.3)' : '1px solid #333',
+              color: activeHomeTab === 'evolucao' ? '#FFF' : planoUsuario === 'basico' ? '#ffb300' : '#888',
               padding: '10px 22px',
               borderRadius: '999px',
               fontSize: '13px',
@@ -762,10 +762,11 @@ function Home() {
               alignItems: 'center',
               gap: '8px',
               transition: 'all 0.25s',
-              boxShadow: activeHomeTab === 'evolucao' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none'
+              boxShadow: activeHomeTab === 'evolucao' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none',
+              opacity: planoUsuario === 'basico' ? 0.75 : 1
             }}
           >
-            📊 Minha Evolução
+            {planoUsuario === 'basico' ? '🔒' : '📊'} Minha Evolução
           </button>
         </div>
 
@@ -1017,8 +1018,57 @@ function Home() {
 
         {/* TAB MINHA EVOLUÇÃO (Student Stats Dashboard) */}
         {activeHomeTab === 'evolucao' && (
-          <div style={{ padding: '0 10px', animation: 'fadeIn 0.4s' }}>
-            <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '25px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '0 10px', animation: 'fadeIn 0.4s', position: 'relative' }}>
+
+            {/* OVERLAY DE BLOQUEIO PARA USUÁRIO BÁSICO */}
+            {planoUsuario === 'basico' && (
+              <div style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 10,
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                backgroundColor: 'rgba(7, 7, 7, 0.6)',
+                borderRadius: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                textAlign: 'center',
+                padding: '40px',
+                minHeight: '400px'
+              }}>
+                <div style={{ fontSize: '64px', filter: 'drop-shadow(0 0 20px rgba(255,179,0,0.6))' }}>📊</div>
+                <div style={{
+                  backgroundColor: 'rgba(255,179,0,0.1)',
+                  border: '1px solid rgba(255,179,0,0.4)',
+                  borderRadius: '20px',
+                  padding: '30px 40px',
+                  maxWidth: '420px'
+                }}>
+                  <h3 style={{ color: '#ffb300', fontSize: '22px', fontWeight: '900', margin: '0 0 10px', letterSpacing: '0.5px' }}>
+                    🔒 Recurso Exclusivo
+                  </h3>
+                  <p style={{ color: '#ccc', fontSize: '14px', lineHeight: '1.7', margin: '0 0 20px' }}>
+                    Acompanhe sua ofensiva de estudos, horas assistidas e progresso por curso — disponível nos planos <strong style={{ color: '#ffb300' }}>Médio e Premium</strong>.
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ backgroundColor: 'rgba(33,150,243,0.15)', color: '#2196F3', border: '1px solid #2196F3', padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
+                      📈 Plano Médio
+                    </span>
+                    <span style={{ backgroundColor: 'rgba(229,9,20,0.15)', color: '#E50914', border: '1px solid #E50914', padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
+                      ⭐ Plano Premium
+                    </span>
+                  </div>
+                </div>
+                <p style={{ color: '#555', fontSize: '12px', margin: 0 }}>
+                  Fale com o administrador para fazer upgrade do seu plano.
+                </p>
+              </div>
+            )}
+
+            <h2 style={{ fontSize: '20px', color: planoUsuario === 'basico' ? '#444' : '#FFF', fontWeight: '800', marginBottom: '25px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               📊 DESEMPENHO E EVOLUÇÃO
             </h2>
 

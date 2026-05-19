@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
 
 // Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
-function PdfCover({ category, title, source, isBasico, url }) {
+function PdfCover({ category, title, source, isBasico, url, hideSource }) {
   const isPdf = url && url.toLowerCase().includes('.pdf');
 
   let colors = {
@@ -213,26 +213,28 @@ function PdfCover({ category, title, source, isBasico, url }) {
         {colors.badge}
       </div>
 
-      <div style={{
-        position: 'absolute',
-        top: '12px',
-        right: '12px',
-        zIndex: 5,
-        fontSize: '10px',
-        fontWeight: 'bold',
-        color: badgeColor,
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        padding: '4px 8px',
-        borderRadius: '4px',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-        maxWidth: '120px',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }}>
-        {sourceLabel}
-      </div>
+      {!hideSource && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 5,
+          fontSize: '10px',
+          fontWeight: 'bold',
+          color: badgeColor,
+          backgroundColor: 'rgba(0,0,0,0.75)',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          maxWidth: '120px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>
+          {sourceLabel}
+        </div>
+      )}
 
       {/* Selo PDF 3D */}
       <div style={{
@@ -609,6 +611,7 @@ function DocumentosPage() {
                           source={doc.fonte} 
                           isBasico={isBasico}
                           url={doc.url}
+                          hideSource={isBasico}
                         />
 
                         <div style={styles.cardInfo}>
@@ -616,14 +619,16 @@ function DocumentosPage() {
                           <p style={styles.cardDesc}>{doc.descricao}</p>
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 'auto' }}>
                             <span style={styles.cardBadge}>{doc.categoria}</span>
-                            <span style={{
-                              ...styles.cardBadge, 
-                              backgroundColor: getCourseColor(doc.fonte).bg,
-                              color: getCourseColor(doc.fonte).text,
-                              border: getCourseColor(doc.fonte).border
-                            }}>
-                              {doc.fonte}
-                            </span>
+                            {!isBasico && (
+                              <span style={{
+                                ...styles.cardBadge, 
+                                backgroundColor: getCourseColor(doc.fonte).bg,
+                                color: getCourseColor(doc.fonte).text,
+                                border: getCourseColor(doc.fonte).border
+                              }}>
+                                {doc.fonte}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -667,6 +672,7 @@ function DocumentosPage() {
                   source={doc.fonte} 
                   isBasico={isBasico}
                   url={doc.url}
+                  hideSource={isBasico}
                 />
 
                 <div style={styles.cardInfo}>
@@ -674,14 +680,16 @@ function DocumentosPage() {
                   <p style={styles.cardDesc}>{doc.descricao}</p>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 'auto' }}>
                     <span style={styles.cardBadge}>{doc.categoria}</span>
-                    <span style={{
-                      ...styles.cardBadge, 
-                      backgroundColor: getCourseColor(doc.fonte).bg,
-                      color: getCourseColor(doc.fonte).text,
-                      border: getCourseColor(doc.fonte).border
-                    }}>
-                      {doc.fonte}
-                    </span>
+                    {!isBasico && (
+                      <span style={{
+                        ...styles.cardBadge, 
+                        backgroundColor: getCourseColor(doc.fonte).bg,
+                        color: getCourseColor(doc.fonte).text,
+                        border: getCourseColor(doc.fonte).border
+                      }}>
+                        {doc.fonte}
+                      </span>
+                    )}
                   </div>
                 </div>
 
