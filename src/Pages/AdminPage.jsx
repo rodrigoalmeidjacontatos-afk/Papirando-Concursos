@@ -65,7 +65,7 @@ function AdminPage() {
 
   // ========== DOCUMENTOS ==========
   const [documentos, setDocumentos] = useState([]);
-  const [novoDocumento, setNovoDocumento] = useState({ titulo: '', descricao: '', categoria: 'Simulado', url: '' });
+  const [novoDocumento, setNovoDocumento] = useState({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
   const [editandoDocumento, setEditandoDocumento] = useState(null);
 
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
@@ -1572,6 +1572,11 @@ function AdminPage() {
                       <option value="Edital">Edital</option>
                       <option value="Outros">Outros</option>
                     </select>
+                    <select style={{...styles.select, flex: 1}} value={novoDocumento.fonte || 'Avulso'} onChange={e => setNovoDocumento({...novoDocumento, fonte: e.target.value})}>
+                      <option value="Avulso">Avulso (Independente)</option>
+                      <option value="Gramatique">Gramatique</option>
+                      <option value="Estrategia">Estratégia</option>
+                    </select>
                     <div style={{flex: 2, display: 'flex', gap: '8px'}}>
                       <input style={{...styles.input, flex: 1}} placeholder="URL ou Upload ->" value={novoDocumento.url} onChange={e => setNovoDocumento({...novoDocumento, url: e.target.value})} />
                       <label style={{...styles.addButton, padding: '10px 14px', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center', backgroundColor: '#4CAF50'}}>
@@ -1608,11 +1613,20 @@ function AdminPage() {
                   </div>
                   <button style={styles.addButton} onClick={async () => {
                     if(!novoDocumento.titulo || !novoDocumento.url) return alert('Preencha título e selecione um arquivo');
-                    const { error } = await supabase.from('documentos').insert([novoDocumento]);
+                    
+                    const prefixo = novoDocumento.fonte && novoDocumento.fonte !== 'Avulso' ? `[${novoDocumento.fonte}] ` : '';
+                    const documentoComPrefixo = {
+                      titulo: `${prefixo}${novoDocumento.titulo}`,
+                      descricao: novoDocumento.descricao,
+                      categoria: novoDocumento.categoria,
+                      url: novoDocumento.url
+                    };
+
+                    const { error } = await supabase.from('documentos').insert([documentoComPrefixo]);
                     if(!error) {
                       const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
                       setDocumentos(data || []);
-                      setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '' });
+                      setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
                       alert('✅ Documento adicionado à Central!');
                     }
                   }}>
@@ -1622,48 +1636,97 @@ function AdminPage() {
               </div>
 
               <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                {documentos.map(doc => (
-                  <div key={doc.id} style={styles.item}>
-                    {editandoDocumento?.id === doc.id ? (
-                      <div style={styles.editForm}>
-                        <input style={{...styles.input, flex: 1}} value={editandoDocumento.titulo} onChange={e => setEditandoDocumento({...editandoDocumento, titulo: e.target.value})} />
-                        <select style={styles.select} value={editandoDocumento.categoria} onChange={e => setEditandoDocumento({...editandoDocumento, categoria: e.target.value})}>
-                          <option value="Simulado">Simulado</option>
-                          <option value="Apostila">Apostila</option>
-                          <option value="Edital">Edital</option>
-                          <option value="Outros">Outros</option>
-                        </select>
-                        <button style={styles.saveButtonSmall} onClick={async () => {
-                           const { error } = await supabase.from('documentos').update(editandoDocumento).eq('id', doc.id);
-                           if(!error) {
-                             setDocumentos(documentos.map(d => d.id === doc.id ? editandoDocumento : d));
-                             setEditandoDocumento(null);
-                           }
-                        }}>Salvar</button>
-                        <button style={styles.cancelButtonSmall} onClick={() => setEditandoDocumento(null)}>Cancelar</button>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                          <span style={{fontSize: '24px'}}>{doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : '📎'}</span>
-                          <div>
-                            <div style={{fontWeight: 'bold', color: '#FFF'}}>{doc.titulo}</div>
-                            <div style={{fontSize: '12px', color: '#888'}}>{doc.categoria} • {doc.descricao}</div>
+                {documentos.map(doc => {
+                  let exibicaoFonte = 'Avulso';
+                  let tituloLimpo = doc.titulo;
+                  if (doc.titulo.startsWith('[Gramatique] ')) {
+                    exibicaoFonte = 'Gramatique';
+                    tituloLimpo = doc.titulo.replace('[Gramatique] ', '');
+                  } else if (doc.titulo.startsWith('[Estrategia] ')) {
+                    exibicaoFonte = 'Estratégia';
+                    tituloLimpo = doc.titulo.replace('[Estrategia] ', '');
+                  }
+
+                  return (
+                    <div key={doc.id} style={styles.item}>
+                      {editandoDocumento?.id === doc.id ? (
+                        <div style={styles.editForm}>
+                          <input style={{...styles.input, flex: 1}} value={editandoDocumento.titulo_limpo || ''} onChange={e => setEditandoDocumento({...editandoDocumento, titulo_limpo: e.target.value})} />
+                          <select style={styles.select} value={editandoDocumento.categoria} onChange={e => setEditandoDocumento({...editandoDocumento, categoria: e.target.value})}>
+                            <option value="Simulado">Simulado</option>
+                            <option value="Apostila">Apostila</option>
+                            <option value="Edital">Edital</option>
+                            <option value="Outros">Outros</option>
+                          </select>
+                          <select style={styles.select} value={editandoDocumento.fonte || 'Avulso'} onChange={e => setEditandoDocumento({...editandoDocumento, fonte: e.target.value})}>
+                            <option value="Avulso">Avulso</option>
+                            <option value="Gramatique">Gramatique</option>
+                            <option value="Estrategia">Estratégia</option>
+                          </select>
+                          <button style={styles.saveButtonSmall} onClick={async () => {
+                             const prefixo = editandoDocumento.fonte && editandoDocumento.fonte !== 'Avulso' ? `[${editandoDocumento.fonte}] ` : '';
+                             const docAtualizado = {
+                               titulo: `${prefixo}${editandoDocumento.titulo_limpo}`,
+                               descricao: editandoDocumento.descricao,
+                               categoria: editandoDocumento.categoria,
+                               url: editandoDocumento.url
+                             };
+                             const { error } = await supabase.from('documentos').update(docAtualizado).eq('id', doc.id);
+                             if(!error) {
+                               const updatedDocs = documentos.map(d => d.id === doc.id ? { ...doc, ...docAtualizado } : d);
+                               setDocumentos(updatedDocs);
+                               setEditandoDocumento(null);
+                             }
+                          }}>Salvar</button>
+                          <button style={styles.cancelButtonSmall} onClick={() => setEditandoDocumento(null)}>Cancelar</button>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                            <span style={{fontSize: '24px'}}>{doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : '📎'}</span>
+                            <div>
+                              <div style={{fontWeight: 'bold', color: '#FFF'}}>
+                                {tituloLimpo}
+                                <span style={{
+                                  fontSize: '11px', 
+                                  padding: '2px 8px', 
+                                  borderRadius: '4px', 
+                                  backgroundColor: exibicaoFonte === 'Gramatique' ? '#7e22ce' : exibicaoFonte === 'Estratégia' ? '#0284c7' : '#37474f', 
+                                  marginLeft: '8px',
+                                  fontWeight: 'normal',
+                                  color: '#FFF'
+                                }}>
+                                  {exibicaoFonte}
+                                </span>
+                              </div>
+                              <div style={{fontSize: '12px', color: '#888'}}>{doc.categoria} • {doc.descricao}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div style={styles.actionButtons}>
-                          <button style={styles.editButtonSmall} onClick={() => setEditandoDocumento(doc)}>Editar</button>
-                          <button style={styles.deleteButton} onClick={async () => {
-                            if(window.confirm('Excluir este documento?')) {
-                              const { error } = await supabase.from('documentos').delete().eq('id', doc.id);
-                              if(!error) setDocumentos(documentos.filter(d => d.id !== doc.id));
-                            }
-                          }}>Excluir</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                          <div style={styles.actionButtons}>
+                            <button style={styles.editButtonSmall} onClick={() => {
+                              let fonte = 'Avulso';
+                              let titulo_limpo = doc.titulo;
+                              if (doc.titulo.startsWith('[Gramatique] ')) {
+                                fonte = 'Gramatique';
+                                titulo_limpo = doc.titulo.replace('[Gramatique] ', '');
+                              } else if (doc.titulo.startsWith('[Estrategia] ')) {
+                                fonte = 'Estrategia';
+                                titulo_limpo = doc.titulo.replace('[Estrategia] ', '');
+                              }
+                              setEditandoDocumento({ ...doc, titulo_limpo, fonte });
+                            }}>Editar</button>
+                            <button style={styles.deleteButton} onClick={async () => {
+                              if(window.confirm('Excluir este documento?')) {
+                                const { error } = await supabase.from('documentos').delete().eq('id', doc.id);
+                                if(!error) setDocumentos(documentos.filter(d => d.id !== doc.id));
+                              }
+                            }}>Excluir</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -1,31 +1,268 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import LoadingScreen from '../components/LoadingScreen';
+
+// Componente para a capa simulada de PDF em 3D Realista
+function PdfCover({ category, title, source, isBasico }) {
+  let colors = {
+    bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
+    border: '#38bdf8',
+    emblem: '📝',
+    badge: 'SIMULADO',
+    badgeBg: '#0284c7'
+  };
+
+  if (category === 'Apostila') {
+    colors = {
+      bg: 'linear-gradient(135deg, #3f1516, #1c0a0b)',
+      border: '#ef4444',
+      emblem: '📚',
+      badge: 'APOSTILA',
+      badgeBg: '#b91c1c'
+    };
+  } else if (category === 'Edital') {
+    colors = {
+      bg: 'linear-gradient(135deg, #27272a, #09090b)',
+      border: '#a1a1aa',
+      emblem: '⚖️',
+      badge: 'EDITAL',
+      badgeBg: '#52525b'
+    };
+  } else if (category === 'Outros') {
+    colors = {
+      bg: 'linear-gradient(135deg, #1e1b4b, #090514)',
+      border: '#a855f7',
+      emblem: '📎',
+      badge: 'MATERIAL',
+      badgeBg: '#7e22ce'
+    };
+  }
+
+  const sourceLabel = source === 'Gramatique' ? 'Gramatique' : source === 'Estratégia' ? 'Estratégia' : 'Avulso';
+
+  return (
+    <div style={{
+      width: '100%',
+      height: '220px',
+      background: colors.bg,
+      borderRadius: '12px 12px 0 0',
+      position: 'relative',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      padding: '20px',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+      boxSizing: 'border-box'
+    }}>
+      {/* Brilho Glossy / Reflexo Laminado de Revista */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 55%)',
+        pointerEvents: 'none',
+        zIndex: 2
+      }} />
+
+      {/* Cabeçalho da Capa (Badge Categoria + Fonte) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 3 }}>
+        <span style={{
+          fontSize: '9px',
+          fontWeight: 'bold',
+          color: '#FFF',
+          backgroundColor: colors.badgeBg,
+          padding: '4px 8px',
+          borderRadius: '4px',
+          letterSpacing: '0.8px',
+          textTransform: 'uppercase'
+        }}>
+          {colors.badge}
+        </span>
+        <span style={{
+          fontSize: '10px',
+          fontWeight: 'bold',
+          color: source === 'Gramatique' ? '#c084fc' : source === 'Estratégia' ? '#38bdf8' : '#94a3b8',
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          border: '1px solid rgba(255,255,255,0.08)'
+        }}>
+          {sourceLabel}
+        </span>
+      </div>
+
+      {/* Emblema Central em Destaque com Brilho Neon */}
+      <div style={{
+        fontSize: '44px',
+        textAlign: 'center',
+        filter: `drop-shadow(0 0 8px ${colors.border}44)`,
+        zIndex: 3,
+        userSelect: 'none'
+      }}>
+        {colors.emblem}
+      </div>
+
+      {/* Título e Rodapé Estilizados do Documento */}
+      <div style={{ zIndex: 3, textAlign: 'center' }}>
+        <h4 style={{
+          fontSize: '13px',
+          fontWeight: '850',
+          color: '#FFF',
+          margin: '0 0 2px',
+          lineHeight: '1.4',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          textTransform: 'uppercase',
+          letterSpacing: '0.3px',
+          textShadow: '0 2px 4px rgba(0,0,0,0.8)'
+        }}>
+          {title}
+        </h4>
+        <span style={{ fontSize: '9px', color: '#94a3b8', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '500' }}>
+          Papirando Concursos
+        </span>
+      </div>
+
+      {/* Selo PDF 3D Brilhoso */}
+      <div style={{
+        position: 'absolute',
+        bottom: '12px',
+        right: '12px',
+        backgroundColor: '#E50914',
+        color: '#FFF',
+        fontSize: '9px',
+        fontWeight: 'bold',
+        padding: '3px 6px',
+        borderRadius: '3px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+        zIndex: 4
+      }}>
+        PDF
+      </div>
+
+      {/* OVERLAY DE CADEADO PARA USUÁRIO BÁSICO */}
+      {isBasico && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 5
+        }}>
+          <span style={{ fontSize: '38px', marginBottom: '8px', filter: 'drop-shadow(0 0 10px rgba(255,179,0,0.5))' }}>🔒</span>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 'bold',
+            color: '#ffb300',
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            border: '1px solid #ffb300',
+            letterSpacing: '0.5px'
+          }}>
+            EXCLUSIVO MÉDIO/PREMIUM
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DocumentosPage() {
   const navigate = useNavigate();
   const [documentos, setDocumentos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos');
+  const [fonteAtiva, setFonteAtiva] = useState('Todos');
+  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
+  const fontes = ['Todos', 'Gramatique', 'Estratégia', 'Avulso'];
 
   useEffect(() => {
-    async function carregarDocumentos() {
-      const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
-      setDocumentos(data || []);
-      setCarregando(false);
+    async function carregarDados() {
+      try {
+        // 1. Carregar documentos do Supabase
+        const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
+        setDocumentos(data || []);
+
+        // 2. Verificar perfil e plano do usuário logado
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const userEmail = user.email?.toLowerCase();
+          const isOwner = userEmail === 'rodrigoalmeidja@gmail.com';
+          
+          if (isOwner) {
+            setPlanoUsuario('premium');
+          } else {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('plano, data_expiracao')
+              .eq('id', user.id)
+              .single();
+
+            if (profile) {
+              const dataExp = profile.data_expiracao;
+              let planoNormalizado = String(profile.plano || 'basico')
+                .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+              // Verifica expiração do plano
+              if (dataExp && new Date(dataExp) < new Date() && planoNormalizado !== 'premium') {
+                planoNormalizado = 'basico';
+              }
+              setPlanoUsuario(planoNormalizado);
+            } else {
+              setPlanoUsuario('basico');
+            }
+          }
+        } else {
+          setPlanoUsuario('basico');
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados da Central de Documentos:", err);
+        setPlanoUsuario('basico');
+      } finally {
+        setCarregando(false);
+      }
     }
-    carregarDocumentos();
+    carregarDados();
   }, []);
 
-  const documentosFiltrados = documentos.filter(doc => {
-    const matchesSearch = doc.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         doc.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
+  // Mapeia e filtra os documentos com base nas seleções e pesquisa
+  const documentosFiltrados = documentos.map(doc => {
+    let fonte = 'Avulso';
+    let tituloLimpo = doc.titulo;
+    
+    if (doc.titulo.startsWith('[Gramatique] ')) {
+      fonte = 'Gramatique';
+      tituloLimpo = doc.titulo.replace('[Gramatique] ', '');
+    } else if (doc.titulo.startsWith('[Estrategia] ')) {
+      fonte = 'Estratégia';
+      tituloLimpo = doc.titulo.replace('[Estrategia] ', '');
+    }
+    
+    return { ...doc, fonte, tituloLimpo };
+  }).filter(doc => {
+    const matchesSearch = doc.tituloLimpo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          doc.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategoria = categoriaAtiva === 'Todos' || doc.categoria === categoriaAtiva;
-    return matchesSearch && matchesCategoria;
+    const matchesFonte = fonteAtiva === 'Todos' || doc.fonte === fonteAtiva;
+    return matchesSearch && matchesCategoria && matchesFonte;
   });
+
+  const isBasico = planoUsuario === 'basico';
+
+  if (carregando || planoUsuario === 'carregando') {
+    return <LoadingScreen text="Carregando biblioteca de materiais..." />;
+  }
 
   return (
     <div style={styles.container}>
@@ -48,7 +285,7 @@ function DocumentosPage() {
       <main style={styles.main}>
         <div style={styles.searchSection}>
           <h1 style={styles.mainTitle}>Documentos Complementares</h1>
-          <p style={styles.subTitle}>Simulados, apostilas e materiais de apoio para sua aprovação.</p>
+          <p style={styles.subTitle}>Simulados oficiais, apostilas e materiais exclusivos para turbinar seus estudos.</p>
           
           <div style={styles.searchBarWrapper}>
             <input 
@@ -61,47 +298,100 @@ function DocumentosPage() {
             <span style={styles.searchIcon}>🔍</span>
           </div>
 
-          <div style={styles.filterBar}>
-            {categorias.map(cat => (
-              <button 
-                key={cat}
-                onClick={() => setCategoriaAtiva(cat)}
-                style={{
-                  ...styles.filterTab, 
-                  backgroundColor: categoriaAtiva === cat ? '#E50914' : 'rgba(255,255,255,0.05)',
-                  borderColor: categoriaAtiva === cat ? '#E50914' : '#333'
-                }}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Filtro 1: Categoria */}
+          <div style={{ marginBottom: '15px' }}>
+            <span style={styles.filterLabel}>📚 CATEGORIA:</span>
+            <div style={styles.filterBar}>
+              {categorias.map(cat => (
+                <button 
+                  key={cat}
+                  onClick={() => setCategoriaAtiva(cat)}
+                  style={{
+                    ...styles.filterTab, 
+                    backgroundColor: categoriaAtiva === cat ? '#E50914' : 'rgba(255,255,255,0.05)',
+                    borderColor: categoriaAtiva === cat ? '#E50914' : '#333'
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Filtro 2: Origem/Fonte */}
+          <div>
+            <span style={styles.filterLabel}>🏷️ FONTE DO MATERIAL:</span>
+            <div style={styles.filterBar}>
+              {fontes.map(f => (
+                <button 
+                  key={f}
+                  onClick={() => setFonteAtiva(f)}
+                  style={{
+                    ...styles.filterTab, 
+                    backgroundColor: fonteAtiva === f ? '#7e22ce' : 'rgba(255,255,255,0.05)',
+                    borderColor: fonteAtiva === f ? '#7e22ce' : '#333'
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {carregando ? (
-          <div style={styles.loading}>Carregando materiais...</div>
-        ) : (
-          <div style={styles.grid}>
-            {documentosFiltrados.map(doc => (
-              <div key={doc.id} style={styles.card}>
-                <div style={styles.cardIcon}>
-                  {doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : '📎'}
-                </div>
-                <div style={styles.cardInfo}>
-                  <h3 style={styles.cardTitle}>{doc.titulo}</h3>
-                  <p style={styles.cardDesc}>{doc.descricao}</p>
+        <div style={styles.grid}>
+          {documentosFiltrados.map(doc => (
+            <div 
+              key={doc.id} 
+              style={{
+                ...styles.card,
+                opacity: isBasico ? 0.8 : 1,
+                transform: isBasico ? 'none' : undefined,
+                cursor: isBasico ? 'not-allowed' : 'default'
+              }}
+            >
+              {/* Capa de PDF customizada */}
+              <PdfCover 
+                category={doc.categoria} 
+                title={doc.tituloLimpo} 
+                source={doc.fonte} 
+                isBasico={isBasico}
+              />
+
+              {/* Informações do Material */}
+              <div style={styles.cardInfo}>
+                <h3 style={styles.cardTitle}>{doc.tituloLimpo}</h3>
+                <p style={styles.cardDesc}>{doc.descricao}</p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={styles.cardBadge}>{doc.categoria}</span>
+                  <span style={{
+                    ...styles.cardBadge, 
+                    backgroundColor: doc.fonte === 'Gramatique' ? 'rgba(126,34,206,0.15)' : doc.fonte === 'Estratégia' ? 'rgba(2,132,199,0.15)' : 'rgba(255,255,255,0.05)',
+                    color: doc.fonte === 'Gramatique' ? '#c084fc' : doc.fonte === 'Estratégia' ? '#38bdf8' : '#AAA',
+                    border: doc.fonte === 'Gramatique' ? '1px solid rgba(126,34,206,0.3)' : doc.fonte === 'Estratégia' ? '1px solid rgba(2,132,199,0.3)' : '1px solid #333'
+                  }}>
+                    {doc.fonte}
+                  </span>
                 </div>
-                <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
-                  Visualizar / Baixar
-                </a>
               </div>
-            ))}
-            {documentosFiltrados.length === 0 && (
-              <p style={styles.empty}>Nenhum documento encontrado para sua busca.</p>
-            )}
-          </div>
-        )}
+
+              {/* Botão de Ação condicionado ao plano */}
+              {isBasico ? (
+                <div style={styles.downloadBtnLocked}>
+                  🔒 Exclusivo Médio / Premium
+                </div>
+              ) : (
+                <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
+                  Visualizar / Baixar 📥
+                </a>
+              )}
+            </div>
+          ))}
+          
+          {documentosFiltrados.length === 0 && (
+            <p style={styles.empty}>Nenhum material encontrado para os filtros selecionados.</p>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -116,25 +406,26 @@ const styles = {
   logoSpan: { fontSize: '8px', color: '#FFF', letterSpacing: '6px' },
   nav: { display: 'flex', gap: '30px' },
   navButton: { background: 'none', border: 'none', color: '#AAA', cursor: 'pointer', fontSize: '14px', transition: 'color 0.2s' },
-  main: { maxWidth: '1200px', margin: '0 auto', padding: '60px 20px' },
-  searchSection: { textAlign: 'center', marginBottom: '60px' },
-  mainTitle: { fontSize: '42px', fontWeight: 'bold', margin: '0 0 10px' },
-  subTitle: { color: '#888', fontSize: '18px', margin: '0 0 40px' },
-  searchBarWrapper: { position: 'relative', maxWidth: '600px', margin: '0 auto 30px' },
-  searchInput: { width: '100%', padding: '16px 20px 16px 50px', backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '30px', color: '#FFF', fontSize: '16px', outline: 'none' },
-  searchIcon: { position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: '#666' },
-  filterBar: { display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' },
-  filterTab: { padding: '8px 20px', borderRadius: '20px', border: '1px solid #333', color: '#FFF', cursor: 'pointer', transition: 'all 0.2s', fontSize: '14px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '25px' },
-  card: { backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '24px', border: '1px solid #222', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s' },
-  cardIcon: { fontSize: '40px', marginBottom: '15px' },
-  cardInfo: { flex: 1 },
-  cardTitle: { fontSize: '18px', fontWeight: 'bold', margin: '0 0 8px', color: '#FFF' },
-  cardDesc: { fontSize: '14px', color: '#888', margin: '0 0 15px', lineHeight: '1.5' },
-  cardBadge: { fontSize: '10px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '4px', color: '#AAA', textTransform: 'uppercase' },
-  downloadBtn: { marginTop: '20px', padding: '12px', backgroundColor: '#333', color: '#FFF', textAlign: 'center', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', transition: 'background 0.2s' },
+  main: { maxWidth: '1200px', margin: '0 auto', padding: '50px 20px' },
+  searchSection: { textAlign: 'center', marginBottom: '50px' },
+  mainTitle: { fontSize: '38px', fontWeight: 'bold', margin: '0 0 10px', color: '#FFF' },
+  subTitle: { color: '#888', fontSize: '16px', margin: '0 0 30px' },
+  searchBarWrapper: { position: 'relative', maxWidth: '600px', margin: '0 auto 25px' },
+  searchInput: { width: '100%', padding: '14px 20px 14px 50px', backgroundColor: '#141414', border: '1px solid #2d2d2d', borderRadius: '30px', color: '#FFF', fontSize: '15px', outline: 'none', transition: 'border-color 0.2s' },
+  searchIcon: { position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: '#666', fontSize: '16px' },
+  filterLabel: { fontSize: '11px', fontWeight: 'bold', color: '#888', display: 'block', marginBottom: '8px', letterSpacing: '1px' },
+  filterBar: { display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' },
+  filterTab: { padding: '7px 18px', borderRadius: '20px', border: '1px solid #2d2d2d', color: '#FFF', cursor: 'pointer', transition: 'all 0.2s', fontSize: '13px', fontWeight: '500' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '30px' },
+  card: { backgroundColor: '#141414', borderRadius: '16px', border: '1px solid #222', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.25s ease', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
+  cardInfo: { flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  cardTitle: { fontSize: '16px', fontWeight: 'bold', margin: 0, color: '#FFF', lineHeight: '1.4' },
+  cardDesc: { fontSize: '13px', color: '#888', margin: 0, lineHeight: '1.5', flex: 1 },
+  cardBadge: { fontSize: '9px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px', color: '#AAA', textTransform: 'uppercase', border: '1px solid #222', fontWeight: 'bold' },
+  downloadBtn: { display: 'block', margin: '0 20px 20px', padding: '12px', backgroundColor: '#E50914', color: '#FFF', textAlign: 'center', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '14px', transition: 'background 0.2s, transform 0.2s', boxShadow: '0 4px 10px rgba(229,9,20,0.2)' },
+  downloadBtnLocked: { margin: '0 20px 20px', padding: '12px', backgroundColor: '#262626', color: '#666', textAlign: 'center', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', border: '1px solid #333', userSelect: 'none' },
   loading: { textAlign: 'center', padding: '100px', color: '#888' },
-  empty: { textAlign: 'center', gridColumn: '1 / -1', padding: '60px', color: '#666' }
+  empty: { textAlign: 'center', gridColumn: '1 / -1', padding: '60px', color: '#666', fontSize: '15px' }
 };
 
 export default DocumentosPage;
