@@ -294,7 +294,7 @@ function Home() {
       const categoriasComCursos = categoriasSupabase.map(cat => ({
         id: cat.id,
         nome: cat.icone + ' ' + cat.nome,
-        cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id).map(car => ({
+        cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).map(car => ({
           id: car.id,
           nome: car.nome,
           capa: car.capa || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(car.nome),

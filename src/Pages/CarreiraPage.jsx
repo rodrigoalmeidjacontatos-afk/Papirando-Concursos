@@ -10,7 +10,6 @@ function CarreiraPage() {
   const [preparatorios, setPreparatorios] = useState([]);
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     async function carregarDados() {
@@ -26,12 +25,18 @@ function CarreiraPage() {
       const { data: vData } = await supabase.from('vinculos').select('*');
       const storedVinculos = {};
       if (vData) {
+        // Primeiro processa o registro legado (data) se existir
+        const legado = vData.find(row => row.data);
+        if (legado && legado.data) {
+          Object.assign(storedVinculos, legado.data);
+        }
+        // Depois processa as linhas individuais, garantindo que não sejam sobrescritas pelo legado
         vData.forEach(row => {
-          if (row.data) {
-            Object.assign(storedVinculos, row.data);
-          } else if (row.carreira_id && row.preparatorio_id) {
+          if (!row.data && row.carreira_id && row.preparatorio_id) {
             if (!storedVinculos[row.carreira_id]) storedVinculos[row.carreira_id] = {};
-            storedVinculos[row.carreira_id][row.preparatorio_id] = { modulos: {} };
+            if (!storedVinculos[row.carreira_id][row.preparatorio_id]) {
+              storedVinculos[row.carreira_id][row.preparatorio_id] = { modulos: {} };
+            }
           }
         });
       }
@@ -44,7 +49,6 @@ function CarreiraPage() {
       // 5. Verificar plano do usuário
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setUser(user);
         const { data: profile } = await supabase
           .from('profiles')
           .select('plano, preparatorios_liberados, data_expiracao')
@@ -71,7 +75,18 @@ function CarreiraPage() {
         if (planoNormalizado === 'basico') {
           setPreparatorios(prepsFiltrados);
         } else if (planoNormalizado === 'medio') {
-          const liberados = profile?.preparatorios_liberados || [];
+          let liberados = profile?.preparatorios_liberados || [];
+          if (typeof liberados === 'string') {
+            try {
+              liberados = JSON.parse(liberados);
+            } catch (e) {
+              liberados = liberados.split(',').map(s => s.trim());
+            }
+          }
+          if (!Array.isArray(liberados)) {
+            liberados = [];
+          }
+
           if (liberados.length > 0) {
             setPreparatorios(prepsFiltrados.filter(p => liberados.includes(p.id)));
           } else {

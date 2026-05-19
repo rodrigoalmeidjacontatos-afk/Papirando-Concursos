@@ -253,13 +253,20 @@ function AdminPage() {
 
         if (vData) {
           const obj = {};
+          // 1. Processar legado primeiro
+          const legado = vData.find(row => row.data);
+          if (legado && legado.data) {
+            Object.assign(obj, legado.data);
+          }
+          // 2. Processar linhas individuais modernas por cima
           vData.forEach(row => {
-            if (row.data) Object.assign(obj, row.data);
-            else if (row.carreira_id && row.preparatorio_id) {
+            if (!row.data && row.carreira_id && row.preparatorio_id) {
               if (!obj[row.carreira_id]) obj[row.carreira_id] = {};
               if (!obj[row.carreira_id][row.preparatorio_id]) obj[row.carreira_id][row.preparatorio_id] = { modulos: {} };
               if (row.modulo_id) {
-                if (!obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id]) obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id] = { aulas: {} };
+                if (!obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id]) {
+                  obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id] = { aulas: {} };
+                }
                 if (row.aula_id) obj[row.carreira_id][row.preparatorio_id].modulos[row.modulo_id].aulas[row.aula_id] = true;
               }
             }
