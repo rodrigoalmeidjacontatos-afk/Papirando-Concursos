@@ -1382,7 +1382,6 @@ function AulaPage() {
                 </div>
               </div>
             </div>
-            </div>
           )}
 
           {/* SESSÃO DE ANOTAÇÕES ABAIXO DO VÍDEO */}
