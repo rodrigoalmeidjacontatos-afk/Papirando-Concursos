@@ -1452,32 +1452,36 @@ function AulaPage() {
                 </div>
               </div>
 
-              <div style={styles.selectionCardsContainer}>
-                <div className="selector-card" onClick={() => setSidebarView('disciplinas')}>
-                  <div style={styles.selectorCardLabel}>DISCIPLINA</div>
-                  <div style={styles.selectorCardValue}>
-                    <span>{browsingDisciplina?.nome || 'Carregando...'}</span>
-                    <span style={styles.selectorCardArrow}>›</span>
+              <div style={{ padding: '0 20px 10px 20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {/* Disciplina */}
+                <div 
+                  style={{ borderBottom: '1px solid #222', paddingBottom: '10px', cursor: 'pointer' }} 
+                  onClick={() => setSidebarView('disciplinas')}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
+                      DISCIPLINA
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#2196F3' }}>ver tudo &gt;</span>
                   </div>
-                  <div style={styles.progressContainer}>
-                    {(() => {
-                      const pct = progressoGeral.disciplinas[browsingDisciplinaId] || 0;
-                      return <div style={{...styles.progressBar, width: `${pct}%`}}></div>;
-                    })()}
+                  <div style={{ fontSize: '13px', color: '#FFF', fontWeight: '600', lineHeight: '1.3' }}>
+                    {browsingDisciplina?.nome || 'Carregando...'}
                   </div>
                 </div>
 
-                <div className="selector-card" onClick={() => setSidebarView('modulos')}>
-                  <div style={styles.selectorCardLabel}>TÓPICO</div>
-                  <div style={styles.selectorCardValue}>
-                    <span>{browsingModulo?.nome || 'Carregando...'}</span>
-                    <span style={styles.selectorCardArrow}>›</span>
+                {/* Tópico */}
+                <div 
+                  style={{ borderBottom: '1px solid #222', paddingBottom: '10px', cursor: 'pointer' }} 
+                  onClick={() => setSidebarView('modulos')}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
+                      TÓPICO
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#2196F3' }}>ver tudo &gt;</span>
                   </div>
-                  <div style={styles.progressContainer}>
-                    {(() => {
-                      const pct = progressoGeral.modulos[browsingModuloId] || 0;
-                      return <div style={{...styles.progressBar, width: `${pct}%`, backgroundColor: '#4CAF50'}}></div>;
-                    })()}
+                  <div style={{ fontSize: '13px', color: '#FFF', fontWeight: '600', lineHeight: '1.3' }}>
+                    {browsingModulo?.nome || 'Carregando...'}
                   </div>
                 </div>
               </div>
