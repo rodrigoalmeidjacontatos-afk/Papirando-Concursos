@@ -293,7 +293,8 @@ const styles = {
     padding: '40px 30px',
     marginBottom: '40px',
     overflow: 'hidden',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+    boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+    textAlign: 'center'
   },
   heroGlow: {
     position: 'absolute',
@@ -305,13 +306,13 @@ const styles = {
   },
   heroTag: { fontSize: '10px', color: '#E50914', fontWeight: 'bold', letterSpacing: '2px', display: 'block', marginBottom: '8px' },
   heroTitle: { fontSize: '28px', fontWeight: '850', color: '#FFF', margin: '0 0 10px' },
-  heroSubtitle: { color: '#94a3b8', fontSize: '14px', margin: 0, maxWidth: '600px', lineHeight: '1.6' },
+  heroSubtitle: { color: '#94a3b8', fontSize: '14px', margin: '0 auto', maxWidth: '600px', lineHeight: '1.6' },
 
   main: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', position: 'relative', zIndex: 2 },
 
   // Seção de preparatórios
   sectionHeader: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px',
     marginBottom: '30px', paddingBottom: '16px',
     borderBottom: '2px solid #1a1a1f'
   },
@@ -330,7 +331,7 @@ const styles = {
   // Grid
   grid: { 
     display: 'grid', 
-    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', 
+    gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 320px))', 
     gap: '30px', 
     justifyContent: 'center' 
   },
