@@ -13,6 +13,8 @@ function Home() {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
+  const [cursosAtualizados, setCursosAtualizados] = useState([]);
+
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
     horasLiquidas: '0.0',
     aulasConcluidas: 0,
@@ -325,6 +327,46 @@ function Home() {
         ]);
       } else {
         setCategorias(categoriasComCursos);
+        
+        // Buscar novas vídeoaulas adicionadas nas últimas 48 horas para destacar cursos atualizados
+        try {
+          const limiteRecente = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+          const { data: novasAulas } = await supabase
+            .from('aulas')
+            .select('id, modulo_id, created_at')
+            .gt('created_at', limiteRecente);
+
+          const atualizadosSet = new Set();
+          if (novasAulas && novasAulas.length > 0) {
+            const modulosIds = novasAulas.map(a => a.modulo_id).filter(Boolean);
+            if (modulosIds.length > 0) {
+              const { data: modulosNovos } = await supabase
+                .from('modulos')
+                .select('id, disciplina_id')
+                .in('id', modulosIds);
+
+              if (modulosNovos && modulosNovos.length > 0) {
+                const discIds = modulosNovos.map(m => m.disciplina_id).filter(Boolean);
+                if (discIds.length > 0) {
+                  const { data: disciplinasNovas } = await supabase
+                    .from('disciplinas')
+                    .select('id, preparatorio_id')
+                    .in('id', discIds);
+
+                  if (disciplinasNovas && disciplinasNovas.length > 0) {
+                    disciplinasNovas.forEach(d => {
+                      const prepId = d.preparatorio_id;
+                      if (prepId) atualizadosSet.add(prepId);
+                    });
+                  }
+                }
+              }
+            }
+          }
+          setCursosAtualizados(Array.from(atualizadosSet));
+        } catch (e) {
+          console.error("Erro ao buscar atualizações de vídeoaulas:", e);
+        }
       }
     } catch (err) {
       console.error("[Admin] Erro fatal no carregamento:", err);
@@ -883,7 +925,27 @@ function Home() {
                         <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
                           {categoria.cursos.map((curso, idx) => (
                             <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
-                              <div style={styles.cardImage}>
+                              <div style={{ ...styles.cardImage, position: 'relative' }}>
+                                {cursosAtualizados.includes(curso.id) && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    top: '12px',
+                                    right: '12px',
+                                    background: 'linear-gradient(135deg, #E50914 0%, #9e040c 100%)',
+                                    color: '#FFF',
+                                    fontSize: '9px',
+                                    fontWeight: '900',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    boxShadow: '0 0 15px rgba(229, 9, 20, 0.75)',
+                                    zIndex: 5,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px'
+                                  }}>
+                                    ⚡ ATUALIZAÇÃO NOVA
+                                  </span>
+                                )}
                                 <img src={curso.capa} alt={curso.nome} style={styles.image} />
                                 <div style={styles.cardOverlay}></div>
                               </div>

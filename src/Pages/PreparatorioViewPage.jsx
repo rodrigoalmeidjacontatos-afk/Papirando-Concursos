@@ -20,6 +20,14 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [dataExpiracao, setDataExpiracao] = useState(null);
 
+  const isRecente = (createdAtString) => {
+    if (!createdAtString) return false;
+    const dataAula = new Date(createdAtString);
+    const agora = new Date();
+    const diferencaMs = agora - dataAula;
+    return diferencaMs > 0 && diferencaMs < 48 * 60 * 60 * 1000; // 48 horas
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -316,6 +324,9 @@ function PreparatorioViewPage() {
           const totalAulas = getModulosDaDisciplina(disciplina.id).reduce(
             (acc, m) => acc + getAulasDoModulo(m.id).length, 0
           );
+          const discTemNovidades = getModulosDaDisciplina(disciplina.id).some(
+            m => getAulasDoModulo(m.id).some(a => isRecente(a.created_at))
+          );
           return (
             <div key={disciplina.id} style={styles.disciplinaCard}>
               {/* Header clicável da disciplina */}
@@ -329,7 +340,24 @@ function PreparatorioViewPage() {
                 onClick={() => toggleDisciplina(disciplina.id)}
               >
                 <span style={styles.disciplinaIcon}>{disciplina.icone}</span>
-                <h2 style={{...styles.disciplinaTitle, flex: 1}}>{disciplina.nome}</h2>
+                <h2 style={{...styles.disciplinaTitle, flex: 1, display: 'flex', alignItems: 'center'}}>
+                  {disciplina.nome}
+                  {discTemNovidades && (
+                    <span style={{
+                      backgroundColor: 'rgba(229, 9, 20, 0.15)',
+                      color: '#E50914',
+                      border: '1px solid #E50914',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      marginLeft: '12px',
+                      letterSpacing: '0.5px'
+                    }}>
+                      ⚡ NOVO CONTEÚDO
+                    </span>
+                  )}
+                </h2>
                 <span style={{ color: '#888', fontSize: '12px', marginRight: '12px' }}>
                   {getModulosDaDisciplina(disciplina.id).length} módulos · {totalAulas} aulas
                 </span>
@@ -346,11 +374,28 @@ function PreparatorioViewPage() {
               {isDisciplinaExpanded && getModulosDaDisciplina(disciplina.id).map(modulo => {
                 const aulasModulo = getAulasDoModulo(modulo.id);
                 const isExpanded = modulosExpandidos[modulo.id];
+                const modTemNovidades = aulasModulo.some(a => isRecente(a.created_at));
                 return (
                   <div key={modulo.id} style={styles.moduloContainer}>
                     <div style={styles.moduloHeader} onClick={() => toggleModulo(modulo.id)}>
                       <span style={styles.moduloIcon}>{isExpanded ? '📖' : '📁'}</span>
-                      <span style={styles.moduloTitle}>{modulo.nome}</span>
+                      <span style={{ ...styles.moduloTitle, display: 'flex', alignItems: 'center' }}>
+                        {modulo.nome}
+                        {modTemNovidades && (
+                          <span style={{
+                            backgroundColor: 'rgba(255, 179, 0, 0.15)',
+                            color: '#FFB300',
+                            border: '1px solid #FFB300',
+                            fontSize: '9px',
+                            fontWeight: 'bold',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            marginLeft: '8px'
+                          }}>
+                            🔥 NOVIDADE
+                          </span>
+                        )}
+                      </span>
                       <span style={styles.moduloCount}>{aulasModulo.length} aulas</span>
                       <span style={styles.moduloToggle}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
@@ -389,9 +434,23 @@ function PreparatorioViewPage() {
                               <div style={styles.aulaLeft}>
                                 <span style={styles.aulaNumero}>{String(idx + 1).padStart(2, '0')}</span>
                                 <div>
-                                  <div style={{...styles.aulaTitulo, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                  <div style={{...styles.aulaTitulo, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}}>
                                     {bloqueada && <span style={{fontSize: '12px'}}>🔒</span>}
                                     {aula.titulo}
+                                    {isRecente(aula.created_at) && (
+                                      <span style={{
+                                        backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                                        color: '#4CAF50',
+                                        border: '1px solid #4CAF50',
+                                        fontSize: '8px',
+                                        fontWeight: '900',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        letterSpacing: '0.5px'
+                                      }}>
+                                        🆕 NOVO
+                                      </span>
+                                    )}
                                     {badgeColor && (
                                       <span style={{
                                         fontSize: '9px', padding: '1px 5px', borderRadius: '999px',
