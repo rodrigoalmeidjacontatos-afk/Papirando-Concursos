@@ -1421,20 +1421,7 @@ function AulaPage() {
               <div style={styles.sidebarHeaderMain}>
                 <h2 style={styles.sidebarTitle}>Selecione o conteúdo</h2>
                 
-                <div style={styles.tabsContainer}>
-                  <button 
-                    onClick={() => setActiveTab('curso')} 
-                    style={{...styles.tabButton, ...(activeTab === 'curso' ? styles.tabButtonActive : {})}}
-                  >
-                    Aulas Curso
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('cronograma')} 
-                    style={{...styles.tabButton, ...(activeTab === 'cronograma' ? styles.tabButtonActive : {})}}
-                  >
-                    Aulas Cronograma
-                  </button>
-                </div>
+                {/* Abas removidas temporariamente: Aulas Curso / Aulas Cronograma */}
 
                 <div style={styles.subTabsContainer}>
                   <button 
