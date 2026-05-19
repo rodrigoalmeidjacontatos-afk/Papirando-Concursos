@@ -5,20 +5,7 @@ import LoadingScreen from '../components/LoadingScreen';
 
 // Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
 function PdfCover({ category, title, source, isBasico, url }) {
-  const [useFallback, setUseFallback] = useState(true);
-
-  useEffect(() => {
-    // Detecta se é celular, tablet ou se a largura é de dispositivo móvel
-    const checkDevice = () => {
-      const isMobileOrTablet = window.innerWidth < 1024 || /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent);
-      const isPdf = url && url.toLowerCase().includes('.pdf');
-      setUseFallback(isMobileOrTablet || !isPdf);
-    };
-
-    checkDevice();
-    window.addEventListener('resize', checkDevice);
-    return () => window.removeEventListener('resize', checkDevice);
-  }, [url]);
+  const isPdf = url && url.toLowerCase().includes('.pdf');
 
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
@@ -78,21 +65,31 @@ function PdfCover({ category, title, source, isBasico, url }) {
         pointerEvents: 'auto'
       }} />
 
-      {!useFallback ? (
-        <iframe 
-          src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} 
-          title={title}
-          style={{
-            width: '100%',
-            height: '270px', // Ligeiramente maior para recortar e ocultar controles inferiores nativos
-            border: 'none',
-            pointerEvents: 'none',
-            backgroundColor: '#141414',
-            transform: 'scale(1.0)',
-            transformOrigin: 'top left'
-          }}
-          scrolling="no"
-        />
+      {isPdf ? (
+        /* Container absoluto estrito para forçar o limite de altura no iOS/Safari de Tablets e Smartphones */
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          overflow: 'hidden',
+          width: '100%',
+          height: '100%',
+          borderRadius: '12px 12px 0 0'
+        }}>
+          <iframe 
+            src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} 
+            title={title}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: '100%',
+              height: '270px', // Ligeiramente maior para recortar e ocultar controles inferiores nativos
+              border: 'none',
+              pointerEvents: 'none',
+              backgroundColor: '#141414'
+            }}
+            scrolling="no"
+          />
+        </div>
       ) : (
         /* Fallback de Capa Editorial de Alta Fidelidade (Premium CSS Book) */
         <div style={{
