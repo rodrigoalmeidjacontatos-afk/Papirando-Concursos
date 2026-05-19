@@ -71,6 +71,7 @@ function AulaPage() {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
+  const hasResumedRef = useRef(false);
 
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -88,6 +89,10 @@ function AulaPage() {
     }
   }, [aulaPlaying, videoKey]);
 
+  // Reset do controle de resumo ao trocar de vídeo/aula
+  useEffect(() => {
+    hasResumedRef.current = false;
+  }, [aulaId, videoId]);
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -262,7 +267,7 @@ function AulaPage() {
         aula_id: aulaId, 
         conteudo: novoConteudo,
         updated_at: new Date()
-      }, { onConflict: 'user_id, aula_id' });
+      }, { onConflict: 'user_id,aula_id' });
 
     if (error) {
       console.error('Erro ao salvar anotação:', error);
@@ -426,11 +431,17 @@ function AulaPage() {
           });
           setProgressoAulas(progressoMap);
           
-          // Se a aula atual tiver progresso salvo e for o primeiro carregamento do vídeo
+          // Se a aula atual tiver progresso salvo e ainda não foi resumida
           const progressoAtual = progressoMap[aulaId];
-          if (progressoAtual && player && playerReady && tempoAtual === 0) {
-            player.seekTo(progressoAtual.tempo_assistido || 0, true);
-            setTempoAtual(progressoAtual.tempo_assistido || 0);
+          if (!hasResumedRef.current && progressoAtual) {
+            const seekTime = progressoAtual.tempo_assistido || 0;
+            if (seekTime > 0) {
+              setTempoAtual(seekTime);
+              if (player && playerReady) {
+                player.seekTo(seekTime, true);
+                hasResumedRef.current = true;
+              }
+            }
           }
         }
       } catch (err) {
@@ -509,25 +520,37 @@ function AulaPage() {
   const salvarProgresso = async (tempo) => {
     if (!user || !temAcesso) return;
     
-    const isConcluida = tempo > (duracao * 0.9); // Marca como concluída se assistiu 90%
+    // Evita conclusão prematura se a duração ainda não foi obtida
+    const isConcluida = duracao > 0 && tempo > (duracao * 0.9); 
 
-    await supabase
-      .from('progresso')
-      .upsert({
-        user_id: user.id,
-        aula_id: aulaId,
-        tempo_assistido: Math.floor(tempo),
-        concluida: isConcluida,
-        ultimo_acesso: new Date()
-      }, {
-        onConflict: 'user_id, aula_id'
-      });
-      
-    if (isConcluida) {
-      setProgressoAulas(prev => ({
-        ...prev,
-        [aulaId]: { ...prev[aulaId], concluida: true }
-      }));
+    try {
+      const { error } = await supabase
+        .from('progresso')
+        .upsert({
+          user_id: user.id,
+          aula_id: aulaId,
+          tempo_assistido: Math.floor(tempo),
+          concluida: isConcluida,
+          ultimo_acesso: new Date()
+        }, {
+          onConflict: 'user_id,aula_id'
+        });
+        
+      if (error) {
+        console.error('Erro ao salvar progresso no Supabase:', error);
+      } else {
+        // Atualiza o progresso em tempo real no estado local para feedback imediato na barra lateral
+        setProgressoAulas(prev => ({
+          ...prev,
+          [aulaId]: { 
+            ...prev[aulaId], 
+            tempo_assistido: Math.floor(tempo), 
+            concluida: isConcluida 
+          }
+        }));
+      }
+    } catch (e) {
+      console.error('Erro ao tentar salvar progresso:', e);
     }
   };
 
@@ -617,7 +640,10 @@ function AulaPage() {
             }
 
             // Se o tempo atual for > 0 (progresso), seek logo no início
-            if (tempoAtual > 0) event.target.seekTo(tempoAtual, true);
+            if (tempoAtual > 0) {
+              event.target.seekTo(tempoAtual, true);
+              hasResumedRef.current = true;
+            }
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
@@ -835,6 +861,9 @@ function AulaPage() {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         handleForward();
+      } else if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        togglePlayPause();
       } else if (e.key === 'Escape') {
         if (isFullscreen) {
           sairTelaCheia();
@@ -849,7 +878,7 @@ function AulaPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [player, playerReady, duracao, isFullscreen, iosFullscreen]);
+  }, [player, playerReady, isPlaying, duracao, isFullscreen, iosFullscreen]);
 
   const entrarTelaCheia = () => {
     const elem = containerRef.current;

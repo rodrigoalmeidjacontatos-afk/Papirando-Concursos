@@ -19,6 +19,7 @@ function PreparatorioViewPage() {
   const [userName, setUserName] = useState('Aluno');
   const [isAdmin, setIsAdmin] = useState(false);
   const [dataExpiracao, setDataExpiracao] = useState(null);
+  const [progressoAulas, setProgressoAulas] = useState({});
 
   const isRecente = (createdAtString) => {
     if (!createdAtString) return false;
@@ -148,16 +149,39 @@ function PreparatorioViewPage() {
 
         const { data: vData } = await supabase.from('vinculos').select('*').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId);
 
+        let aulasFinal = [];
         if (mounted) {
           if (vData && vData.length > 0) {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
             const aulasPermitidas = vData.filter(v => v.aula_id).map(v => v.aula_id);
-            setModulos(modulosPermitidos.length > 0 ? (modData || []).filter(m => modulosPermitidos.includes(m.id)) : (modData || []));
-            setAulas(aulasPermitidas.length > 0 ? (aulaData || []).filter(a => aulasPermitidas.includes(a.id)) : (aulaData || []));
+            const modulosFiltrados = modulosPermitidos.length > 0 ? (modData || []).filter(m => modulosPermitidos.includes(m.id)) : (modData || []);
+            aulasFinal = aulasPermitidas.length > 0 ? (aulaData || []).filter(a => aulasPermitidas.includes(a.id)) : (aulaData || []);
+            setModulos(modulosFiltrados);
+            setAulas(aulasFinal);
           } else {
+            aulasFinal = aulaData || [];
             setModulos(modData || []);
-            setAulas(aulaData || []);
+            setAulas(aulasFinal);
           }
+        }
+
+        // 3. Buscar progresso do usuário para essas aulas
+        let progressoMap = {};
+        if (currentUser && aulasFinal.length > 0) {
+          const { data: progressoData } = await supabase
+            .from('progresso')
+            .select('aula_id, tempo_assistido, concluida')
+            .eq('user_id', currentUser.id)
+            .in('aula_id', aulasFinal.map(a => a.id));
+
+          if (progressoData) {
+            progressoData.forEach(p => {
+              progressoMap[p.aula_id] = p;
+            });
+          }
+        }
+        if (mounted) {
+          setProgressoAulas(progressoMap);
         }
       } catch (err) {
         console.error('Erro geral:', err);
@@ -413,6 +437,10 @@ function PreparatorioViewPage() {
                             nivelAula === 'medio'   ? { bg: 'rgba(33,150,243,0.15)', color: '#2196F3', border: '#2196F3', label: 'MÉDIO' } :
                             null;
 
+                          const prog = progressoAulas[aula.id];
+                          const concluida = prog?.concluida;
+                          const emAndamento = prog && !concluida && prog.tempo_assistido > 0;
+
                           return (
                             <div
                               key={aula.id}
@@ -420,7 +448,8 @@ function PreparatorioViewPage() {
                                 ...styles.aulaItem,
                                 opacity: bloqueada ? 0.5 : 1,
                                 cursor: bloqueada ? 'not-allowed' : 'pointer',
-                                position: 'relative'
+                                position: 'relative',
+                                borderLeft: concluida ? '4px solid #4CAF50' : emAndamento ? '4px solid #2196F3' : 'none'
                               }}
                               onClick={() => {
                                 if (bloqueada) {
@@ -437,6 +466,34 @@ function PreparatorioViewPage() {
                                   <div style={{...styles.aulaTitulo, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'}}>
                                     {bloqueada && <span style={{fontSize: '12px'}}>🔒</span>}
                                     {aula.titulo}
+                                    {concluida && (
+                                      <span style={{
+                                        backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                                        color: '#4CAF50',
+                                        border: '1px solid #4CAF50',
+                                        fontSize: '8px',
+                                        fontWeight: '900',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        letterSpacing: '0.5px'
+                                      }}>
+                                        ✓ ASSISTIDA
+                                      </span>
+                                    )}
+                                    {emAndamento && (
+                                      <span style={{
+                                        backgroundColor: 'rgba(33, 150, 243, 0.15)',
+                                        color: '#2196F3',
+                                        border: '1px solid #2196F3',
+                                        fontSize: '8px',
+                                        fontWeight: '900',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        letterSpacing: '0.5px'
+                                      }}>
+                                        ⏱ EM ANDAMENTO
+                                      </span>
+                                    )}
                                     {isRecente(aula.created_at) && (
                                       <span style={{
                                         backgroundColor: 'rgba(76, 175, 80, 0.15)',
@@ -462,8 +519,8 @@ function PreparatorioViewPage() {
                                   <div style={styles.aulaDuracao}>🎦 {formatarTempo(aula.duracao) || '--:--'}</div>
                                 </div>
                               </div>
-                              <div style={{color: bloqueada ? '#555' : '#AAA', fontSize: '14px'}}>
-                                {bloqueada ? '🔒' : '▶'}
+                              <div style={{color: bloqueada ? '#555' : concluida ? '#4CAF50' : emAndamento ? '#2196F3' : '#AAA', fontSize: '14px'}}>
+                                {bloqueada ? '🔒' : concluida ? '✓' : '▶'}
                               </div>
                             </div>
                           );
