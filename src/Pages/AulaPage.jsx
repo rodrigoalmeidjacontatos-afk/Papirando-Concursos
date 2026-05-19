@@ -1017,6 +1017,8 @@ function AulaPage() {
           {/* Título da Aula acima do player */}
           {aulaPlaying?.titulo && (
             <div style={{
+              width: '100%',
+              maxWidth: '1000px',
               marginBottom: '14px',
               padding: '0 4px',
               display: 'flex',
