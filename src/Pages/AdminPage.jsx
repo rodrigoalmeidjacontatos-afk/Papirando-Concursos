@@ -1574,8 +1574,9 @@ function AdminPage() {
                     </select>
                     <select style={{...styles.select, flex: 1}} value={novoDocumento.fonte || 'Avulso'} onChange={e => setNovoDocumento({...novoDocumento, fonte: e.target.value})}>
                       <option value="Avulso">Avulso (Independente)</option>
-                      <option value="Gramatique">Gramatique</option>
-                      <option value="Estrategia">Estratégia</option>
+                      {preparatorios.map(p => (
+                        <option key={p.id} value={p.nome}>{p.nome}</option>
+                      ))}
                     </select>
                     <div style={{flex: 2, display: 'flex', gap: '8px'}}>
                       <input style={{...styles.input, flex: 1}} placeholder="URL ou Upload ->" value={novoDocumento.url} onChange={e => setNovoDocumento({...novoDocumento, url: e.target.value})} />
@@ -1639,12 +1640,10 @@ function AdminPage() {
                 {documentos.map(doc => {
                   let exibicaoFonte = 'Avulso';
                   let tituloLimpo = doc.titulo;
-                  if (doc.titulo.startsWith('[Gramatique] ')) {
-                    exibicaoFonte = 'Gramatique';
-                    tituloLimpo = doc.titulo.replace('[Gramatique] ', '');
-                  } else if (doc.titulo.startsWith('[Estrategia] ')) {
-                    exibicaoFonte = 'Estratégia';
-                    tituloLimpo = doc.titulo.replace('[Estrategia] ', '');
+                  if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+                    const parts = doc.titulo.split('] ');
+                    exibicaoFonte = parts[0].replace('[', '').trim();
+                    tituloLimpo = parts.slice(1).join('] ').trim();
                   }
 
                   return (
@@ -1660,8 +1659,9 @@ function AdminPage() {
                           </select>
                           <select style={styles.select} value={editandoDocumento.fonte || 'Avulso'} onChange={e => setEditandoDocumento({...editandoDocumento, fonte: e.target.value})}>
                             <option value="Avulso">Avulso</option>
-                            <option value="Gramatique">Gramatique</option>
-                            <option value="Estrategia">Estratégia</option>
+                            {preparatorios.map(p => (
+                              <option key={p.id} value={p.nome}>{p.nome}</option>
+                            ))}
                           </select>
                           <button style={styles.saveButtonSmall} onClick={async () => {
                              const prefixo = editandoDocumento.fonte && editandoDocumento.fonte !== 'Avulso' ? `[${editandoDocumento.fonte}] ` : '';
@@ -1691,7 +1691,7 @@ function AdminPage() {
                                   fontSize: '11px', 
                                   padding: '2px 8px', 
                                   borderRadius: '4px', 
-                                  backgroundColor: exibicaoFonte === 'Gramatique' ? '#7e22ce' : exibicaoFonte === 'Estratégia' ? '#0284c7' : '#37474f', 
+                                  backgroundColor: exibicaoFonte === 'Avulso' ? '#37474f' : '#7e22ce', 
                                   marginLeft: '8px',
                                   fontWeight: 'normal',
                                   color: '#FFF'
@@ -1706,12 +1706,10 @@ function AdminPage() {
                             <button style={styles.editButtonSmall} onClick={() => {
                               let fonte = 'Avulso';
                               let titulo_limpo = doc.titulo;
-                              if (doc.titulo.startsWith('[Gramatique] ')) {
-                                fonte = 'Gramatique';
-                                titulo_limpo = doc.titulo.replace('[Gramatique] ', '');
-                              } else if (doc.titulo.startsWith('[Estrategia] ')) {
-                                fonte = 'Estrategia';
-                                titulo_limpo = doc.titulo.replace('[Estrategia] ', '');
+                              if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+                                const parts = doc.titulo.split('] ');
+                                fonte = parts[0].replace('[', '').trim();
+                                titulo_limpo = parts.slice(1).join('] ').trim();
                               }
                               setEditandoDocumento({ ...doc, titulo_limpo, fonte });
                             }}>Editar</button>

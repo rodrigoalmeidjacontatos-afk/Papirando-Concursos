@@ -39,7 +39,9 @@ function PdfCover({ category, title, source, isBasico }) {
     };
   }
 
-  const sourceLabel = source === 'Gramatique' ? 'Gramatique' : source === 'Estratégia' ? 'Estratégia' : 'Avulso';
+  const sourceLabel = source || 'Avulso';
+  const isSpecial = sourceLabel !== 'Avulso';
+  const badgeColor = isSpecial ? '#c084fc' : '#94a3b8';
 
   return (
     <div style={{
@@ -82,11 +84,15 @@ function PdfCover({ category, title, source, isBasico }) {
         <span style={{
           fontSize: '10px',
           fontWeight: 'bold',
-          color: source === 'Gramatique' ? '#c084fc' : source === 'Estratégia' ? '#38bdf8' : '#94a3b8',
+          color: badgeColor,
           backgroundColor: 'rgba(0,0,0,0.45)',
           padding: '4px 8px',
           borderRadius: '4px',
-          border: '1px solid rgba(255,255,255,0.08)'
+          border: '1px solid rgba(255,255,255,0.08)',
+          maxWidth: '120px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
         }}>
           {sourceLabel}
         </span>
@@ -181,18 +187,31 @@ function DocumentosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos');
   const [fonteAtiva, setFonteAtiva] = useState('Todos');
+  const [fontes, setFontes] = useState(['Todos']);
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
-  const fontes = ['Todos', 'Gramatique', 'Estratégia', 'Avulso'];
 
   useEffect(() => {
     async function carregarDados() {
       try {
         // 1. Carregar documentos do Supabase
         const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
-        setDocumentos(data || []);
+        const docs = data || [];
+        setDocumentos(docs);
+
+        // Extrair dinamicamente a lista de origens/preparatórios existentes nos documentos
+        const mappedFontes = docs.map(doc => {
+          let fonte = 'Avulso';
+          if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+            const parts = doc.titulo.split('] ');
+            fonte = parts[0].replace('[', '').trim();
+          }
+          return fonte;
+        });
+        const uniqueFontes = ['Todos', ...new Set(mappedFontes)];
+        setFontes(uniqueFontes);
 
         // 2. Verificar perfil e plano do usuário logado
         const { data: { user } } = await supabase.auth.getUser();
@@ -241,12 +260,10 @@ function DocumentosPage() {
     let fonte = 'Avulso';
     let tituloLimpo = doc.titulo;
     
-    if (doc.titulo.startsWith('[Gramatique] ')) {
-      fonte = 'Gramatique';
-      tituloLimpo = doc.titulo.replace('[Gramatique] ', '');
-    } else if (doc.titulo.startsWith('[Estrategia] ')) {
-      fonte = 'Estratégia';
-      tituloLimpo = doc.titulo.replace('[Estrategia] ', '');
+    if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+      const parts = doc.titulo.split('] ');
+      fonte = parts[0].replace('[', '').trim();
+      tituloLimpo = parts.slice(1).join('] ').trim();
     }
     
     return { ...doc, fonte, tituloLimpo };
@@ -318,25 +335,27 @@ function DocumentosPage() {
             </div>
           </div>
 
-          {/* Filtro 2: Origem/Fonte */}
-          <div>
-            <span style={styles.filterLabel}>🏷️ FONTE DO MATERIAL:</span>
-            <div style={styles.filterBar}>
-              {fontes.map(f => (
-                <button 
-                  key={f}
-                  onClick={() => setFonteAtiva(f)}
-                  style={{
-                    ...styles.filterTab, 
-                    backgroundColor: fonteAtiva === f ? '#7e22ce' : 'rgba(255,255,255,0.05)',
-                    borderColor: fonteAtiva === f ? '#7e22ce' : '#333'
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
+          {/* Filtro 2: Origem/Fonte Dinâmica */}
+          {fontes.length > 1 && (
+            <div>
+              <span style={styles.filterLabel}>🏷️ PREPARATÓRIO VINCULADO:</span>
+              <div style={styles.filterBar}>
+                {fontes.map(f => (
+                  <button 
+                    key={f}
+                    onClick={() => setFonteAtiva(f)}
+                    style={{
+                      ...styles.filterTab, 
+                      backgroundColor: fonteAtiva === f ? '#7e22ce' : 'rgba(255,255,255,0.05)',
+                      borderColor: fonteAtiva === f ? '#7e22ce' : '#333'
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div style={styles.grid}>
@@ -366,9 +385,9 @@ function DocumentosPage() {
                   <span style={styles.cardBadge}>{doc.categoria}</span>
                   <span style={{
                     ...styles.cardBadge, 
-                    backgroundColor: doc.fonte === 'Gramatique' ? 'rgba(126,34,206,0.15)' : doc.fonte === 'Estratégia' ? 'rgba(2,132,199,0.15)' : 'rgba(255,255,255,0.05)',
-                    color: doc.fonte === 'Gramatique' ? '#c084fc' : doc.fonte === 'Estratégia' ? '#38bdf8' : '#AAA',
-                    border: doc.fonte === 'Gramatique' ? '1px solid rgba(126,34,206,0.3)' : doc.fonte === 'Estratégia' ? '1px solid rgba(2,132,199,0.3)' : '1px solid #333'
+                    backgroundColor: doc.fonte === 'Avulso' ? 'rgba(255,255,255,0.05)' : 'rgba(126,34,206,0.15)',
+                    color: doc.fonte === 'Avulso' ? '#AAA' : '#c084fc',
+                    border: doc.fonte === 'Avulso' ? '1px solid #333' : '1px solid rgba(126,34,206,0.3)'
                   }}>
                     {doc.fonte}
                   </span>
