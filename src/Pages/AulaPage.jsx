@@ -630,6 +630,9 @@ function AulaPage() {
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
                 salvarProgresso(duracao); // Marca como concluída no final
+                if (irParaProximaAulaRef.current) {
+                  irParaProximaAulaRef.current();
+                }
               }
               stopProgressTracking();
             }
@@ -787,6 +790,66 @@ function AulaPage() {
       player.setPlaybackRate(novaVelocidade);
     }
   };
+
+  const currentIndex = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+  const temProxima = currentIndex !== -1 && currentIndex < listaAulas.length - 1;
+  const temAnterior = currentIndex > 0;
+
+  const irParaProximaAula = () => {
+    if (temProxima) {
+      const proxima = listaAulas[currentIndex + 1];
+      navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${proxima.id}`);
+    }
+  };
+
+  const irParaAulaAnterior = () => {
+    if (temAnterior) {
+      const anterior = listaAulas[currentIndex - 1];
+      navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${anterior.id}`);
+    }
+  };
+
+  const irParaProximaAulaRef = useRef(irParaProximaAula);
+  const irParaAulaAnteriorRef = useRef(irParaAulaAnterior);
+
+  useEffect(() => {
+    irParaProximaAulaRef.current = irParaProximaAula;
+    irParaAulaAnteriorRef.current = irParaAulaAnterior;
+  }, [irParaProximaAula, irParaAulaAnterior]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleBackward();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleForward();
+      } else if (e.key === 'Escape') {
+        if (isFullscreen) {
+          sairTelaCheia();
+        }
+        if (iosFullscreen) {
+          setIosFullscreen(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [player, playerReady, duracao, isFullscreen, iosFullscreen]);
 
   const entrarTelaCheia = () => {
     const elem = containerRef.current;
@@ -1040,6 +1103,21 @@ function AulaPage() {
                 }}
               >
                 <button 
+                  onClick={irParaAulaAnterior} 
+                  disabled={!temAnterior}
+                  style={{
+                    ...styles.modernControlButton, 
+                    background: 'rgba(255,255,255,0.1)', 
+                    padding: '5px 10px',
+                    opacity: temAnterior ? 1 : 0.3,
+                    cursor: temAnterior ? 'pointer' : 'not-allowed',
+                    fontSize: '18px'
+                  }}
+                >
+                  ⏮
+                </button>
+
+                <button 
                   onClick={handleBackward} 
                   style={{...styles.modernControlButton, background: 'rgba(255,255,255,0.1)', padding: '5px 10px'}}
                 >
@@ -1072,6 +1150,21 @@ function AulaPage() {
                 >
                   10s ⏩
                 </button>
+
+                <button 
+                  onClick={irParaProximaAula} 
+                  disabled={!temProxima}
+                  style={{
+                    ...styles.modernControlButton, 
+                    background: 'rgba(255,255,255,0.1)', 
+                    padding: '5px 10px',
+                    opacity: temProxima ? 1 : 0.3,
+                    cursor: temProxima ? 'pointer' : 'not-allowed',
+                    fontSize: '18px'
+                  }}
+                >
+                  ⏭
+                </button>
               </div>
             </div>
           ) : (
@@ -1094,6 +1187,13 @@ function AulaPage() {
                   pointerEvents: isPlaying ? 'auto' : 'none'
                 }} 
                 onClick={togglePlayPause}
+                onDoubleClick={() => {
+                  if (isFullscreen) {
+                    sairTelaCheia();
+                  } else {
+                    entrarTelaCheia();
+                  }
+                }}
               ></div>
               
               {/* Overlay de Controles Moderno */}
@@ -1140,8 +1240,32 @@ function AulaPage() {
 
                   <div style={styles.controlsRow}>
                     <div style={styles.controlsGroupLeft}>
+                      <button 
+                        onClick={irParaAulaAnterior} 
+                        style={{
+                          ...styles.modernControlButton,
+                          opacity: temAnterior ? 0.9 : 0.3,
+                          cursor: temAnterior ? 'pointer' : 'not-allowed'
+                        }} 
+                        disabled={!temAnterior}
+                        title="Aula Anterior"
+                      >
+                        ⏮
+                      </button>
                       <button onClick={togglePlayPause} style={styles.modernControlButton} title={isPlaying ? 'Pausar' : 'Reproduzir'}>
                         {isPlaying ? '⏸' : '▶'}
+                      </button>
+                      <button 
+                        onClick={irParaProximaAula} 
+                        style={{
+                          ...styles.modernControlButton,
+                          opacity: temProxima ? 0.9 : 0.3,
+                          cursor: temProxima ? 'pointer' : 'not-allowed'
+                        }} 
+                        disabled={!temProxima}
+                        title="Próxima Aula"
+                      >
+                        ⏭
                       </button>
                       
                       <button onClick={handleBackward} style={styles.modernControlButton} title="-10 segundos">↺</button>
