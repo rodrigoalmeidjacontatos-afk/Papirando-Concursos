@@ -506,8 +506,9 @@ function Home() {
                 };
               }).filter(Boolean);
 
-              // 1. Filtrar os primeiros 8 para o "Continue Assistindo"
-              setContinueAssistindo(progressoCompleto.slice(0, 8));
+              // 1. Filtrar os primeiros 4 não concluídos para o "Continue Assistindo"
+              const videosEmProgresso = progressoCompleto.filter(p => !p.concluida);
+              setContinueAssistindo(videosEmProgresso.slice(0, 8));
 
               // 2. Agrupar progresso por preparatório para o "Histórico de Cursos"
               const cursosMap = {};
