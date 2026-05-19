@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
 
-// Componente para a capa simulada de PDF em 3D Realista
-function PdfCover({ category, title, source, isBasico }) {
+// Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
+function PdfCover({ category, title, source, isBasico, url }) {
+  const isPdf = url && url.toLowerCase().includes('.pdf');
+
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
     border: '#38bdf8',
@@ -47,92 +49,105 @@ function PdfCover({ category, title, source, isBasico }) {
     <div style={{
       width: '100%',
       height: '220px',
-      background: colors.bg,
       borderRadius: '12px 12px 0 0',
       position: 'relative',
       overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      padding: '20px',
       borderBottom: '1px solid rgba(255,255,255,0.08)',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      backgroundColor: '#141414'
     }}>
-      {/* Brilho Glossy / Reflexo Laminado de Revista */}
+      {/* Camada protetora transparente por cima para travar cliques, zoom e interacoes indesejadas com o PDF */}
       <div style={{
         position: 'absolute',
         top: 0, left: 0, right: 0, bottom: 0,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 55%)',
-        pointerEvents: 'none',
-        zIndex: 2
+        zIndex: 4,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.12) 100%)',
+        pointerEvents: 'auto'
       }} />
 
-      {/* Cabeçalho da Capa (Badge Categoria + Fonte) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 3 }}>
-        <span style={{
-          fontSize: '9px',
-          fontWeight: 'bold',
-          color: '#FFF',
-          backgroundColor: colors.badgeBg,
-          padding: '4px 8px',
-          borderRadius: '4px',
-          letterSpacing: '0.8px',
-          textTransform: 'uppercase'
+      {isPdf ? (
+        <iframe 
+          src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} 
+          title={title}
+          style={{
+            width: '100%',
+            height: '270px', // Ligeiramente maior para recortar e ocultar controles inferiores nativos
+            border: 'none',
+            pointerEvents: 'none',
+            backgroundColor: '#141414',
+            transform: 'scale(1.0)',
+            transformOrigin: 'top left'
+          }}
+          scrolling="no"
+        />
+      ) : (
+        /* Fallback caso nao seja PDF */
+        <div style={{
+          width: '100%',
+          height: '100%',
+          background: colors.bg,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          boxSizing: 'border-box'
         }}>
-          {colors.badge}
-        </span>
-        <span style={{
-          fontSize: '10px',
-          fontWeight: 'bold',
-          color: badgeColor,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          maxWidth: '120px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}>
-          {sourceLabel}
-        </span>
-      </div>
+          <div style={{ fontSize: '44px', marginBottom: '10px' }}>{colors.emblem}</div>
+          <h4 style={{
+            fontSize: '13px',
+            fontWeight: 'bold',
+            color: '#FFF',
+            margin: 0,
+            textAlign: 'center',
+            textTransform: 'uppercase'
+          }}>
+            {title}
+          </h4>
+        </div>
+      )}
 
-      {/* Emblema Central em Destaque com Brilho Neon */}
+      {/* Badges Flutuantes por cima do PDF */}
       <div style={{
-        fontSize: '44px',
-        textAlign: 'center',
-        filter: `drop-shadow(0 0 8px ${colors.border}44)`,
-        zIndex: 3,
-        userSelect: 'none'
+        position: 'absolute',
+        top: '12px',
+        left: '12px',
+        zIndex: 5,
+        fontSize: '9px',
+        fontWeight: 'bold',
+        color: '#FFF',
+        backgroundColor: colors.badgeBg,
+        padding: '4px 8px',
+        borderRadius: '4px',
+        letterSpacing: '0.8px',
+        textTransform: 'uppercase',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
       }}>
-        {colors.emblem}
+        {colors.badge}
       </div>
 
-      {/* Título e Rodapé Estilizados do Documento */}
-      <div style={{ zIndex: 3, textAlign: 'center' }}>
-        <h4 style={{
-          fontSize: '13px',
-          fontWeight: '850',
-          color: '#FFF',
-          margin: '0 0 2px',
-          lineHeight: '1.4',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          textTransform: 'uppercase',
-          letterSpacing: '0.3px',
-          textShadow: '0 2px 4px rgba(0,0,0,0.8)'
-        }}>
-          {title}
-        </h4>
-        <span style={{ fontSize: '9px', color: '#94a3b8', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: '500' }}>
-          Papirando Concursos
-        </span>
+      <div style={{
+        position: 'absolute',
+        top: '12px',
+        right: '12px',
+        zIndex: 5,
+        fontSize: '10px',
+        fontWeight: 'bold',
+        color: badgeColor,
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+        maxWidth: '120px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {sourceLabel}
       </div>
 
-      {/* Selo PDF 3D Brilhoso */}
+      {/* Selo PDF 3D */}
       <div style={{
         position: 'absolute',
         bottom: '12px',
@@ -144,7 +159,7 @@ function PdfCover({ category, title, source, isBasico }) {
         padding: '3px 6px',
         borderRadius: '3px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-        zIndex: 4
+        zIndex: 5
       }}>
         PDF
       </div>
@@ -154,8 +169,8 @@ function PdfCover({ category, title, source, isBasico }) {
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(3px)',
+          backgroundColor: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(3.5px)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -167,7 +182,7 @@ function PdfCover({ category, title, source, isBasico }) {
             fontSize: '10px',
             fontWeight: 'bold',
             color: '#ffb300',
-            backgroundColor: 'rgba(0,0,0,0.8)',
+            backgroundColor: 'rgba(0,0,0,0.85)',
             padding: '4px 10px',
             borderRadius: '12px',
             border: '1px solid #ffb300',
@@ -375,6 +390,7 @@ function DocumentosPage() {
                 title={doc.tituloLimpo} 
                 source={doc.fonte} 
                 isBasico={isBasico}
+                url={doc.url}
               />
 
               {/* Informações do Material */}
