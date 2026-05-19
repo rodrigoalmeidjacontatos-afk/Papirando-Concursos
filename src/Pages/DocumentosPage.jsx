@@ -5,7 +5,20 @@ import LoadingScreen from '../components/LoadingScreen';
 
 // Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
 function PdfCover({ category, title, source, isBasico, url }) {
-  const isPdf = url && url.toLowerCase().includes('.pdf');
+  const [useFallback, setUseFallback] = useState(true);
+
+  useEffect(() => {
+    // Detecta se é celular, tablet ou se a largura é de dispositivo móvel
+    const checkDevice = () => {
+      const isMobileOrTablet = window.innerWidth < 1024 || /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent);
+      const isPdf = url && url.toLowerCase().includes('.pdf');
+      setUseFallback(isMobileOrTablet || !isPdf);
+    };
+
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, [url]);
 
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
@@ -65,7 +78,7 @@ function PdfCover({ category, title, source, isBasico, url }) {
         pointerEvents: 'auto'
       }} />
 
-      {isPdf ? (
+      {!useFallback ? (
         <iframe 
           src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} 
           title={title}
@@ -81,29 +94,95 @@ function PdfCover({ category, title, source, isBasico, url }) {
           scrolling="no"
         />
       ) : (
-        /* Fallback caso nao seja PDF */
+        /* Fallback de Capa Editorial de Alta Fidelidade (Premium CSS Book) */
         <div style={{
           width: '100%',
           height: '100%',
           background: colors.bg,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '20px',
-          boxSizing: 'border-box'
+          justifyContent: 'space-between',
+          padding: '24px 20px',
+          boxSizing: 'border-box',
+          position: 'relative'
         }}>
-          <div style={{ fontSize: '44px', marginBottom: '10px' }}>{colors.emblem}</div>
-          <h4 style={{
-            fontSize: '13px',
-            fontWeight: 'bold',
-            color: '#FFF',
-            margin: 0,
+          {/* Textura de Linhas Verticais de Livro (Encadernação) */}
+          <div style={{
+            position: 'absolute',
+            left: 0, top: 0, bottom: 0,
+            width: '12px',
+            background: 'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.08) 50%, rgba(0,0,0,0.4) 100%)',
+            borderRight: '1px solid rgba(255,255,255,0.05)'
+          }} />
+
+          {/* Efeito sutil de malha de pontos na capa */}
+          <div style={{
+            position: 'absolute',
+            top: 0, left: '12px', right: 0, bottom: 0,
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
+            backgroundSize: '12px 12px',
+            opacity: 0.4,
+            pointerEvents: 'none'
+          }} />
+
+          {/* Cabeçalho de Capa */}
+          <div style={{ zIndex: 3, display: 'flex', justifyContent: 'flex-end', marginLeft: '12px' }}>
+            <span style={{
+              fontSize: '8px',
+              fontWeight: 'bold',
+              color: '#FFF',
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              padding: '3px 8px',
+              borderRadius: '20px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              letterSpacing: '1px'
+            }}>
+              ED. 2026
+            </span>
+          </div>
+
+          {/* Emblema em Destaque */}
+          <div style={{
+            fontSize: '52px',
             textAlign: 'center',
-            textTransform: 'uppercase'
+            filter: `drop-shadow(0 4px 12px ${colors.border}55)`,
+            zIndex: 3,
+            transform: 'translateY(-5px)',
+            userSelect: 'none'
           }}>
-            {title}
-          </h4>
+            {colors.emblem}
+          </div>
+
+          {/* Título e Linha de Rodapé */}
+          <div style={{ zIndex: 3, textAlign: 'center', paddingLeft: '12px' }}>
+            <div style={{
+              width: '30px',
+              height: '2px',
+              backgroundColor: colors.border,
+              margin: '0 auto 10px',
+              borderRadius: '2px',
+              boxShadow: `0 0 8px ${colors.border}`
+            }} />
+            <h4 style={{
+              fontSize: '13px',
+              fontWeight: '800',
+              color: '#FFF',
+              margin: '0 0 4px',
+              lineHeight: '1.4',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textTransform: 'uppercase',
+              letterSpacing: '0.4px',
+              textShadow: '0 1px 3px rgba(0,0,0,0.6)'
+            }}>
+              {title}
+            </h4>
+            <span style={{ fontSize: '8px', color: '#94a3b8', letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+              PAPIRANDO CONCURSOS
+            </span>
+          </div>
         </div>
       )}
 
