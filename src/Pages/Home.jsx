@@ -11,6 +11,7 @@ function Home() {
   const [userName, setUserName] = useState('Aluno');
   const [planoUsuario, setPlanoUsuario] = useState('basico'); 
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [continueAssistindo, setContinueAssistindo] = useState([]);
 
   // Helper para não deixar requisições penduradas para sempre
   const withTimeout = (promise, ms = 8000) => {
@@ -327,6 +328,97 @@ function Home() {
     carregarESincronizarDados();
   }, []);
 
+  // Buscar progresso recente (Continue Assistindo)
+  useEffect(() => {
+    async function carregarProgressoRecente() {
+      if (!user) return;
+      try {
+        const { data: recentProgress } = await supabase
+          .from('progresso')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('ultimo_acesso', { ascending: false })
+          .limit(8);
+
+        if (recentProgress && recentProgress.length > 0) {
+          const aulaIds = recentProgress.map(p => p.aula_id);
+          const { data: aulasData } = await supabase.from('aulas').select('*').in('id', aulaIds);
+          
+          if (aulasData && aulasData.length > 0) {
+            const moduloIds = aulasData.map(a => a.modulo_id || a.moduloId).filter(Boolean);
+            const { data: modulosData } = await supabase.from('modulos').select('*').in('id', moduloIds);
+            
+            if (modulosData && modulosData.length > 0) {
+              const disciplinaIds = modulosData.map(m => m.disciplina_id || m.disciplinaId).filter(Boolean);
+              const { data: disciplinasData } = await supabase.from('disciplinas').select('*').in('id', disciplinaIds);
+              
+              if (disciplinasData && disciplinasData.length > 0) {
+                const preparatorioIds = disciplinasData.map(d => d.preparatorio_id || d.preparatorioId).filter(Boolean);
+                const { data: preparatoriosData } = await supabase.from('preparatorios').select('*').in('id', preparatorioIds);
+                
+                const { data: vinculosData } = await supabase.from('vinculos').select('*');
+                
+                // Mapeia tudo
+                const list = recentProgress.map(p => {
+                  const aula = aulasData.find(a => a.id === p.aula_id);
+                  if (!aula) return null;
+                  
+                  const modulo = modulosData.find(m => m.id === (aula.modulo_id || aula.moduloId));
+                  if (!modulo) return null;
+                  
+                  const disciplina = disciplinasData.find(d => d.id === (modulo.disciplina_id || modulo.disciplinaId));
+                  if (!disciplina) return null;
+                  
+                  const preparatorio = preparatoriosData.find(prep => prep.id === (disciplina.preparatorio_id || disciplina.preparatorioId));
+                  if (!preparatorio) return null;
+                  
+                  // Acha a carreira correspondente
+                  let carreiraId = null;
+                  if (vinculosData) {
+                    const individual = vinculosData.find(v => !v.data && v.preparatorio_id === preparatorio.id);
+                    if (individual) {
+                      carreiraId = individual.carreira_id;
+                    } else {
+                      const legadoRow = vinculosData.find(v => v.data);
+                      if (legadoRow && legadoRow.data) {
+                        for (const [cId, prepsMap] of Object.entries(legadoRow.data)) {
+                          if (prepsMap && prepsMap[preparatorio.id]) {
+                            carreiraId = cId;
+                            break;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Fallback se não achar carreira
+                  if (!carreiraId) carreiraId = 'policiais'; // fallback seguro
+
+                  return {
+                    id: p.id,
+                    aula,
+                    modulo,
+                    disciplina,
+                    preparatorio,
+                    carreiraId,
+                    tempo: p.tempo_assistido,
+                    concluida: p.concluida,
+                    ultimoAcesso: p.ultimo_acesso
+                  };
+                }).filter(Boolean);
+                
+                setContinueAssistindo(list);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar progresso recente:", err);
+      }
+    }
+    carregarProgressoRecente();
+  }, [user]);
+
   const scrollHorizontal = (categoriaId, direction) => {
     const ref = carouselRefs.current[categoriaId];
     if (ref) {
@@ -498,6 +590,131 @@ function Home() {
       </div>
 
       <main style={styles.main}>
+        {/* CONTINUE ASSISTINDO (Netflix-Style) */}
+        {continueAssistindo.length > 0 && (
+          <div style={{ marginBottom: '50px', padding: '0 10px' }}>
+            <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '20px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🍿 CONTINUE ASSISTINDO
+            </h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: '25px',
+              justifyContent: 'flex-start'
+            }}>
+              {continueAssistindo.map((item) => {
+                // Calcular porcentagem do progresso
+                let pct = 50;
+                if (item.tempo && item.aula?.duracao) {
+                  const durStr = String(item.aula.duracao);
+                  if (!isNaN(durStr)) {
+                    const sec = Number(durStr);
+                    if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
+                  } else {
+                    try {
+                      const parts = durStr.split(':').map(Number);
+                      let sec = 0;
+                      if (parts.length === 2) sec = parts[0] * 60 + parts[1];
+                      else if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                      if (sec > 0) pct = Math.min(100, Math.floor((item.tempo / sec) * 100));
+                    } catch(e) {}
+                  }
+                }
+                if (item.concluida) pct = 100;
+
+                return (
+                  <div 
+                    key={item.id} 
+                    className="card-hover continue-assistindo-card"
+                    style={{
+                      backgroundColor: 'rgba(20, 20, 25, 0.75)',
+                      border: '1px solid #1c1c1f',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transition: 'all 0.25s',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                      boxSizing: 'border-box'
+                    }}
+                    onClick={() => navigate(`/aula/${item.carreiraId}/${item.preparatorio.id}/${item.disciplina.id}/${item.modulo.id}/${item.aula.id}`)}
+                  >
+                    {/* Imagem de Capa do Curso */}
+                    <div style={{ height: '140px', position: 'relative', overflow: 'hidden', backgroundColor: '#070708' }}>
+                      {item.preparatorio.capa ? (
+                        <img 
+                          src={item.preparatorio.capa} 
+                          alt="Capa" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} 
+                        />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '32px' }}>
+                          📚
+                        </div>
+                      )}
+                      
+                      {/* Play Button Overlay */}
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                        zIndex: 2
+                      }}>
+                        <span style={{
+                          fontSize: '36px',
+                          color: '#FFF',
+                          filter: 'drop-shadow(0 0 8px rgba(229, 9, 20, 0.9))'
+                        }} className="play-icon-glow">▶️</span>
+                      </div>
+                      
+                      {/* Badge do Curso / Preparatório */}
+                      <span style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        color: '#ffb300',
+                        fontSize: '9px',
+                        fontWeight: '900',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(255,179,0,0.3)',
+                        zIndex: 3,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {item.preparatorio.nome}
+                      </span>
+                    </div>
+                    
+                    {/* Detalhes da Aula */}
+                    <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#101012' }}>
+                      <span style={{ fontSize: '9px', color: '#777', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {item.disciplina.nome} • {item.modulo.nome}
+                      </span>
+                      <h3 style={{ fontSize: '13px', color: '#FFF', margin: 0, fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {item.aula.titulo}
+                      </h3>
+                    </div>
+                    
+                    {/* Netflix-style red progress bar */}
+                    <div style={{ height: '4px', backgroundColor: '#2b2b30', width: '100%', position: 'relative' }}>
+                      <div style={{ 
+                        height: '100%', 
+                        backgroundColor: '#E50914', 
+                        width: `${pct}%`,
+                        boxShadow: '0 0 8px rgba(229, 9, 20, 0.8)'
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {categorias.map((categoria) => {
           // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
           const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
