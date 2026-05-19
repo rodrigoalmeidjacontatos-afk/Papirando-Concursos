@@ -64,6 +64,7 @@ function AulaPage() {
   const [sidebarView, setSidebarView] = useState('main'); // 'main', 'disciplinas', 'modulos'
   const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
   const [progressoGeral, setProgressoGeral] = useState({ disciplinas: {}, modulos: {} });
+  const [docsDoPreparatorio, setDocsDoPreparatorio] = useState([]);
 
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
@@ -317,6 +318,27 @@ function AulaPage() {
           .select('*')
           .eq('preparatorio_id', preparatorioId);
         setListaDisciplinas((todasDisciplinas || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
+
+        // Carregar Preparatório e seus Documentos vinculados
+        const { data: prepObj } = await supabase.from('preparatorios').select('nome').eq('id', preparatorioId).single();
+        if (prepObj) {
+          const { data: allDocs } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
+          if (allDocs) {
+            const cleanDocs = allDocs.map(doc => {
+              let fonte = 'Avulso';
+              let tituloLimpo = doc.titulo;
+              if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+                const parts = doc.titulo.split('] ');
+                fonte = parts[0].replace('[', '').trim();
+                tituloLimpo = parts.slice(1).join('] ').trim();
+              }
+              return { ...doc, fonte, tituloLimpo };
+            });
+            // Filtra os documentos onde a fonte/preparatório bate com o nome do preparatório atual
+            const filteredDocs = cleanDocs.filter(d => d.fonte === prepObj.nome);
+            setDocsDoPreparatorio(filteredDocs);
+          }
+        }
 
         // BUSCA DE AULAS DO MÓDULO EXPLORADO
         let aulasFinais = [];
@@ -1302,27 +1324,115 @@ function AulaPage() {
                   })}
 
                 {activeSubTab === 'pdf' && (
-                  <div style={{padding: '20px'}}>
-                    <h3 style={{fontSize: '16px', marginBottom: '15px'}}>Material em PDF</h3>
-                    {aulaPlaying?.pdf_url ? (
-                      <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+                  <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
+                    {/* 1. PDF Específico da Aula */}
+                    <div>
+                      <h3 style={{fontSize: '13px', fontWeight: 'bold', color: '#FFF', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+                        📄 PDF desta Aula
+                      </h3>
+                      {aulaPlaying?.pdf_url ? (
                         <a 
                           href={aulaPlaying.pdf_url} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           style={{
-                            padding: '12px', backgroundColor: '#E50914', color: '#FFF', 
-                            borderRadius: '8px', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold'
+                            display: 'block',
+                            padding: '12px', 
+                            backgroundColor: '#E50914', 
+                            color: '#FFF', 
+                            borderRadius: '8px', 
+                            textDecoration: 'none', 
+                            textAlign: 'center', 
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            boxShadow: '0 4px 12px rgba(229,9,20,0.2)'
                           }}
                         >
-                          📄 Abrir PDF da Aula
+                          Abrir PDF da Aula
                         </a>
-                      </div>
-                    ) : (
-                      <div style={{textAlign: 'center', color: '#666', padding: '20px'}}>
-                        <p>Nenhum PDF disponível para esta aula.</p>
-                      </div>
-                    )}
+                      ) : (
+                        <div style={{backgroundColor: 'rgba(255,255,255,0.02)', border: '1px dashed #333', borderRadius: '8px', padding: '15px', textAlign: 'center', color: '#666', fontSize: '12px'}}>
+                          Nenhum PDF específico associado a esta videoaula.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Materiais de Apoio do Preparatório */}
+                    <div style={{borderTop: '1px solid #222', paddingTop: '15px'}}>
+                      <h3 style={{fontSize: '13px', fontWeight: 'bold', color: '#FFF', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+                        📚 Materiais de Apoio (Curso)
+                      </h3>
+                      {docsDoPreparatorio.length > 0 ? (
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                          {docsDoPreparatorio.map(doc => {
+                            const isBasico = planoUsuario === 'basico';
+                            
+                            const linkStyle = {
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              padding: '10px 12px',
+                              backgroundColor: 'rgba(255,255,255,0.03)',
+                              border: '1px solid #222',
+                              borderRadius: '8px',
+                              textDecoration: 'none',
+                              color: isBasico ? '#555' : '#FFF',
+                              cursor: isBasico ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            };
+
+                            return (
+                              <div key={doc.id} style={{ position: 'relative' }}>
+                                {isBasico ? (
+                                  <div 
+                                    style={linkStyle}
+                                    title="Exclusivo para assinantes do plano Médio ou Premium"
+                                  >
+                                    <span style={{fontSize: '18px', opacity: 0.5}}>
+                                      {doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : doc.categoria === 'Edital' ? '⚖️' : '📎'}
+                                    </span>
+                                    <div style={{flex: 1, overflow: 'hidden'}}>
+                                      <div style={{fontSize: '12px', fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', opacity: 0.5}}>
+                                        {doc.tituloLimpo}
+                                      </div>
+                                      <div style={{fontSize: '10px', color: '#ffb300', fontWeight: 'bold'}}>
+                                        🔒 MÉDIO / PREMIUM
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <a 
+                                    href={doc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={linkStyle}
+                                    className="prep-doc-link-sidebar"
+                                  >
+                                    <span style={{fontSize: '18px'}}>
+                                      {doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : doc.categoria === 'Edital' ? '⚖️' : '📎'}
+                                    </span>
+                                    <div style={{flex: 1, overflow: 'hidden'}}>
+                                      <div style={{fontSize: '12px', fontWeight: 'bold', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap'}}>
+                                        {doc.tituloLimpo}
+                                      </div>
+                                      <div style={{fontSize: '10px', color: '#666'}}>
+                                        {doc.categoria} • Abrir
+                                      </div>
+                                    </div>
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{backgroundColor: 'rgba(255,255,255,0.02)', border: '1px dashed #333', borderRadius: '8px', padding: '15px', textAlign: 'center', color: '#666', fontSize: '12px'}}>
+                          Nenhum material de apoio cadastrado para este preparatório.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
