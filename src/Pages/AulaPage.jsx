@@ -1382,7 +1382,38 @@ function AulaPage() {
                 </div>
               </div>
             </div>
+            </div>
           )}
+
+          {/* SESSÃO DE ANOTAÇÕES ABAIXO DO VÍDEO */}
+          <div style={{
+            width: '100%',
+            maxWidth: '1000px',
+            marginTop: '20px',
+            padding: '20px',
+            backgroundColor: '#0A0A0A',
+            border: '1px solid #222',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <h3 style={{color: '#FFF', fontSize: '14px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px'}}>
+                📝 Suas Anotações
+              </h3>
+              <span style={{fontSize: '11px', fontWeight: 'bold', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
+                {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
+              </span>
+            </div>
+            <textarea 
+              style={styles.anotacoesTextArea}
+              value={anotacao}
+              onChange={(e) => setAnotacao(e.target.value)}
+              placeholder="Digite aqui suas observações sobre esta aula. Tudo é salvo automaticamente."
+            />
+          </div>
+
         </div>
 
         <div style={styles.listaSection}>
@@ -1418,12 +1449,6 @@ function AulaPage() {
                     style={{...styles.subTabButton, ...(activeSubTab === 'pdf' ? styles.subTabActive : {})}}
                   >
                     PDF
-                  </button>
-                  <button 
-                    onClick={() => setActiveSubTab('anotacoes')} 
-                    style={{...styles.subTabButton, ...(activeSubTab === 'anotacoes' ? styles.subTabActive : {})}}
-                  >
-                    Anotações
                   </button>
                 </div>
               </div>
@@ -1624,21 +1649,6 @@ function AulaPage() {
                     </div>
                   </div>
                 )}
-
-                {activeSubTab === 'anotacoes' && (
-                  <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', height: '100%'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                      <h3 style={{color: '#FFF', fontSize: '14px', margin: 0}}>Suas Anotações</h3>
-                      <span style={{fontSize: '10px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
-                        {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
-                      </span>
-                    </div>
-                    <textarea 
-                      style={styles.anotacoesTextArea}
-                      value={anotacao}
-                      onChange={(e) => setAnotacao(e.target.value)}
-                      placeholder="Digite aqui suas observações sobre esta aula..."
-                    />
                   </div>
                 )}
               </div>
