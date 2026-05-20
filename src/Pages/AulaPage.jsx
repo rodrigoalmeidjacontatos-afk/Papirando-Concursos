@@ -49,8 +49,7 @@ function AulaPage() {
   const [listaAulas, setListaAulas] = useState([]);
   const [progressoAulas, setProgressoAulas] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('curso'); // 'curso' ou 'cronograma'
-  const [activeSubTab, setActiveSubTab] = useState('video'); // 'video', 'pdf', 'anotacoes'
+  const [activeSubTab, setActiveSubTab] = useState('video'); // 'video', 'pdf'
   const [showModulosMenu, setShowModulosMenu] = useState(false);
   const [showDisciplinasMenu, setShowDisciplinasMenu] = useState(false);
 
@@ -1383,6 +1382,52 @@ function AulaPage() {
               </div>
             </div>
           )}
+
+          {/* Caixa de anotações posicionada logo abaixo do player de vídeo */}
+          <div style={{
+            width: '100%',
+            maxWidth: '1000px',
+            marginTop: '24px',
+            backgroundColor: '#0c0c0c',
+            border: '1px solid #1a1a1a',
+            borderRadius: '12px',
+            padding: '20px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#FFF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📝 Minhas Anotações
+              </h3>
+              <span style={{ fontSize: '11px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50', fontWeight: '600' }}>
+                {salvandoAnotacao ? '⏳ Salvando...' : '✓ Salvo automaticamente'}
+              </span>
+            </div>
+            <textarea
+              placeholder="Digite aqui suas anotações sobre esta aula... Tudo o que você escrever aqui é salvo automaticamente no seu perfil!"
+              value={anotacao}
+              onChange={(e) => setAnotacao(e.target.value)}
+              style={{
+                width: '100%',
+                height: '160px',
+                backgroundColor: '#050505',
+                border: '1px solid #222',
+                borderRadius: '8px',
+                color: '#FFF',
+                padding: '12px',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                resize: 'vertical',
+                outline: 'none',
+                fontFamily: 'inherit',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#E50914'}
+              onBlur={(e) => e.target.style.borderColor = '#222'}
+            />
+          </div>
         </div>
 
         <div style={styles.listaSection}>
@@ -1390,21 +1435,6 @@ function AulaPage() {
             <>
               <div style={styles.sidebarHeaderMain}>
                 <h2 style={styles.sidebarTitle}>Selecione o conteúdo</h2>
-                
-                <div style={styles.tabsContainer}>
-                  <button 
-                    onClick={() => setActiveTab('curso')} 
-                    style={{...styles.tabButton, ...(activeTab === 'curso' ? styles.tabButtonActive : {})}}
-                  >
-                    Aulas Curso
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('cronograma')} 
-                    style={{...styles.tabButton, ...(activeTab === 'cronograma' ? styles.tabButtonActive : {})}}
-                  >
-                    Aulas Cronograma
-                  </button>
-                </div>
 
                 <div style={styles.subTabsContainer}>
                   <button 
@@ -1418,12 +1448,6 @@ function AulaPage() {
                     style={{...styles.subTabButton, ...(activeSubTab === 'pdf' ? styles.subTabActive : {})}}
                   >
                     PDF
-                  </button>
-                  <button 
-                    onClick={() => setActiveSubTab('anotacoes')} 
-                    style={{...styles.subTabButton, ...(activeSubTab === 'anotacoes' ? styles.subTabActive : {})}}
-                  >
-                    Anotações
                   </button>
                 </div>
               </div>
@@ -1625,22 +1649,7 @@ function AulaPage() {
                   </div>
                 )}
 
-                {activeSubTab === 'anotacoes' && (
-                  <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', height: '100%'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                      <h3 style={{color: '#FFF', fontSize: '14px', margin: 0}}>Suas Anotações</h3>
-                      <span style={{fontSize: '10px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
-                        {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
-                      </span>
-                    </div>
-                    <textarea 
-                      style={styles.anotacoesTextArea}
-                      value={anotacao}
-                      onChange={(e) => setAnotacao(e.target.value)}
-                      placeholder="Digite aqui suas observações sobre esta aula..."
-                    />
-                  </div>
-                )}
+
               </div>
             </>
           ) : sidebarView === 'disciplinas' ? (
