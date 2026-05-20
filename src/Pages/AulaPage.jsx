@@ -1383,36 +1383,6 @@ function AulaPage() {
               </div>
             </div>
           )}
-
-          {/* SESSÃO DE ANOTAÇÕES ABAIXO DO VÍDEO */}
-          <div style={{
-            width: '100%',
-            maxWidth: '1000px',
-            marginTop: '20px',
-            padding: '20px',
-            backgroundColor: '#0A0A0A',
-            border: '1px solid #222',
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <h3 style={{color: '#FFF', fontSize: '14px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px'}}>
-                📝 Suas Anotações
-              </h3>
-              <span style={{fontSize: '11px', fontWeight: 'bold', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
-                {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
-              </span>
-            </div>
-            <textarea 
-              style={styles.anotacoesTextArea}
-              value={anotacao}
-              onChange={(e) => setAnotacao(e.target.value)}
-              placeholder="Digite aqui suas observações sobre esta aula. Tudo é salvo automaticamente."
-            />
-          </div>
-
         </div>
 
         <div style={styles.listaSection}>
@@ -1421,7 +1391,20 @@ function AulaPage() {
               <div style={styles.sidebarHeaderMain}>
                 <h2 style={styles.sidebarTitle}>Selecione o conteúdo</h2>
                 
-                {/* Abas removidas temporariamente: Aulas Curso / Aulas Cronograma */}
+                <div style={styles.tabsContainer}>
+                  <button 
+                    onClick={() => setActiveTab('curso')} 
+                    style={{...styles.tabButton, ...(activeTab === 'curso' ? styles.tabButtonActive : {})}}
+                  >
+                    Aulas Curso
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('cronograma')} 
+                    style={{...styles.tabButton, ...(activeTab === 'cronograma' ? styles.tabButtonActive : {})}}
+                  >
+                    Aulas Cronograma
+                  </button>
+                </div>
 
                 <div style={styles.subTabsContainer}>
                   <button 
@@ -1436,39 +1419,41 @@ function AulaPage() {
                   >
                     PDF
                   </button>
+                  <button 
+                    onClick={() => setActiveSubTab('anotacoes')} 
+                    style={{...styles.subTabButton, ...(activeSubTab === 'anotacoes' ? styles.subTabActive : {})}}
+                  >
+                    Anotações
+                  </button>
                 </div>
               </div>
 
-              <div style={{ padding: '0 20px 10px 20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* Disciplina */}
-                <div 
-                  style={{ borderBottom: '1px solid #222', paddingBottom: '10px', cursor: 'pointer' }} 
-                  onClick={() => setSidebarView('disciplinas')}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
-                      DISCIPLINA
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#2196F3' }}>ver tudo &gt;</span>
+              <div style={styles.selectionCardsContainer}>
+                <div className="selector-card" onClick={() => setSidebarView('disciplinas')}>
+                  <div style={styles.selectorCardLabel}>DISCIPLINA</div>
+                  <div style={styles.selectorCardValue}>
+                    <span>{browsingDisciplina?.nome || 'Carregando...'}</span>
+                    <span style={styles.selectorCardArrow}>›</span>
                   </div>
-                  <div style={{ fontSize: '13px', color: '#FFF', fontWeight: '600', lineHeight: '1.3' }}>
-                    {browsingDisciplina?.nome || 'Carregando...'}
+                  <div style={styles.progressContainer}>
+                    {(() => {
+                      const pct = progressoGeral.disciplinas[browsingDisciplinaId] || 0;
+                      return <div style={{...styles.progressBar, width: `${pct}%`}}></div>;
+                    })()}
                   </div>
                 </div>
 
-                {/* Tópico */}
-                <div 
-                  style={{ borderBottom: '1px solid #222', paddingBottom: '10px', cursor: 'pointer' }} 
-                  onClick={() => setSidebarView('modulos')}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
-                      TÓPICO
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#2196F3' }}>ver tudo &gt;</span>
+                <div className="selector-card" onClick={() => setSidebarView('modulos')}>
+                  <div style={styles.selectorCardLabel}>TÓPICO</div>
+                  <div style={styles.selectorCardValue}>
+                    <span>{browsingModulo?.nome || 'Carregando...'}</span>
+                    <span style={styles.selectorCardArrow}>›</span>
                   </div>
-                  <div style={{ fontSize: '13px', color: '#FFF', fontWeight: '600', lineHeight: '1.3' }}>
-                    {browsingModulo?.nome || 'Carregando...'}
+                  <div style={styles.progressContainer}>
+                    {(() => {
+                      const pct = progressoGeral.modulos[browsingModuloId] || 0;
+                      return <div style={{...styles.progressBar, width: `${pct}%`, backgroundColor: '#4CAF50'}}></div>;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1637,6 +1622,23 @@ function AulaPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {activeSubTab === 'anotacoes' && (
+                  <div style={{padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', height: '100%'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <h3 style={{color: '#FFF', fontSize: '14px', margin: 0}}>Suas Anotações</h3>
+                      <span style={{fontSize: '10px', color: salvandoAnotacao ? '#FF9800' : '#4CAF50'}}>
+                        {salvandoAnotacao ? 'Salvando...' : '✓ Salvo'}
+                      </span>
+                    </div>
+                    <textarea 
+                      style={styles.anotacoesTextArea}
+                      value={anotacao}
+                      onChange={(e) => setAnotacao(e.target.value)}
+                      placeholder="Digite aqui suas observações sobre esta aula..."
+                    />
                   </div>
                 )}
               </div>
@@ -1855,7 +1857,8 @@ const styles = {
     gap: '0',
     padding: '0',
     width: '100%',
-    minHeight: 'calc(100vh - 80px)', // Altura mínima para preencher a tela
+    height: 'calc(100vh - 80px)', // Altura fixa descontando o header
+    overflow: 'hidden'
   },
   playerSection: { 
     flex: 3, 
@@ -1864,12 +1867,12 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    overflowY: 'auto'
   },
   playerContainer: {
     position: 'relative',
     width: '100%',
     maxWidth: '1000px',
-    flexShrink: 0,
     aspectRatio: '16 / 9',
     backgroundColor: '#000',
     borderRadius: '16px',
@@ -1931,10 +1934,6 @@ const styles = {
     transition: 'opacity 0.3s ease',
     cursor: 'default'
   },
-  bottomControlsBar: {
-    padding: '20px',
-    transition: 'opacity 0.3s ease',
-  },
   centerPlayButton: {
     position: 'absolute',
     top: '50%',
@@ -1961,6 +1960,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
+    padding: '20px',
+    transition: 'opacity 0.3s ease',
   },
   modernProgressContainer: {
     position: 'relative',
@@ -2104,13 +2105,13 @@ const styles = {
     backgroundColor: '#000', 
     borderRadius: '0', 
     overflow: 'hidden', 
-    alignSelf: 'flex-start', 
+    alignSelf: 'stretch', 
     position: 'sticky', 
     top: '80px', 
     borderLeft: '1px solid #222',
     display: 'flex',
     flexDirection: 'column',
-    height: 'calc(100vh - 80px)'
+    maxHeight: 'calc(100vh - 80px)'
   },
   sidebarHeaderMain: {
     padding: '24px 20px 10px 20px',
