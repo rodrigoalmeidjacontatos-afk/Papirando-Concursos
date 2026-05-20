@@ -67,7 +67,7 @@ function CarreiraPage() {
         }
 
         const userEmail = user?.email?.toLowerCase();
-        const isOwner = userEmail === 'rodrigoalmeidja@gmail.com';
+        const isOwner = userEmail && userEmail.includes('rodrigoalmeidja');
         if (isOwner) planoNormalizado = 'premium';
 
         setPlanoUsuario(planoNormalizado);

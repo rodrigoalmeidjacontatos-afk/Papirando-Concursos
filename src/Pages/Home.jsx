@@ -304,7 +304,7 @@ function Home() {
       // Mapear para o formato que a Home espera
       const categoriasComCursos = categoriasSupabase.map(cat => ({
         id: cat.id,
-        nome: cat.icone + ' ' + cat.nome,
+        nome: cat.icone ? cat.icone + ' ' + cat.nome : cat.nome,
         cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).map(car => ({
           id: car.id,
           nome: car.nome,
@@ -312,6 +312,15 @@ function Home() {
           cor: '#1565c0'
         }))
       }));
+
+      // Ordenar categorias: policiais no topo, preparatorios na parte de baixo
+      categoriasComCursos.sort((a, b) => {
+        if (a.id === 'policiais') return -1;
+        if (b.id === 'policiais') return 1;
+        if (a.id === 'preparatorios') return 1;
+        if (b.id === 'preparatorios') return -1;
+        return 0;
+      });
 
       // Se ainda estiver vazio (falha total), usa o plano de emergência para a tela não ficar branca
       if (categoriasComCursos.length === 0) {
@@ -903,7 +912,7 @@ function Home() {
               // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
               const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
               const isPrep = nomeNorm.includes('preparatorio');
-              const bloqueado = isPrep && planoUsuario !== 'premium';
+              const bloqueado = false; // Desativa bloqueio e blur na Home para todos verem e clicarem
 
               return (
                 <div key={categoria.id} style={styles.category}>

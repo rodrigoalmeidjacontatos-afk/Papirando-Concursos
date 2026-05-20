@@ -40,7 +40,7 @@ function PreparatorioViewPage() {
 
       // ADMIN: verifica email ANTES de qualquer consulta ao banco
       const userEmail = userObj.email?.toLowerCase();
-      if (userEmail === 'rodrigoalmeidja@gmail.com') {
+      if (userEmail && userEmail.includes('rodrigoalmeidja')) {
         if (mounted) {
           setIsAdmin(true);
           setPlanoUsuario('premium');
@@ -87,7 +87,7 @@ function PreparatorioViewPage() {
             }
   
             // ADMIN: bypass total se email for o do dono
-            const isOwnerByRole = userEmail === 'rodrigoalmeidja@gmail.com';
+            const isOwnerByRole = userEmail && userEmail.includes('rodrigoalmeidja');
             setIsAdmin(isOwnerByRole);
             if (isOwnerByRole) {
               planoNormalizado = 'premium';

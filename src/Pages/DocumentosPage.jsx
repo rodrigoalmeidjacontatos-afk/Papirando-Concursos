@@ -338,7 +338,7 @@ function DocumentosPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const userEmail = user.email?.toLowerCase();
-          const isOwner = userEmail === 'rodrigoalmeidja@gmail.com';
+          const isOwner = userEmail && userEmail.includes('rodrigoalmeidja');
           
           if (isOwner) {
             setPlanoUsuario('premium');
