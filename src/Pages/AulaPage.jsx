@@ -1023,7 +1023,8 @@ function AulaPage() {
               display: 'flex',
               alignItems: 'flex-start',
               flexDirection: 'column',
-              gap: '4px'
+              gap: '4px',
+              flexShrink: 0
             }}>
               <p style={{
                 margin: 0,
@@ -1395,7 +1396,8 @@ function AulaPage() {
             boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '12px',
+            flexShrink: 0
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#FFF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1887,7 +1889,8 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-    border: '1px solid #222'
+    border: '1px solid #222',
+    flexShrink: 0
   },
   player: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   blockTop: {
