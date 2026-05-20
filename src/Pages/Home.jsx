@@ -912,7 +912,7 @@ function Home() {
               // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
               const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
               const isPrep = nomeNorm.includes('preparatorio');
-              const bloqueado = false; // Desativa bloqueio e blur na Home para todos verem e clicarem
+              const bloqueado = isPrep && planoUsuario !== 'premium';
 
               return (
                 <div key={categoria.id} style={styles.category}>
