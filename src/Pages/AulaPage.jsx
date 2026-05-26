@@ -122,7 +122,7 @@ function AulaPage() {
 
       try {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase.from('profiles').select('display_name, plano, data_expiracao').eq('id', userObj.id).single();
+        const { data: profile, error } = await supabase.from('profiles').select('display_name, plano, plano_anterior, data_expiracao').eq('id', userObj.id).single();
         
         if (error) {
           console.error("[Auth] Erro ao buscar profile:", error);
@@ -154,9 +154,10 @@ function AulaPage() {
             const gracePeriodMs = 5 * 60 * 1000;
             const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
 
-            if (expirou && !dentroDaTolerancia && planoNormalizado !== 'premium') {
+            if (expirou && !dentroDaTolerancia) {
               console.log("[Auth] Plano expirado:", dataExp);
-              planoNormalizado = 'basico';
+              planoNormalizado = profile.plano_anterior || 'basico';
+              supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', userObj.id);
             } else if (expirou && dentroDaTolerancia) {
               console.log("[Auth] Plano expirado mas dentro da tolerância de 5min.");
             }

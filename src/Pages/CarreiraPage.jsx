@@ -51,7 +51,7 @@ function CarreiraPage() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('plano, preparatorios_liberados, data_expiracao')
+          .select('plano, plano_anterior, preparatorios_liberados, data_expiracao')
           .eq('id', user.id)
           .single();
 
@@ -62,8 +62,9 @@ function CarreiraPage() {
         
         console.log(`[CarreiraPage] User: ${user.email} | Plano Banco: "${profile?.plano}" | Normalizado: "${planoNormalizado}"`);
         
-        if (dataExp && new Date(dataExp) < new Date() && planoNormalizado !== 'premium') {
-          planoNormalizado = 'basico';
+        if (dataExp && new Date(dataExp) < new Date()) {
+          planoNormalizado = profile?.plano_anterior || 'basico';
+          supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', user.id);
         }
 
         const userEmail = user?.email?.toLowerCase();

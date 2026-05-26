@@ -86,7 +86,7 @@ function AdminPage() {
     
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, created_at, plano, data_expiracao, preparatorios_liberados') 
+      .select('id, email, created_at, plano, plano_anterior, data_expiracao, preparatorios_liberados') 
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -95,7 +95,19 @@ function AdminPage() {
       setUsuarios([]);
     } else {
       console.log("[Admin] Usuários carregados:", data?.length);
-      setUsuarios(data || []);
+      
+      const now = new Date();
+      const processedData = data?.map(u => {
+        if (u.data_expiracao && new Date(u.data_expiracao) < now) {
+          const fallback = u.plano_anterior || 'basico';
+          // Dispara atualização assíncrona no banco para limpar a expiração e voltar o plano
+          supabase.from('profiles').update({ plano: fallback, data_expiracao: null, plano_anterior: null }).eq('id', u.id).then(()=>console.log(`[Admin] Usuário ${u.email} expirado e revertido para ${fallback}`));
+          return { ...u, plano: fallback, data_expiracao: null, plano_anterior: null };
+        }
+        return u;
+      }) || [];
+
+      setUsuarios(processedData);
     }
     setCarregandoUsuarios(false);
   };
@@ -191,16 +203,25 @@ function AdminPage() {
     console.log(`[Admin] Tentando atualizar plano de ${userId} para ${novoPlano}...`);
     
     // Atualização otimista (na interface primeiro)
+    const usuarioAtual = usuarios.find(u => u.id === userId);
+    
+    // Atualização otimista
     const backupUsuarios = [...usuarios];
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, plano: novoPlano, data_expiracao: null } : u));
+    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, plano: novoPlano, data_expiracao: null, plano_anterior: (usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : u.plano_anterior } : u));
+
+    const updates = { 
+      plano: novoPlano,
+      data_expiracao: null,
+      preparatorios_liberados: novoPlano === 'premium' ? [] : undefined 
+    };
+
+    if (usuarioAtual && usuarioAtual.plano !== novoPlano) {
+       updates.plano_anterior = usuarioAtual.plano;
+    }
 
     const { error } = await supabase
       .from('profiles')
-      .update({ 
-        plano: novoPlano,
-        data_expiracao: null,
-        preparatorios_liberados: novoPlano === 'premium' ? [] : undefined // Se for premium, limpa os filtros de medio
-      })
+      .update(updates)
       .eq('id', userId);
     
     if (!error) {
@@ -243,6 +264,10 @@ function AdminPage() {
     // REGRA: Apenas o botão de 15 minutos (degustação) força o plano PREMIUM
     // Os outros botões (+1d, +30d) apenas definem o tempo do plano que o usuário já tem
     if (unidade === 'minutos' && tempo !== null) {
+      const usuarioAtual = usuarios.find(u => u.id === userId);
+      if (usuarioAtual && usuarioAtual.plano !== 'premium') {
+         updates.plano_anterior = usuarioAtual.plano;
+      }
       updates.plano = 'premium';
     }
     

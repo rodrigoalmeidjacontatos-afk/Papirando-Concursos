@@ -53,7 +53,7 @@ function PreparatorioViewPage() {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
           const { data: profile, error } = await supabase
             .from('profiles')
-            .select('plano, display_name, data_expiracao')
+            .select('plano, plano_anterior, display_name, data_expiracao')
             .eq('id', userObj.id)
             .single();
             
@@ -80,9 +80,10 @@ function PreparatorioViewPage() {
               const gracePeriodMs = 5 * 60 * 1000;
               const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
   
-              if (expirou && !dentroDaTolerancia && planoNormalizado !== 'premium') {
+              if (expirou && !dentroDaTolerancia) {
                 console.log("[Auth] Plano expirado:", dataExp);
-                planoNormalizado = 'basico';
+                planoNormalizado = profile.plano_anterior || 'basico';
+                supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', userObj.id);
               }
             }
   

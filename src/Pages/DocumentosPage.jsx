@@ -345,7 +345,7 @@ function DocumentosPage() {
           } else {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('plano, data_expiracao')
+              .select('plano, plano_anterior, data_expiracao')
               .eq('id', user.id)
               .single();
 
@@ -355,8 +355,9 @@ function DocumentosPage() {
                 .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
               // Verifica expiração do plano
-              if (dataExp && new Date(dataExp) < new Date() && planoNormalizado !== 'premium') {
-                planoNormalizado = 'basico';
+              if (dataExp && new Date(dataExp) < new Date()) {
+                planoNormalizado = profile?.plano_anterior || 'basico';
+                supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', user.id);
               }
               setPlanoUsuario(planoNormalizado);
             } else {

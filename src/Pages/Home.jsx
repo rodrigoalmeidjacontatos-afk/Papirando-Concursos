@@ -53,7 +53,7 @@ function Home() {
         // 1. TENTA BUSCAR PELO ID (Padrão)
         let { data: profile, error } = await withTimeout(supabase
           .from('profiles')
-          .select('id, plano, avatar_url, display_name, data_expiracao')
+          .select('id, plano, plano_anterior, avatar_url, display_name, data_expiracao')
           .eq('id', userObj.id)
           .maybeSingle(), 5000);
 
@@ -62,7 +62,7 @@ function Home() {
           console.log("[Auth] Perfil não achado por ID, tentando por e-mail...");
           const { data: profileByEmail } = await withTimeout(supabase
             .from('profiles')
-            .select('id, plano, avatar_url, display_name, data_expiracao')
+            .select('id, plano, plano_anterior, avatar_url, display_name, data_expiracao')
             .eq('email', userEmail)
             .maybeSingle(), 5000);
           
@@ -95,7 +95,10 @@ function Home() {
           console.log(`[Home] User: ${userEmail} | Plano Banco: "${profile.plano}" | Normalizado: "${planoNormalizado}"`);
           
           if (profile.data_expiracao && new Date(profile.data_expiracao) < new Date()) {
-             if (!userEmail.includes('rodrigoalmeidja') && planoNormalizado !== 'premium') planoNormalizado = 'basico';
+             if (!userEmail.includes('rodrigoalmeidja')) {
+                 planoNormalizado = profile.plano_anterior || 'basico';
+                 supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', profile.id).then(()=>console.log('[Auth] Plano expirado e revertido'));
+             }
           }
 
           if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
