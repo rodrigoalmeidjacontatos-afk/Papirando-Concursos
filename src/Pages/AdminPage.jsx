@@ -52,7 +52,7 @@ function AdminPage() {
   const [expandedDiscVinculo, setExpandedDiscVinculo] = useState(null);
   
   // ========== FORMULÁRIOS ==========
-  const [novaCategoria, setNovaCategoria] = useState({ nome: '', icone: '' });
+  const [novaCategoria, setNovaCategoria] = useState({ nome: '', icone: '', tipo_acesso: 'livre' });
   const [novaCarreira, setNovaCarreira] = useState({ nome: '', icone: '', capa: '', categoriaId: '' });
   const [novoPreparatorio, setNovoPreparatorio] = useState({ nome: '', logo: '', capa: '', cor: '#1a237e' });
   const [editandoPreparatorio, setEditandoPreparatorio] = useState(null);
@@ -380,32 +380,59 @@ function AdminPage() {
   }, []);
 
   const salvarTudo = async () => {
-    // Salva todos os dados nas tabelas do Supabase
-    await supabase.from('categorias').upsert(categorias);
-    await supabase.from('carreiras').upsert(carreiras);
-    await supabase.from('preparatorios').upsert(preparatorios);
-    await supabase.from('disciplinas').upsert(disciplinas.map(d => ({
-      id: d.id,
-      nome: d.nome,
-      icone: d.icone,
-      preparatorio_id: d.preparatorioId || d.preparatorio_id
-    })));
-    await supabase.from('modulos').upsert(modulos.map(m => ({
-      id: m.id,
-      nome: m.nome,
-      disciplina_id: m.disciplinaId || m.disciplina_id
-    })));
-    await supabase.from('aulas').upsert(aulas.map(a => ({
-      id: a.id,
-      titulo: a.titulo,
-      duracao: a.duracao,
-      video_id: a.videoId || a.video_id,
-      modulo_id: a.moduloId || a.modulo_id,
-      pdf_url: a.pdf_url || null,
-      nivel: a.nivel || 'basico',
-      ordem: a.ordem || 0
-    })));
-    alert('✅ Dados salvos com sucesso! (Os vínculos são atualizados automaticamente ao clicar)');
+    try {
+      // Salva todos os dados nas tabelas do Supabase com tratamento de erro passo-a-passo
+      const resCat = await supabase.from('categorias').upsert(categorias);
+      if (resCat.error) throw new Error(`Categorias: ${resCat.error.message}`);
+      
+      // Mapeia carreiras incluindo a coluna ordem
+      const resCar = await supabase.from('carreiras').upsert(carreiras.map(c => ({
+        id: c.id,
+        nome: c.nome,
+        icone: c.icone,
+        capa: c.capa,
+        categoriaId: c.categoriaId || c.categoria_id,
+        ordem: c.ordem || null
+      })));
+      if (resCar.error) throw new Error(`Carreiras: ${resCar.error.message}`);
+      
+      const resPrep = await supabase.from('preparatorios').upsert(preparatorios);
+      if (resPrep.error) throw new Error(`Preparatórios: ${resPrep.error.message}`);
+      
+      const resDisc = await supabase.from('disciplinas').upsert(disciplinas.map(d => ({
+        id: d.id,
+        nome: d.nome,
+        icone: d.icone,
+        preparatorio_id: d.preparatorioId || d.preparatorio_id,
+        ordem: d.ordem || null
+      })));
+      if (resDisc.error) throw new Error(`Disciplinas: ${resDisc.error.message}`);
+      
+      const resMods = await supabase.from('modulos').upsert(modulos.map(m => ({
+        id: m.id,
+        nome: m.nome,
+        disciplina_id: m.disciplinaId || m.disciplina_id,
+        ordem: m.ordem || null
+      })));
+      if (resMods.error) throw new Error(`Módulos: ${resMods.error.message}`);
+      
+      const resAulas = await supabase.from('aulas').upsert(aulas.map(a => ({
+        id: a.id,
+        titulo: a.titulo,
+        duracao: a.duracao,
+        video_id: a.videoId || a.video_id,
+        modulo_id: a.moduloId || a.modulo_id,
+        pdf_url: a.pdf_url || null,
+        nivel: a.nivel || 'basico',
+        ordem: a.ordem || 0
+      })));
+      if (resAulas.error) throw new Error(`Aulas: ${resAulas.error.message}`);
+      
+      alert('✅ Dados salvos com sucesso! (Os vínculos são atualizados automaticamente ao clicar)');
+    } catch (err) {
+      console.error("Erro ao salvar tudo:", err);
+      alert(`❌ Erro ao salvar dados: ${err.message}`);
+    }
   };
 
   const limparEmojisGeral = async (prepId) => {
@@ -494,11 +521,11 @@ function AdminPage() {
   const addCategoria = async () => {
     if (!novaCategoria.nome) return alert('Digite o nome');
     const id = novaCategoria.nome.toLowerCase().replace(/ /g, '_');
-    const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '' };
+    const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '', tipo_acesso: novaCategoria.tipo_acesso || 'livre' };
     const { error } = await supabase.from('categorias').upsert([nova]);
     if (!error) {
       setCategorias([...categorias, nova]);
-      setNovaCategoria({ nome: '', icone: '' });
+      setNovaCategoria({ nome: '', icone: '', tipo_acesso: 'livre' });
     } else {
       alert('Erro ao adicionar categoria');
     }
@@ -597,9 +624,13 @@ function AdminPage() {
     setDraggedCarreira(null);
     // Atualizar no banco (se a coluna existir, senão só ordena localmente por hora)
     const updates = carreiras.map((c, i) => ({ 
-      id: c.id, nome: c.nome, icone: c.icone, capa: c.capa, categoria_id: c.categoriaId, ordem: i + 1 
+      id: c.id, nome: c.nome, icone: c.icone, capa: c.capa, categoriaId: c.categoriaId, ordem: i + 1 
     }));
-    await supabase.from('carreiras').upsert(updates);
+    const { error } = await supabase.from('carreiras').upsert(updates);
+    if (error) {
+      console.error("Erro ao salvar ordem das carreiras:", error);
+      alert("Erro ao salvar ordem das carreiras no banco: " + error.message);
+    }
   };
 
 
@@ -677,14 +708,15 @@ function AdminPage() {
   const addDisciplina = async (prepId) => {
     if (!novaDisciplina.nome || !prepId) return alert('Preencha o nome');
     const id = `${prepId}_${novaDisciplina.nome.toLowerCase().replace(/ /g, '_')}`;
-    const nova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorioId: prepId };
-    const dbNova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorio_id: prepId };
+    const ordem = getDisciplinasPorPrep(prepId).length + 1;
+    const nova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorioId: prepId, ordem };
+    const dbNova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorio_id: prepId, ordem };
     const { error } = await supabase.from('disciplinas').upsert([dbNova]);
     if (!error) {
       setDisciplinas([...disciplinas, nova]);
       setNovaDisciplina({ nome: '', icone: '', preparatorioId: '' });
     } else {
-      alert('Erro ao adicionar disciplina');
+      alert('Erro ao adicionar disciplina: ' + error.message);
     }
   };
 
@@ -740,7 +772,16 @@ function AdminPage() {
       return update ? { ...m, ordem: update.ordem } : m;
     }));
 
-    await Promise.all(updates.map(u => supabase.from('modulos').update({ ordem: u.ordem }).eq('id', u.id)));
+    try {
+      const results = await Promise.all(updates.map(u => supabase.from('modulos').update({ ordem: u.ordem }).eq('id', u.id)));
+      const err = results.find(r => r.error);
+      if (err) {
+        throw err.error;
+      }
+    } catch (error) {
+      console.error("Erro ao salvar ordem dos módulos:", error);
+      alert("Erro ao salvar ordem dos módulos: " + error.message);
+    }
     setDraggedModulo(null);
   };
   const handleDropDisciplina = async (e, targetId, prepId) => {
@@ -763,21 +804,31 @@ function AdminPage() {
       return update ? { ...d, ordem: update.ordem } : d;
     }));
 
-    await Promise.all(updates.map(u => supabase.from('disciplinas').update({ ordem: u.ordem }).eq('id', u.id)));
+    try {
+      const results = await Promise.all(updates.map(u => supabase.from('disciplinas').update({ ordem: u.ordem }).eq('id', u.id)));
+      const err = results.find(r => r.error);
+      if (err) {
+        throw err.error;
+      }
+    } catch (error) {
+      console.error("Erro ao salvar ordem das disciplinas:", error);
+      alert("Erro ao salvar ordem das disciplinas: " + error.message);
+    }
     setDraggedDisciplina(null);
   };
 
   const addModulo = async (discId) => {
     if (!novoModulo.nome || !discId) return alert('Preencha o nome do módulo');
     const id = `mod_${Date.now()}`;
-    const novo = { id, nome: novoModulo.nome, disciplinaId: discId };
-    const dbNovo = { id, nome: novoModulo.nome, disciplina_id: discId };
+    const ordem = getModulosPorDisciplina(discId).length + 1;
+    const novo = { id, nome: novoModulo.nome, disciplinaId: discId, ordem };
+    const dbNovo = { id, nome: novoModulo.nome, disciplina_id: discId, ordem };
     const { error } = await supabase.from('modulos').upsert([dbNovo]);
     if (!error) {
       setModulos([...modulos, novo]);
       setNovoModulo({ nome: '', disciplinaId: '' });
     } else {
-      alert('Erro ao adicionar módulo');
+      alert('Erro ao adicionar módulo: ' + error.message);
     }
   };
 
@@ -909,9 +960,18 @@ function AdminPage() {
     const updates = novaLista.map((a, i) => ({ id: a.id, ordem: i + 1 }));
 
     // Salvar no banco (atualiza cada uma)
-    await Promise.all(
-      updates.map(u => supabase.from('aulas').update({ ordem: u.ordem }).eq('id', u.id))
-    );
+    try {
+      const results = await Promise.all(
+        updates.map(u => supabase.from('aulas').update({ ordem: u.ordem }).eq('id', u.id))
+      );
+      const err = results.find(r => r.error);
+      if (err) {
+        throw err.error;
+      }
+    } catch (error) {
+      console.error("Erro ao salvar ordem das aulas:", error);
+      alert("Erro ao salvar ordem das aulas: " + error.message);
+    }
 
     // Atualiza estado local
     setAulas(prev => {
@@ -1138,6 +1198,16 @@ function AdminPage() {
                 <div style={styles.addForm}>
                   <input style={styles.input} placeholder="Nome (Ex: Tribunais)" value={novaCategoria.nome} onChange={e => setNovaCategoria({...novaCategoria, nome: e.target.value})} />
                   <input style={styles.inputSmall} placeholder="Ícone (Ex: ⚖️)" value={novaCategoria.icone} onChange={e => setNovaCategoria({...novaCategoria, icone: e.target.value})} />
+                  <select
+                    style={styles.select}
+                    value={novaCategoria.tipo_acesso}
+                    onChange={e => setNovaCategoria({...novaCategoria, tipo_acesso: e.target.value})}
+                  >
+                    <option value="livre">🌐 Livre (todos)</option>
+                    <option value="basico">🟢 Básico</option>
+                    <option value="medio">🔵 Médio</option>
+                    <option value="premium">🟡 Premium</option>
+                  </select>
                   <button style={styles.addButton} onClick={addCategoria}>Adicionar</button>
                 </div>
               </div>
@@ -1145,9 +1215,19 @@ function AdminPage() {
                 {categorias.map(cat => (
                   <div key={cat.id} style={styles.item}>
                     {editandoCategoria?.id === cat.id ? (
-                      <div style={{display: 'flex', gap: '8px', flex: 1, alignItems: 'center'}}>
+                      <div style={{display: 'flex', gap: '8px', flex: 1, alignItems: 'center', flexWrap: 'wrap'}}>
                         <input style={styles.inputSmall} value={editandoCategoria.icone} onChange={e => setEditandoCategoria({...editandoCategoria, icone: e.target.value})} placeholder="Ícone" />
                         <input style={styles.input} value={editandoCategoria.nome} onChange={e => setEditandoCategoria({...editandoCategoria, nome: e.target.value})} placeholder="Nome" />
+                        <select
+                          style={styles.select}
+                          value={editandoCategoria.tipo_acesso || 'livre'}
+                          onChange={e => setEditandoCategoria({...editandoCategoria, tipo_acesso: e.target.value})}
+                        >
+                          <option value="livre">🌐 Livre (todos)</option>
+                          <option value="basico">🟢 Básico</option>
+                          <option value="medio">🔵 Médio</option>
+                          <option value="premium">🟡 Premium</option>
+                        </select>
                         <div style={{display: 'flex', gap: '8px'}}>
                           <button style={styles.saveButton} onClick={saveEditCategoria}>Salvar</button>
                           <button style={styles.deleteButton} onClick={cancelEditCategoria}>Cancelar</button>
@@ -1156,9 +1236,30 @@ function AdminPage() {
                     ) : (
                       <>
                         <span style={{color: '#F5F5F5', fontWeight: 'bold'}}>{cat.icone} {cat.nome}</span>
-                        <div style={styles.actionButtons}>
-                          <button style={styles.editButton} onClick={() => setEditandoCategoria(cat)}>Editar</button>
-                          <button style={styles.deleteButton} onClick={() => removeCategoria(cat.id)}>Excluir</button>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            background:
+                              cat.tipo_acesso === 'premium' ? 'linear-gradient(135deg, #f5a623, #e8880a)' :
+                              cat.tipo_acesso === 'medio'   ? 'linear-gradient(135deg, #4a90e2, #2c6fbd)' :
+                              cat.tipo_acesso === 'basico'  ? 'linear-gradient(135deg, #27ae60, #1e8449)' :
+                              'linear-gradient(135deg, #555, #333)',
+                            color: '#fff',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {cat.tipo_acesso === 'premium' ? '⭐ Premium' :
+                             cat.tipo_acesso === 'medio'   ? '🔵 Médio' :
+                             cat.tipo_acesso === 'basico'  ? '🟢 Básico' :
+                             '🌐 Livre'}
+                          </span>
+                          <div style={styles.actionButtons}>
+                            <button style={styles.editButton} onClick={() => setEditandoCategoria(cat)}>Editar</button>
+                            <button style={styles.deleteButton} onClick={() => removeCategoria(cat.id)}>Excluir</button>
+                          </div>
                         </div>
                       </>
                     )}

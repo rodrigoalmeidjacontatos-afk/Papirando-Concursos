@@ -14,6 +14,7 @@ function Home() {
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
     horasLiquidas: '0.0',
@@ -304,8 +305,8 @@ function Home() {
       // Mapear para o formato que a Home espera
       const categoriasComCursos = categoriasSupabase.map(cat => ({
         id: cat.id,
-        nome: cat.icone ? cat.icone + ' ' + cat.nome : cat.nome,
-        cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).map(car => ({
+        nome: cat.nome,
+        cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999)).map(car => ({
           id: car.id,
           nome: car.nome,
           capa: car.capa || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(car.nome),
@@ -327,7 +328,7 @@ function Home() {
         setCategorias([
           {
             id: 'policiais',
-            nome: '👮 Carreiras Policiais',
+            nome: 'Carreiras Policiais',
             cursos: [
               { id: 'gm', nome: 'Guarda Municipal', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', cor: '#1565c0' },
               { id: 'pm', nome: 'Polícia Militar', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', cor: '#1565c0' }
@@ -515,23 +516,76 @@ function Home() {
                 };
               }).filter(Boolean);
 
-              // 1. Filtrar os primeiros 4 não concluídos para o "Continue Assistindo"
+              // 1. Filtrar os primeiros 8 não concluídos para o "Continue Assistindo"
               const videosEmProgresso = progressoCompleto.filter(p => !p.concluida);
               setContinueAssistindo(videosEmProgresso.slice(0, 8));
 
-              // 2. Agrupar progresso por preparatório para o "Histórico de Cursos"
+              // 2. Buscar total real de aulas por preparatório (para o % de progresso correto)
+              const prepIds = [...new Set(preparatoriosData.map(p => p.id))];
+
+              // Buscar todas as disciplinas dos preparatórios acessados
+              const { data: todasDiscPreps } = await supabase
+                .from('disciplinas')
+                .select('id, preparatorio_id')
+                .in('preparatorio_id', prepIds);
+
+              const totalAulasPorPrep = {};
+
+              if (todasDiscPreps && todasDiscPreps.length > 0) {
+                const todasDiscIds = todasDiscPreps.map(d => d.id);
+
+                // Buscar todos os módulos dessas disciplinas
+                const { data: todosModsPreps } = await supabase
+                  .from('modulos')
+                  .select('id, disciplina_id')
+                  .in('disciplina_id', todasDiscIds);
+
+                if (todosModsPreps && todosModsPreps.length > 0) {
+                  const todosModIds = todosModsPreps.map(m => m.id);
+
+                  // Buscar todas as aulas desses módulos
+                  const { data: todasAulasPreps } = await supabase
+                    .from('aulas')
+                    .select('id, modulo_id')
+                    .in('modulo_id', todosModIds);
+
+                  if (todasAulasPreps && todasAulasPreps.length > 0) {
+                    // Montar mapa: modulo_id -> preparatorio_id
+                    const modToDisc = {};
+                    todosModsPreps.forEach(m => { modToDisc[m.id] = m.disciplina_id; });
+
+                    const discToPrep = {};
+                    todasDiscPreps.forEach(d => { discToPrep[d.id] = d.preparatorio_id; });
+
+                    // Contar total de aulas por preparatório
+                    todasAulasPreps.forEach(a => {
+                      const discId = modToDisc[a.modulo_id];
+                      const prepId = discToPrep[discId];
+                      if (prepId) {
+                        totalAulasPorPrep[prepId] = (totalAulasPorPrep[prepId] || 0) + 1;
+                      }
+                    });
+                  }
+                }
+              }
+
+              // 3. Agrupar progresso por preparatório para o "Histórico de Cursos"
               const cursosMap = {};
               progressoCompleto.forEach(item => {
                 const pId = item.preparatorio.id;
                 if (!cursosMap[pId]) {
                   cursosMap[pId] = {
                     preparatorio: item.preparatorio,
-                    totalAulas: 0,
+                    // Usa o total real do banco; se não encontrou, usa as assistidas como fallback
+                    totalAulas: totalAulasPorPrep[pId] || 0,
                     concluidas: 0,
                     ultimoAcesso: item.ultimoAcesso
                   };
                 }
-                cursosMap[pId].totalAulas++;
+                // Atualiza o ultimoAcesso para o mais recente
+                if (new Date(item.ultimoAcesso) > new Date(cursosMap[pId].ultimoAcesso)) {
+                  cursosMap[pId].ultimoAcesso = item.ultimoAcesso;
+                }
                 if (item.concluida) {
                   cursosMap[pId].concluidas++;
                 }
@@ -539,7 +593,7 @@ function Home() {
 
               const historicoCursos = Object.values(cursosMap).sort((a, b) => new Date(b.ultimoAcesso) - new Date(a.ultimoAcesso));
 
-              // 3. Atualizar Estado Geral de Estatísticas
+              // 4. Atualizar Estado Geral de Estatísticas
               setEstatisticasEstudo({
                 horasLiquidas,
                 aulasConcluidas,
@@ -555,7 +609,8 @@ function Home() {
       }
     }
     carregarDadosProgresso();
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, statsRefreshKey]);
 
   const scrollHorizontal = (categoriaId, direction) => {
     const ref = carouselRefs.current[categoriaId];
@@ -585,7 +640,7 @@ function Home() {
             <button style={styles.navButton} onClick={() => navigate('/documentos')}>Documentos</button>
             {isAdmin && (
               <button onClick={() => navigate('/admin')} style={styles.adminButton}>
-                👑 Admin
+                Painel Admin
               </button>
             )}
           </nav>
@@ -658,7 +713,7 @@ function Home() {
                   }}
                   title="Configurações"
                 >
-                  ⚙️
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </button>
                 <div 
                   style={{...styles.avatar, border: '2px solid #E50914'}} 
@@ -666,7 +721,9 @@ function Home() {
                 >
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-                  ) : '👤'}
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginTop: '3px'}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  )}
                 </div>
               </>
             )}
@@ -682,14 +739,18 @@ function Home() {
             
             <div style={{display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center'}}>
               <div style={{position: 'relative', cursor: 'pointer'}} onClick={trocarAvatar}>
-                <div style={{...styles.avatar, width: '80px', height: '80px', fontSize: '40px'}}>
+                <div style={{...styles.avatar, width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                    {avatarUrl ? (
                     (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:')) ? 
                       <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', borderRadius: '8px', objectFit: 'cover'}} /> : 
                       <span>{avatarUrl}</span>
-                  ) : '👤'}
+                  ) : (
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  )}
                 </div>
-                <div style={styles.editAvatarBadge}>✎</div>
+                <div style={styles.editAvatarBadge}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginTop: '2px'}}><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </div>
               </div>
 
               <div style={{width: '100%', display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -717,6 +778,9 @@ function Home() {
           </div>
         </div>
       )}
+
+      {/* Input invisível para upload de avatar */}
+      <input type="file" id="avatar-upload" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload} />
 
       <div style={styles.hero}>
         <div style={styles.heroContent}>
@@ -755,10 +819,10 @@ function Home() {
               boxShadow: activeHomeTab === 'inicio' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none'
             }}
           >
-            🏠 Início
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Início
           </button>
           <button
-            onClick={() => setActiveHomeTab('evolucao')}
+            onClick={() => { setActiveHomeTab('evolucao'); setStatsRefreshKey(k => k + 1); }}
             style={{
               background: activeHomeTab === 'evolucao' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
               border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : planoUsuario === 'basico' ? '1px solid rgba(255,179,0,0.3)' : '1px solid #333',
@@ -776,7 +840,11 @@ function Home() {
               opacity: planoUsuario === 'basico' ? 0.75 : 1
             }}
           >
-            {planoUsuario === 'basico' ? '🔒' : '📊'} Minha Evolução
+            {planoUsuario === 'basico' ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            )} Minha Evolução
           </button>
         </div>
 
@@ -787,7 +855,7 @@ function Home() {
             {continueAssistindo.length > 0 && (
               <div style={{ marginBottom: '50px', padding: '0 10px' }}>
                 <h2 style={{ fontSize: '20px', color: '#FFF', fontWeight: '800', marginBottom: '20px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🍿 CONTINUE ASSISTINDO
+                  CONTINUE ASSISTINDO
                 </h2>
                 <div style={{
                   display: 'grid',
@@ -843,8 +911,8 @@ function Home() {
                               style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} 
                             />
                           ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '32px' }}>
-                              📚
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                             </div>
                           )}
                           
@@ -925,7 +993,7 @@ function Home() {
                         backgroundColor: 'rgba(229,9,20,0.1)',
                         border: '1px solid rgba(229,9,20,0.3)',
                         padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
-                      }}>🔒 ACESSO RESTRITO</span>
+                      }}>ACESSO RESTRITO</span>
                     )}
                   </div>
 
@@ -962,7 +1030,7 @@ function Home() {
                                     textTransform: 'uppercase',
                                     letterSpacing: '1px'
                                   }}>
-                                    ⚡ ATUALIZAÇÃO NOVA
+                                    ATUALIZAÇÃO NOVA
                                   </span>
                                 )}
                                 <img src={curso.capa} alt={curso.nome} style={styles.image} />
@@ -1003,7 +1071,9 @@ function Home() {
                           boxShadow: '0 0 50px rgba(229,9,20,0.1), 0 20px 60px rgba(0,0,0,0.9)',
                           textAlign: 'center'
                         }}>
-                          <div style={{ fontSize: '48px', marginBottom: '8px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
+                          <div style={{ marginBottom: '12px' }}>
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E50914" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 12px rgba(229,9,20,0.5))' }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                          </div>
                           <div style={{
                             fontSize: '10px', fontWeight: 'bold', letterSpacing: '3px',
                             color: '#E50914', border: '1px solid rgba(229,9,20,0.4)',
@@ -1049,7 +1119,9 @@ function Home() {
                 padding: '40px',
                 minHeight: '400px'
               }}>
-                <div style={{ fontSize: '64px', filter: 'drop-shadow(0 0 20px rgba(255,179,0,0.6))' }}>📊</div>
+                <div>
+                  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffb300" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 15px rgba(255,179,0,0.5))' }}><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                </div>
                 <div style={{
                   backgroundColor: 'rgba(255,179,0,0.1)',
                   border: '1px solid rgba(255,179,0,0.4)',
@@ -1058,17 +1130,17 @@ function Home() {
                   maxWidth: '420px'
                 }}>
                   <h3 style={{ color: '#ffb300', fontSize: '22px', fontWeight: '900', margin: '0 0 10px', letterSpacing: '0.5px' }}>
-                    🔒 Recurso Exclusivo
+                    Recurso Exclusivo
                   </h3>
                   <p style={{ color: '#ccc', fontSize: '14px', lineHeight: '1.7', margin: '0 0 20px' }}>
                     Acompanhe sua ofensiva de estudos, horas assistidas e progresso por curso — disponível nos planos <strong style={{ color: '#ffb300' }}>Médio e Premium</strong>.
                   </p>
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <span style={{ backgroundColor: 'rgba(33,150,243,0.15)', color: '#2196F3', border: '1px solid #2196F3', padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
-                      📈 Plano Médio
+                      Plano Médio
                     </span>
                     <span style={{ backgroundColor: 'rgba(229,9,20,0.15)', color: '#E50914', border: '1px solid #E50914', padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
-                      ⭐ Plano Premium
+                      Plano Premium
                     </span>
                   </div>
                 </div>
@@ -1100,7 +1172,7 @@ function Home() {
                 gap: '20px',
                 boxShadow: '0 8px 24px rgba(229, 9, 20, 0.15)'
               }}>
-                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(229,9,20,0.6))' }}>🔥</span>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E50914" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(229,9,20,0.5))' }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
                     {estatisticasEstudo.streak}
@@ -1122,7 +1194,7 @@ function Home() {
                 gap: '20px',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
               }}>
-                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.1))' }}>⏳</span>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
                     {estatisticasEstudo.horasLiquidas}h
@@ -1144,7 +1216,7 @@ function Home() {
                 gap: '20px',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
               }}>
-                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(76,175,80,0.3))' }}>✅</span>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(76,175,80,0.3))' }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#4CAF50', margin: '0 0 4px', fontWeight: '900' }}>
                     {estatisticasEstudo.aulasConcluidas}
@@ -1166,7 +1238,7 @@ function Home() {
                 gap: '20px',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
               }}>
-                <span style={{ fontSize: '48px', filter: 'drop-shadow(0 0 10px rgba(33,150,243,0.3))' }}>🍿</span>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2196F3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(33,150,243,0.3))' }}><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#2196F3', margin: '0 0 4px', fontWeight: '900' }}>
                     {estatisticasEstudo.aulasEmProgresso}
@@ -1187,7 +1259,7 @@ function Home() {
               boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)'
             }}>
               <h3 style={{ fontSize: '16px', color: '#FFF', fontWeight: '700', marginBottom: '20px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                🎓 Meus Cursos em Andamento
+                Meus Cursos em Andamento
               </h3>
               
               {estatisticasEstudo.historicoCursos.length === 0 ? (
@@ -1197,7 +1269,7 @@ function Home() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {estatisticasEstudo.historicoCursos.map((item) => {
-                    const pctCurso = Math.round((item.concluidas / item.totalAulas) * 100) || 0;
+                    const pctCurso = item.totalAulas > 0 ? Math.round((item.concluidas / item.totalAulas) * 100) : 0;
                     return (
                       <div key={item.preparatorio.id} style={{
                         display: 'flex',
@@ -1208,11 +1280,11 @@ function Home() {
                         flexWrap: 'wrap'
                       }}>
                         {/* Capa miniaturizada */}
-                        <div style={{ width: '100px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000' }}>
+                        <div style={{ width: '100px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {item.preparatorio.capa ? (
                             <img src={item.preparatorio.capa} alt="Capa" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
                           ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📚</div>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                           )}
                         </div>
 
@@ -1301,6 +1373,10 @@ function Home() {
           .user-area {
              scale: 0.9;
           }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
