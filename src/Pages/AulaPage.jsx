@@ -573,6 +573,14 @@ function AulaPage() {
     */
   };
 
+  const salvarProgressoRef = useRef(salvarProgresso);
+  const duracaoRef = useRef(duracao);
+
+  useEffect(() => {
+    salvarProgressoRef.current = salvarProgresso;
+    duracaoRef.current = duracao;
+  }, [salvarProgresso, duracao]);
+
   const stopProgressTracking = () => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -587,13 +595,15 @@ function AulaPage() {
         try {
           const tempo = currentPlayer.getCurrentTime();
           setTempoAtual(tempo);
-          salvarProgresso(tempo);
+          if (salvarProgressoRef.current) {
+            salvarProgressoRef.current(tempo);
+          }
         } catch (e) {
           console.error('Erro no tracking de progresso:', e);
           stopProgressTracking();
         }
       }
-    }, 5000);
+    }, 1000);
   };
 
   useEffect(() => {
@@ -655,7 +665,12 @@ function AulaPage() {
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
-                salvarProgresso(duracao); // Marca como concluída no final
+                if (duracaoRef.current) {
+                  setTempoAtual(duracaoRef.current);
+                }
+                if (salvarProgressoRef.current && duracaoRef.current) {
+                  salvarProgressoRef.current(duracaoRef.current); // Marca como concluída no final
+                }
                 if (irParaProximaAulaRef.current) {
                   irParaProximaAulaRef.current();
                 }
