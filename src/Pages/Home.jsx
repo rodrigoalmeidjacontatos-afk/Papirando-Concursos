@@ -977,10 +977,18 @@ function Home() {
             )}
 
             {categorias.map((categoria) => {
-              // Detecta se esta categoria é de PREPARATÓRIOS pelo nome
-              const nomeNorm = categoria.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-              const isPrep = nomeNorm.includes('preparatorio');
-              const bloqueado = isPrep && planoUsuario !== 'premium';
+              const tipoAcesso = categoria.tipo_acesso || 'livre';
+              let bloqueado = false;
+              
+              if (tipoAcesso === 'premium') {
+                bloqueado = planoUsuario !== 'premium';
+              } else if (tipoAcesso === 'medio') {
+                bloqueado = planoUsuario !== 'medio' && planoUsuario !== 'premium';
+              } else if (tipoAcesso === 'basico') {
+                bloqueado = !user; // requer estar logado (pelo menos plano básico)
+              } else {
+                bloqueado = false; // livre (visível para todos)
+              }
 
               return (
                 <div key={categoria.id} style={styles.category}>
@@ -1056,7 +1064,7 @@ function Home() {
                       </div>
                     </div>
 
-                    {/* OVERLAY DE BLOQUEIO — só aparece para básico na seção de preparatórios */}
+                    {/* OVERLAY DE BLOQUEIO */}
                     {bloqueado && (
                       <div style={{
                         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1081,10 +1089,10 @@ function Home() {
                             padding: '3px 14px', borderRadius: '999px', marginBottom: '12px'
                           }}>ACESSO RESTRITO</div>
                           <h3 style={{ color: '#FFF', margin: '0 0 8px', fontSize: '20px', fontWeight: 'bold' }}>
-                            Área de Preparatórios
+                            {categoria.nome}
                           </h3>
                           <p style={{ color: '#888', margin: '0', fontSize: '13px', lineHeight: '1.7', maxWidth: '280px' }}>
-                            Esta área é exclusiva para usuários<br />com acesso habilitado pelo administrador.
+                            Este conteúdo é exclusivo para assinantes do plano <strong style={{ color: '#ffb300', textTransform: 'uppercase' }}>{tipoAcesso === 'basico' ? 'Básico' : tipoAcesso === 'medio' ? 'Médio' : 'Premium'}</strong> ou superior.
                           </p>
                         </div>
                       </div>
