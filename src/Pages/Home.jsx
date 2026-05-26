@@ -306,6 +306,7 @@ function Home() {
       const categoriasComCursos = categoriasSupabase.map(cat => ({
         id: cat.id,
         nome: cat.nome,
+        tipo_acesso: cat.tipo_acesso || 'livre',
         cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999)).map(car => ({
           id: car.id,
           nome: car.nome,
