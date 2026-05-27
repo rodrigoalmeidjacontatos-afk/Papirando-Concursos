@@ -71,6 +71,7 @@ function AulaPage() {
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const hasResumedRef = useRef(false);
+  const lastSaveTimeRef = useRef(0);
 
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -517,11 +518,34 @@ function AulaPage() {
   }, [user, preparatorioId, listaDisciplinas]);
 
   // Salvar progresso no Supabase
-  const salvarProgresso = async (tempo) => {
+  const salvarProgresso = async (tempo, forceSave = false) => {
     if (!user || !temAcesso) return;
     
     // Evita conclusão prematura se a duração ainda não foi obtida
     const isConcluida = duracao > 0 && tempo > (duracao * 0.9); 
+
+    // Atualiza o progresso em tempo real no estado local SEMPRE, independente do banco
+    setProgressoAulas(prev => {
+      const prevProg = prev[aulaId];
+      if (prevProg && prevProg.tempo_assistido === Math.floor(tempo) && prevProg.concluida === isConcluida) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [aulaId]: { 
+          ...prev[aulaId], 
+          tempo_assistido: Math.floor(tempo), 
+          concluida: isConcluida 
+        }
+      };
+    });
+
+    const now = Date.now();
+    // Throttle de 10 segundos para evitar rate limit do Supabase
+    if (!forceSave && now - lastSaveTimeRef.current < 10000) {
+      return;
+    }
+    lastSaveTimeRef.current = now;
 
     try {
       const { error } = await supabase
@@ -538,16 +562,6 @@ function AulaPage() {
         
       if (error) {
         console.error('Erro ao salvar progresso no Supabase:', error);
-      } else {
-        // Atualiza o progresso em tempo real no estado local para feedback imediato na barra lateral
-        setProgressoAulas(prev => ({
-          ...prev,
-          [aulaId]: { 
-            ...prev[aulaId], 
-            tempo_assistido: Math.floor(tempo), 
-            concluida: isConcluida 
-          }
-        }));
       }
     } catch (e) {
       console.error('Erro ao tentar salvar progresso:', e);
@@ -658,10 +672,18 @@ function AulaPage() {
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
+              const currentDur = event.target.getDuration();
+              if (currentDur > 0 && duracaoRef.current === 0) {
+                setDuracao(currentDur);
+                duracaoRef.current = currentDur;
+              }
               startProgressTracking(event.target);
             } else {
               if (event.data === window.YT.PlayerState.PAUSED) {
                 setIsPlaying(false);
+                if (salvarProgressoRef.current && typeof event.target.getCurrentTime === 'function') {
+                  salvarProgressoRef.current(event.target.getCurrentTime(), true);
+                }
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
@@ -669,7 +691,7 @@ function AulaPage() {
                   setTempoAtual(duracaoRef.current);
                 }
                 if (salvarProgressoRef.current && duracaoRef.current) {
-                  salvarProgressoRef.current(duracaoRef.current); // Marca como concluída no final
+                  salvarProgressoRef.current(duracaoRef.current, true); // Marca como concluída no final
                 }
                 if (irParaProximaAulaRef.current) {
                   irParaProximaAulaRef.current();
@@ -776,7 +798,7 @@ function AulaPage() {
     const novoTempo = Math.max(0, player.getCurrentTime() - 10);
     player.seekTo(novoTempo, true);
     setTempoAtual(novoTempo);
-    salvarProgresso(novoTempo);
+    salvarProgresso(novoTempo, true);
   };
 
   const handleForward = () => {
@@ -784,7 +806,7 @@ function AulaPage() {
     const novoTempo = Math.min(duracao, player.getCurrentTime() + 10);
     player.seekTo(novoTempo, true);
     setTempoAtual(novoTempo);
-    salvarProgresso(novoTempo);
+    salvarProgresso(novoTempo, true);
   };
 
   const handleSeekStart = () => {
@@ -800,7 +822,7 @@ function AulaPage() {
   const handleSeekEnd = () => {
     if (player && typeof player.seekTo === 'function') {
       player.seekTo(tempoAtual, true);
-      salvarProgresso(tempoAtual);
+      salvarProgresso(tempoAtual, true);
       if (isPlaying) {
         startProgressTracking(player);
       }
@@ -1554,7 +1576,11 @@ function AulaPage() {
                       >
                         <div style={styles.itemAulaLeft}>
                           <div style={{...styles.checkCircle, ...(concluida ? styles.checkCircleActive : {})}}>
-                            {concluida && '✓'}
+                            {concluida && (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                            )}
                           </div>
                           <div style={styles.itemAulaInfo}>
                             <span style={{...styles.itemAulaTitulo, ...(isSelected ? styles.itemAulaTituloSelected : {})}}>
