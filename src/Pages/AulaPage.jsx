@@ -68,6 +68,7 @@ function AulaPage() {
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
   const playerRef = useRef(null);
+  const playerInstanceRef = useRef(null);
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const hasResumedRef = useRef(false);
@@ -376,35 +377,39 @@ function AulaPage() {
         }
         setListaAulas(aulasFinais);
 
-        // BUSCAR DADOS DA AULA QUE ESTÁ SENDO ASSISTIDA (PLAYER)
-        const fetchPlaying = async () => {
-          const normalizar = (lista) => (lista || []).map(a => ({
-            ...a,
-            moduloId: a.moduloId || a.modulo_id,
-            videoId: a.videoId || a.video_id,
-            video_id: a.video_id || a.videoId
-          }));
-
-          if (aulaId === 'primeira_aula') {
-              const { data: realModAulas } = await supabase.from('aulas').select('*').eq('modulo_id', moduloId).order('ordem', { ascending: true }).limit(1);
-              if (realModAulas && realModAulas.length > 0) {
-                const aulaReal = normalizar(realModAulas)[0];
-                setAulaPlaying(aulaReal);
-                navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${aulaReal.id}`, { replace: true });
-              }
-          } else {
-              const { data: aulaSolo } = await supabase.from('aulas').select('*').eq('id', aulaId).single();
-              if (aulaSolo) setAulaPlaying(normalizar([aulaSolo])[0]);
-          }
-        };
-        fetchPlaying();
-
       } catch (err) {
         console.error('Erro inesperado no carregarDados:', err);
       }
     };
     carregarDados();
-  }, [disciplinaId, moduloId, browsingDisciplinaId, browsingModuloId, aulaId]);
+  }, [disciplinaId, moduloId, browsingDisciplinaId, browsingModuloId, preparatorioId]);
+
+  // Efeito separado APENAS para buscar a aula atual (evita delay enorme ao trocar de vídeo)
+  useEffect(() => {
+    const fetchPlaying = async () => {
+      const normalizar = (lista) => (lista || []).map(a => ({
+        ...a,
+        moduloId: a.moduloId || a.modulo_id,
+        videoId: a.videoId || a.video_id,
+        video_id: a.video_id || a.videoId
+      }));
+
+      if (aulaId === 'primeira_aula') {
+          const { data: realModAulas } = await supabase.from('aulas').select('*').eq('modulo_id', moduloId).order('ordem', { ascending: true }).limit(1);
+          if (realModAulas && realModAulas.length > 0) {
+            const aulaReal = normalizar(realModAulas)[0];
+            setAulaPlaying(aulaReal);
+            navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${aulaReal.id}`, { replace: true });
+          }
+      } else {
+          const { data: aulaSolo } = await supabase.from('aulas').select('*').eq('id', aulaId).single();
+          if (aulaSolo) setAulaPlaying(normalizar([aulaSolo])[0]);
+      }
+    };
+    if (aulaId && moduloId) {
+      fetchPlaying();
+    }
+  }, [aulaId, moduloId, disciplinaId, preparatorioId, carreiraId, navigate]);
 
   // Sincronizar o estado de browsing quando a URL mudar de verdade (ex: usuário clicou em uma aula)
   useEffect(() => {
@@ -723,6 +728,7 @@ function AulaPage() {
 
       const newPlayer = new window.YT.Player(targetEl, config);
       setPlayer(newPlayer);
+      playerInstanceRef.current = newPlayer;
     };
 
     if (videoId) {
@@ -735,8 +741,9 @@ function AulaPage() {
 
     return () => {
       stopProgressTracking();
-      if (player) {
-        try { player.destroy(); } catch (e) {}
+      if (playerInstanceRef.current) {
+        try { playerInstanceRef.current.destroy(); } catch (e) {}
+        playerInstanceRef.current = null;
       }
     };
   }, [videoId === null]); // Só inicializa na primeira vez que o videoId deixa de ser null
@@ -855,20 +862,33 @@ function AulaPage() {
   };
 
   const currentIndex = listaAulas.findIndex(a => String(a.id) === String(aulaId));
-  const temProxima = currentIndex !== -1 && currentIndex < listaAulas.length - 1;
-  const temAnterior = currentIndex > 0;
+  const currentModuloIndex = listaModulos.findIndex(m => String(m.id) === String(moduloId));
+  
+  const temProximaNaMesmaLista = currentIndex !== -1 && currentIndex < listaAulas.length - 1;
+  const temProximoModulo = currentModuloIndex !== -1 && currentModuloIndex < listaModulos.length - 1;
+  const temProxima = temProximaNaMesmaLista || temProximoModulo;
+  
+  const temAnteriorNaMesmaLista = currentIndex > 0;
+  const temModuloAnterior = currentModuloIndex > 0;
+  const temAnterior = temAnteriorNaMesmaLista || temModuloAnterior;
 
   const irParaProximaAula = () => {
-    if (temProxima) {
+    if (temProximaNaMesmaLista) {
       const proxima = listaAulas[currentIndex + 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${proxima.id}`);
+    } else if (temProximoModulo) {
+      const proximoMod = listaModulos[currentModuloIndex + 1];
+      navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${proximoMod.id}/primeira_aula`);
     }
   };
 
   const irParaAulaAnterior = () => {
-    if (temAnterior) {
+    if (temAnteriorNaMesmaLista) {
       const anterior = listaAulas[currentIndex - 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${anterior.id}`);
+    } else if (temModuloAnterior) {
+      const modAnterior = listaModulos[currentModuloIndex - 1];
+      navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${modAnterior.id}/primeira_aula`);
     }
   };
 
