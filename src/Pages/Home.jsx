@@ -261,116 +261,100 @@ function Home() {
   // Carregar categorias e carreiras do Supabase (migrando do localStorage se necessário)
   useEffect(() => {
     async function carregarESincronizarDados() {
-      try {
-        // Tentar buscar do Supabase
-      let { data: categoriasSupabase } = await withTimeout(supabase.from('categorias').select('*'), 8000);
-      let { data: carreirasSupabase } = await withTimeout(supabase.from('carreiras').select('*'), 8000);
-
-      categoriasSupabase = categoriasSupabase || [];
-      carreirasSupabase = carreirasSupabase || [];
-
-      // Se o Supabase estiver vazio, pegar do localStorage (ou padroes) e subir para o Supabase
-      if (categoriasSupabase.length === 0) {
-        let storedCat = JSON.parse(localStorage.getItem('app_categorias') || '[]');
-        if (storedCat.length === 0) {
-          storedCat = [
-            { id: 'policiais', nome: 'Carreiras Policiais', icone: '👮' },
-            { id: 'fiscais', nome: 'Área Fiscal', icone: '💰' },
-            { id: 'tribunais', nome: 'Tribunais', icone: '⚖️' }
-          ];
-        }
-        await supabase.from('categorias').upsert(storedCat);
-        categoriasSupabase = storedCat;
-      }
-
-      if (carreirasSupabase.length === 0) {
-        let storedCar = JSON.parse(localStorage.getItem('app_carreiras') || '[]');
-        if (storedCar.length === 0) {
-          storedCar = [
-            { id: 'pf', nome: 'Polícia Federal', icone: '🔫', capa: 'https://concursos.adv.br/wp-content/uploads/2022/05/Concurso-Agente-da-Policia-Federal.jpeg', categoriaId: 'policiais' },
-            { id: 'prf', nome: 'Polícia Rodoviária Federal', icone: '🚔', capa: 'https://www.gov.br/prf/pt-br/noticias/estaduais/piaui/anteriores/abril-2022/prf-divulga-balanco-final-da-operacao-semana-santa-no-piaui/whatsapp-image-2021-11-02-at-17-17-11.jpeg/@@images/84916131-eb33-481e-b737-3924fbce52a8.jpeg', categoriaId: 'policiais' },
-            { id: 'pc', nome: 'Polícia Civil', icone: '🕵️', capa: 'https://blogs.correiobraziliense.com.br/cbpoder/wp-content/uploads/sites/5/2024/07/Reprodu%C3%A7%C3%A3o-PCDF-.jpg', categoriaId: 'policiais' },
-            { id: 'pm', nome: 'Polícia Militar', icone: '👮‍♂️', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=7b2446&_nc_ohc=jaPb1lXnOtYQ7kNvwFd2w4h&_nc_oc=AdqRAdi18-lRsosZMClAHVixemUKN8_BLaJgseVZ9L0zqev80ANzYEJ6xaw-d3k7SBA&_nc_zt=23&_nc_ht=scontent.frec38-1.fna&_nc_gid=zQNq8NCuLOj7CZ5WAYm8NA&oh=00_Af2EepkR6UGkChXVY8TfY-_NxMegodD3-70kq7CsAcepTg&oe=6A12F568', categoriaId: 'policiais' },
-            { id: 'bombeiros', nome: 'Corpo de Bombeiros Militar', icone: '🚒', capa: 'https://i.pinimg.com/1200x/85/a6/6c/85a66c7c0d717b1629dfc314673e6e87.jpg', categoriaId: 'policiais' },
-            { id: 'policia_penal', nome: 'Polícia Penal', icone: '🔒', capa: 'https://agencia.ac.gov.br/wp-content/uploads/2024/10/42.jpg', categoriaId: 'policiais' },
-            { id: 'gm', nome: 'Guarda Municipal', icone: '🏛️', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', categoriaId: 'policiais' },
-            { id: 'receita_federal', nome: 'Receita Federal', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=RFB', categoriaId: 'fiscais' },
-            { id: 'sefaz', nome: 'SEFAZ', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=SEFAZ', categoriaId: 'fiscais' },
-            { id: 'tj_sp', nome: 'TJ SP', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TJSP', categoriaId: 'tribunais' },
-            { id: 'trt', nome: 'TRT', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TRT', categoriaId: 'tribunais' },
-            { id: 'stf', nome: 'STF', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=STF', categoriaId: 'tribunais' }
-          ];
-        }
-        await supabase.from('carreiras').upsert(storedCar);
-        carreirasSupabase = storedCar;
-      }
-
-      // Mapear para o formato que a Home espera
-      const categoriasComCursos = categoriasSupabase.map(cat => ({
-        id: cat.id,
-        nome: cat.nome,
-        tipo_acesso: cat.tipo_acesso || 'livre',
-        cursos: carreirasSupabase.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999)).map(car => ({
-          id: car.id,
-          nome: car.nome,
-          capa: car.capa || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(car.nome),
-          cor: '#1565c0'
-        }))
-      }));
-
-      // Ordenar categorias: policiais no topo, preparatorios na parte de baixo
-      categoriasComCursos.sort((a, b) => {
-        if (a.id === 'policiais') return -1;
-        if (b.id === 'policiais') return 1;
-        if (a.id === 'preparatorios') return 1;
-        if (b.id === 'preparatorios') return -1;
-        return 0;
-      });
-
-      // Se ainda estiver vazio (falha total), usa o plano de emergência para a tela não ficar branca
-      if (categoriasComCursos.length === 0) {
-        setCategorias([
-          {
-            id: 'policiais',
-            nome: 'Carreiras Policiais',
-            cursos: [
-              { id: 'gm', nome: 'Guarda Municipal', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', cor: '#1565c0' },
-              { id: 'pm', nome: 'Polícia Militar', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', cor: '#1565c0' }
-            ]
-          }
-        ]);
-      } else {
-        setCategorias(categoriasComCursos);
+      const processarCategorias = (catData, carData, saveLocal = false) => {
+        if (!catData || !carData || catData.length === 0) return false;
         
-        // Buscar novas vídeoaulas adicionadas nas últimas 12 horas para destacar cursos atualizados
+        if (saveLocal) {
+          localStorage.setItem('app_categorias', JSON.stringify(catData));
+          localStorage.setItem('app_carreiras', JSON.stringify(carData));
+        }
+
+        const categoriasComCursos = catData.map(cat => ({
+          id: cat.id,
+          nome: cat.nome,
+          tipo_acesso: cat.tipo_acesso || 'livre',
+          cursos: carData.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999)).map(car => ({
+            id: car.id,
+            nome: car.nome,
+            capa: car.capa || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(car.nome),
+            cor: '#1565c0'
+          }))
+        }));
+
+        categoriasComCursos.sort((a, b) => {
+          if (a.id === 'policiais') return -1;
+          if (b.id === 'policiais') return 1;
+          if (a.id === 'preparatorios') return 1;
+          if (b.id === 'preparatorios') return -1;
+          return 0;
+        });
+
+        if (categoriasComCursos.length > 0) {
+          setCategorias(categoriasComCursos);
+          return true;
+        }
+        return false;
+      };
+
+      try {
+        // 1. CARREGA IMEDIATAMENTE DO CACHE (Sem lentidão na tela)
+        const storedCat = JSON.parse(localStorage.getItem('app_categorias') || '[]');
+        const storedCar = JSON.parse(localStorage.getItem('app_carreiras') || '[]');
+        let renderizouCache = false;
+        if (storedCat.length > 0 && storedCar.length > 0) {
+          renderizouCache = processarCategorias(storedCat, storedCar, false);
+        }
+
+        // 2. BUSCA DO SUPABASE EM BACKGROUND (Com tolerância a falhas)
+        let categoriasSupabase = [];
+        let carreirasSupabase = [];
+        
+        try {
+          const resCat = await withTimeout(supabase.from('categorias').select('*'), 5000);
+          categoriasSupabase = resCat.data || [];
+        } catch (e) { console.warn('Timeout categorias', e); }
+
+        try {
+          const resCar = await withTimeout(supabase.from('carreiras').select('*'), 5000);
+          carreirasSupabase = resCar.data || [];
+        } catch (e) { console.warn('Timeout carreiras', e); }
+
+        // Se conseguiu dados novos, atualiza a tela e o cache
+        if (categoriasSupabase.length > 0) {
+          processarCategorias(categoriasSupabase, carreirasSupabase.length > 0 ? carreirasSupabase : storedCar, true);
+        } else if (!renderizouCache) {
+          // Fallback absoluto se não tinha nada no cache e a rede falhou
+          setCategorias([
+            {
+              id: 'policiais',
+              nome: 'Carreiras Policiais',
+              cursos: [
+                { id: 'gm', nome: 'Guarda Municipal', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', cor: '#1565c0' },
+                { id: 'pm', nome: 'Polícia Militar', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', cor: '#1565c0' }
+              ]
+            }
+          ]);
+        }
+
+        // 3. BUSCAR ATUALIZAÇÕES RECENTES DAS AULAS (Apenas visual, tolerante a falhas)
         try {
           const limiteRecente = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-          const { data: novasAulas } = await supabase
-            .from('aulas')
-            .select('id, modulo_id, created_at')
-            .gt('created_at', limiteRecente);
+          const { data: novasAulas } = await supabase.from('aulas').select('id, modulo_id, created_at').gt('created_at', limiteRecente);
 
           const atualizadosSet = new Set();
           if (novasAulas && novasAulas.length > 0) {
             const modulosIds = novasAulas.map(a => a.modulo_id).filter(Boolean);
             if (modulosIds.length > 0) {
-              const { data: modulosNovos } = await supabase
-                .from('modulos')
-                .select('id, disciplina_id')
-                .in('id', modulosIds);
+              const { data: modulosNovos } = await supabase.from('modulos').select('id, disciplina_id').in('id', modulosIds);
 
               if (modulosNovos && modulosNovos.length > 0) {
                 const discIds = modulosNovos.map(m => m.disciplina_id).filter(Boolean);
                 if (discIds.length > 0) {
-                  const { data: disciplinasNovas } = await supabase
-                    .from('disciplinas')
-                    .select('id, preparatorio_id')
-                    .in('id', discIds);
+                  const { data: disciplinasNovas } = await supabase.from('disciplinas').select('id, preparatorio_id').in('id', discIds);
 
                   if (disciplinasNovas && disciplinasNovas.length > 0) {
                     disciplinasNovas.forEach(d => {
-                      const prepId = d.preparatorio_id;
-                      if (prepId) atualizadosSet.add(prepId);
+                      if (d.preparatorio_id) atualizadosSet.add(d.preparatorio_id);
                     });
                   }
                 }
@@ -379,13 +363,16 @@ function Home() {
           }
           setCursosAtualizados(Array.from(atualizadosSet));
         } catch (e) {
-          console.error("Erro ao buscar atualizações de vídeoaulas:", e);
+          console.error("Erro silencioso ao buscar videoaulas novas:", e);
+        }
+
+      } catch (err) {
+        console.error("[Home] Erro fatal no carregamento:", err);
+        // Mesmo com erro fatal, mantemos a tela se tiver cache
+        if (JSON.parse(localStorage.getItem('app_categorias') || '[]').length === 0) {
+          setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Verifique sua internet', cursos: [] }]);
         }
       }
-    } catch (err) {
-      console.error("[Admin] Erro fatal no carregamento:", err);
-      // Fallback de segurança para o site não sumir
-      setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Recarregue a página', cursos: [] }]);
     }
   }
 
