@@ -73,6 +73,7 @@ function AulaPage() {
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const hasResumedRef = useRef(false);
   const lastSaveTimeRef = useRef(0);
+  const duracaoRef = useRef(0);
   const unmountSaveRef = useRef({ tempo: 0, duracao: 0, aulaId: null, userId: null });
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
@@ -109,13 +110,13 @@ function AulaPage() {
     return () => {
       const state = unmountSaveRef.current;
       if (state.aulaId === currentAulaId && state.tempo > 0 && state.userId && state.duracao > 0) {
-        const isConcluida = state.tempo > (state.duracao * 0.9);
+        const isConcluida = state.tempo >= state.duracao * 0.9;
         supabase.from('progresso').upsert({
           user_id: state.userId,
           aula_id: state.aulaId,
           tempo_assistido: Math.floor(state.tempo),
           concluida: isConcluida,
-          ultimo_acesso: new Date()
+          ultimo_acesso: new Date().toISOString()
         }, { onConflict: 'user_id,aula_id' }).then(() => {});
       }
     };
@@ -547,31 +548,42 @@ function AulaPage() {
   }, [user, preparatorioId, listaDisciplinas]);
 
   // Salvar progresso no Supabase
-  const salvarProgresso = async (tempo, forceSave = false) => {
+  const salvarProgresso = async (tempo, forceSave = false, marcarConcluida = false) => {
     if (!user || !temAcesso) return;
-    
-    // Evita conclusão prematura se a duração ainda não foi obtida
-    const isConcluida = duracao > 0 && tempo > (duracao * 0.9); 
 
-    // Atualiza o progresso em tempo real no estado local SEMPRE, independente do banco
+    const durEfetiva = Math.max(
+      duracaoRef.current || 0,
+      duracao || 0,
+      Number(aulaPlaying?.duracao) || 0
+    );
+    const tempoFinal = marcarConcluida && durEfetiva > 0
+      ? Math.max(tempo, durEfetiva)
+      : tempo;
+    const isConcluida = marcarConcluida
+      || (durEfetiva > 0 && tempoFinal >= durEfetiva * 0.9);
+
+    // Atualiza o progresso em tempo real no estado local
     setProgressoAulas(prev => {
       const prevProg = prev[aulaId];
-      if (prevProg && prevProg.tempo_assistido === Math.floor(tempo) && prevProg.concluida === isConcluida) {
+      if (
+        prevProg
+        && prevProg.tempo_assistido === Math.floor(tempoFinal)
+        && prevProg.concluida === isConcluida
+      ) {
         return prev;
       }
       return {
         ...prev,
-        [aulaId]: { 
-          ...prev[aulaId], 
-          tempo_assistido: Math.floor(tempo), 
-          concluida: isConcluida 
-        }
+        [aulaId]: {
+          ...prev[aulaId],
+          tempo_assistido: Math.floor(tempoFinal),
+          concluida: isConcluida,
+        },
       };
     });
 
     const now = Date.now();
-    // Throttle de 10 segundos para evitar rate limit do Supabase
-    if (!forceSave && now - lastSaveTimeRef.current < 10000) {
+    if (!forceSave && !marcarConcluida && now - lastSaveTimeRef.current < 10000) {
       return;
     }
     lastSaveTimeRef.current = now;
@@ -582,13 +594,13 @@ function AulaPage() {
         .upsert({
           user_id: user.id,
           aula_id: aulaId,
-          tempo_assistido: Math.floor(tempo),
+          tempo_assistido: Math.floor(tempoFinal),
           concluida: isConcluida,
-          ultimo_acesso: new Date()
+          ultimo_acesso: new Date().toISOString(),
         }, {
-          onConflict: 'user_id,aula_id'
+          onConflict: 'user_id,aula_id',
         });
-        
+
       if (error) {
         console.error('Erro ao salvar progresso no Supabase:', error);
       }
@@ -596,6 +608,37 @@ function AulaPage() {
       console.error('Erro ao tentar salvar progresso:', e);
     }
   };
+
+  const marcarAulaComoAssistida = async (playerInstance) => {
+    let dur = duracaoRef.current || duracao || Number(aulaPlaying?.duracao) || 0;
+    let tempo = dur;
+
+    if (playerInstance && typeof playerInstance.getCurrentTime === 'function') {
+      try {
+        const t = playerInstance.getCurrentTime();
+        const d = typeof playerInstance.getDuration === 'function' ? playerInstance.getDuration() : 0;
+        if (d > 0) dur = d;
+        if (t > 0) tempo = t;
+      } catch (e) {
+        console.warn('[AulaPage] Não foi possível ler tempo do player:', e);
+      }
+    }
+
+    if (dur > 0) {
+      duracaoRef.current = dur;
+      setDuracao(dur);
+      setTempoAtual(Math.max(tempo, dur));
+    }
+
+    if (salvarProgressoRef.current) {
+      await salvarProgressoRef.current(Math.max(tempo, dur), true, true);
+    }
+  };
+
+  const marcarAulaComoAssistidaRef = useRef(marcarAulaComoAssistida);
+  useEffect(() => {
+    marcarAulaComoAssistidaRef.current = marcarAulaComoAssistida;
+  });
 
   const salvarPdfUrl = async (novaUrl) => {
     if (planoUsuario !== 'premium') return;
@@ -617,11 +660,10 @@ function AulaPage() {
   };
 
   const salvarProgressoRef = useRef(salvarProgresso);
-  const duracaoRef = useRef(duracao);
 
   useEffect(() => {
     salvarProgressoRef.current = salvarProgresso;
-    duracaoRef.current = duracao;
+    if (duracao > 0) duracaoRef.current = duracao;
   }, [salvarProgresso, duracao]);
 
   const stopProgressTracking = () => {
@@ -638,7 +680,12 @@ function AulaPage() {
         try {
           const tempo = currentPlayer.getCurrentTime();
           setTempoAtual(tempo);
-          if (salvarProgressoRef.current) {
+          const dur = duracaoRef.current || duracao;
+          if (dur > 0 && tempo >= dur * 0.9) {
+            if (salvarProgressoRef.current) {
+              salvarProgressoRef.current(tempo, true, true);
+            }
+          } else if (salvarProgressoRef.current) {
             salvarProgressoRef.current(tempo);
           }
         } catch (e) {
@@ -677,6 +724,7 @@ function AulaPage() {
             setPlayerReady(true);
             const videoDur = event.target.getDuration();
             setDuracao(videoDur);
+            if (videoDur > 0) duracaoRef.current = videoDur;
             
             // Salvar duração no banco se ainda não tiver (para aparecer na barra lateral depois)
             if (aulaId && (!aulaPlaying?.duracao)) {
@@ -716,15 +764,14 @@ function AulaPage() {
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
-                if (duracaoRef.current) {
-                  setTempoAtual(duracaoRef.current);
-                }
-                if (salvarProgressoRef.current && duracaoRef.current) {
-                  salvarProgressoRef.current(duracaoRef.current, true); // Marca como concluída no final
-                }
-                if (irParaProximaAulaRef.current) {
-                  irParaProximaAulaRef.current();
-                }
+                (async () => {
+                  if (marcarAulaComoAssistidaRef.current) {
+                    await marcarAulaComoAssistidaRef.current(event.target);
+                  }
+                  if (irParaProximaAulaRef.current) {
+                    irParaProximaAulaRef.current();
+                  }
+                })();
               }
               stopProgressTracking();
             }
@@ -785,6 +832,40 @@ function AulaPage() {
     }
     return () => { if (iosControlsTimeoutRef.current) clearTimeout(iosControlsTimeoutRef.current); }
   }, [isPlaying, isIOS]);
+
+  // iOS: iframe nativo envia fim do vídeo via postMessage (sem evento ENDED da API)
+  useEffect(() => {
+    if (!isIOS || !videoId || !user) return;
+
+    const onYoutubeMessage = (event) => {
+      if (
+        event.origin !== 'https://www.youtube-nocookie.com'
+        && event.origin !== 'https://www.youtube.com'
+      ) {
+        return;
+      }
+
+      let payload = event.data;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          return;
+        }
+      }
+
+      if (payload?.event === 'onStateChange' && payload.info === 0) {
+        (async () => {
+          if (marcarAulaComoAssistidaRef.current) {
+            await marcarAulaComoAssistidaRef.current(playerInstanceRef.current);
+          }
+        })();
+      }
+    };
+
+    window.addEventListener('message', onYoutubeMessage);
+    return () => window.removeEventListener('message', onYoutubeMessage);
+  }, [isIOS, videoId, user, aulaId]);
 
   const handleShowIosControls = () => {
     setShowIosControls(true);
