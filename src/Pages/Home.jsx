@@ -5,7 +5,6 @@ import LoadingScreen from '../components/LoadingScreen';
 
 function Home() {
   const navigate = useNavigate();
-  const [favoritos, setFavoritos] = useState([]);
   const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('Aluno');
@@ -237,37 +236,11 @@ function Home() {
   // Verificar se é admin (e-mails autorizados)
   const isAdmin = user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com';
 
-  // Carregar favoritos
-  useEffect(() => {
-    const favKeys = JSON.parse(localStorage.getItem('favoritos') || '[]');
-    const cursosFavoritos = [];
-
-    favKeys.forEach(favKey => {
-      const [cursoId, disciplinaId, aulaId] = favKey.split('_');
-      if (cursoId === 'policia') {
-        const aulaNum = aulaId?.replace('aula', '');
-        cursosFavoritos.push({
-          id: favKey,
-          nome: `${disciplinaId} - Aula ${aulaNum}`,
-          capa: '/logos/gramatique.svg',
-          cor: '#ffd700'
-        });
-      }
-    });
-
-    setFavoritos(cursosFavoritos);
-  }, []);
-
-  // Carregar categorias e carreiras do Supabase (migrando do localStorage se necessário)
+  // Carregar categorias e carreiras do Supabase
   useEffect(() => {
     async function carregarESincronizarDados() {
-      const processarCategorias = (catData, carData, saveLocal = false) => {
+      const processarCategorias = (catData, carData) => {
         if (!catData || !carData || catData.length === 0) return false;
-        
-        if (saveLocal) {
-          localStorage.setItem('app_categorias', JSON.stringify(catData));
-          localStorage.setItem('app_carreiras', JSON.stringify(carData));
-        }
 
         const categoriasComCursos = catData.map(cat => ({
           id: cat.id,
@@ -297,18 +270,9 @@ function Home() {
       };
 
       try {
-        // 1. CARREGA IMEDIATAMENTE DO CACHE (Sem lentidão na tela)
-        const storedCat = JSON.parse(localStorage.getItem('app_categorias') || '[]');
-        const storedCar = JSON.parse(localStorage.getItem('app_carreiras') || '[]');
-        let renderizouCache = false;
-        if (storedCat.length > 0 && storedCar.length > 0) {
-          renderizouCache = processarCategorias(storedCat, storedCar, false);
-        }
-
-        // 2. BUSCA DO SUPABASE EM BACKGROUND (Com tolerância a falhas)
         let categoriasSupabase = [];
         let carreirasSupabase = [];
-        
+
         try {
           const resCat = await withTimeout(supabase.from('categorias').select('*'), 5000);
           categoriasSupabase = resCat.data || [];
@@ -319,24 +283,13 @@ function Home() {
           carreirasSupabase = resCar.data || [];
         } catch (e) { console.warn('Timeout carreiras', e); }
 
-        // Se conseguiu dados novos, atualiza a tela e o cache
         if (categoriasSupabase.length > 0) {
-          processarCategorias(categoriasSupabase, carreirasSupabase.length > 0 ? carreirasSupabase : storedCar, true);
-        } else if (!renderizouCache) {
-          // Fallback absoluto se não tinha nada no cache e a rede falhou
-          setCategorias([
-            {
-              id: 'policiais',
-              nome: 'Carreiras Policiais',
-              cursos: [
-                { id: 'gm', nome: 'Guarda Municipal', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', cor: '#1565c0' },
-                { id: 'pm', nome: 'Polícia Militar', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', cor: '#1565c0' }
-              ]
-            }
-          ]);
+          processarCategorias(categoriasSupabase, carreirasSupabase);
+        } else {
+          setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Verifique sua internet', cursos: [] }]);
         }
 
-        // 3. BUSCAR ATUALIZAÇÕES RECENTES DAS AULAS (Apenas visual, tolerante a falhas)
+        // Buscar atualizações recentes das aulas (visual)
         try {
           const limiteRecente = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
           const { data: novasAulas } = await supabase.from('aulas').select('id, modulo_id, created_at').gt('created_at', limiteRecente);
@@ -368,13 +321,9 @@ function Home() {
 
       } catch (err) {
         console.error("[Home] Erro fatal no carregamento:", err);
-        // Mesmo com erro fatal, mantemos a tela se tiver cache
-        if (JSON.parse(localStorage.getItem('app_categorias') || '[]').length === 0) {
-          setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Verifique sua internet', cursos: [] }]);
-        }
+        setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Verifique sua internet', cursos: [] }]);
       }
     }
-  }
 
     carregarESincronizarDados();
   }, []);

@@ -1,48 +1,79 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import { parseVinculosFromRows, countPreparatoriosPorCarreira } from '../utils/vinculos';
 
 function CategoriaPage() {
   const { categoriaId } = useParams();
   const navigate = useNavigate();
   const [categoria, setCategoria] = useState(null);
-  const [subCarreiras, setSubCarreiras] = useState([]);
+  const [carreiras, setCarreiras] = useState([]);
   const [vinculos, setVinculos] = useState({});
-  const [preparatorios, setPreparatorios] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(null);
 
   useEffect(() => {
-    // Carrega categoria
-    const categorias = JSON.parse(localStorage.getItem('app_categorias') || '[]');
-    const encontrada = categorias.find(c => c.id === categoriaId);
-    setCategoria(encontrada);
+    let mounted = true;
 
-    // Carrega subcarreiras (PF, PRF, PC...)
-    const allSub = JSON.parse(localStorage.getItem('app_subcarreiras') || '[]');
-    const filtradas = allSub.filter(s => s.categoriaId === categoriaId);
-    setSubCarreiras(filtradas);
+    async function carregarDados() {
+      setCarregando(true);
+      setErro(null);
 
-    // Carrega preparatórios
-    const storedPrep = JSON.parse(localStorage.getItem('app_preparatorios') || '[]');
-    setPreparatorios(storedPrep);
+      try {
+        const [
+          { data: catData, error: catErr },
+          { data: carreirasData, error: carErr },
+          { data: vData, error: vErr },
+        ] = await Promise.all([
+          supabase.from('categorias').select('*'),
+          supabase.from('carreiras').select('*'),
+          supabase.from('vinculos').select('*'),
+        ]);
 
-    // Carrega vínculos
-    const storedVinculos = JSON.parse(localStorage.getItem('app_vinculos') || '{}');
-    setVinculos(storedVinculos);
+        if (catErr) throw catErr;
+        if (carErr) throw carErr;
+        if (vErr) throw vErr;
+
+        const encontrada = (catData || []).find((c) => c.id === categoriaId);
+        const filtradas = (carreirasData || [])
+          .filter((c) => (c.categoria_id || c.categoriaId) === categoriaId)
+          .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
+
+        if (!mounted) return;
+
+        setCategoria(encontrada || null);
+        setCarreiras(filtradas);
+        setVinculos(parseVinculosFromRows(vData));
+      } catch (e) {
+        console.error('[CategoriaPage] Erro ao carregar:', e);
+        if (mounted) setErro('Não foi possível carregar os dados. Tente novamente.');
+      } finally {
+        if (mounted) setCarregando(false);
+      }
+    }
+
+    carregarDados();
+    return () => { mounted = false; };
   }, [categoriaId]);
 
-  const getPreparatoriosPorCarreira = (carreiraId) => {
-    const prepIds = vinculos[carreiraId] || [];
-    return preparatorios.filter(p => prepIds.includes(p.id));
-  };
-
-  if (!categoria) return <LoadingScreen />;
+  if (carregando) return <LoadingScreen />;
+  if (erro) {
+    return (
+      <div style={styles.container}>
+        <p style={styles.empty}>{erro}</p>
+        <button type="button" onClick={() => navigate('/')} style={styles.backButton}>← Voltar</button>
+      </div>
+    );
+  }
+  if (!categoria) return <LoadingScreen text="Categoria não encontrada" />;
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <button onClick={() => navigate('/')} style={styles.backButton}>← Voltar</button>
+        <button type="button" onClick={() => navigate('/')} style={styles.backButton}>← Voltar</button>
         <h1 style={styles.title}>{categoria.icone} {categoria.nome}</h1>
-        <button onClick={() => navigate('/admin')} style={styles.adminButton}>👑 Admin</button>
+        <button type="button" onClick={() => navigate('/admin')} style={styles.adminButton}>👑 Admin</button>
       </header>
 
       <div style={styles.hero}>
@@ -52,19 +83,28 @@ function CategoriaPage() {
 
       <main style={styles.main}>
         <div style={styles.grid}>
-          {subCarreiras.map(carreira => {
-            const prepsVinculados = getPreparatoriosPorCarreira(carreira.id);
+          {carreiras.map((carreira) => {
+            const qtdPreps = countPreparatoriosPorCarreira(carreira.id, vinculos);
             return (
-              <div key={carreira.id} style={styles.card} onClick={() => navigate(`/carreira/${carreira.id}`)}>
+              <div
+                key={carreira.id}
+                style={styles.card}
+                onClick={() => navigate(`/carreira/${carreira.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/carreira/${carreira.id}`)}
+                role="button"
+                tabIndex={0}
+              >
                 <div style={styles.cardIcon}>{carreira.icone}</div>
                 <h3 style={styles.cardTitle}>{carreira.nome}</h3>
-                <p style={styles.cardCount}>{prepsVinculados.length} preparatórios disponíveis</p>
-                <button style={styles.cardButton}>Ver cursos →</button>
+                <p style={styles.cardCount}>{qtdPreps} preparatório{qtdPreps !== 1 ? 's' : ''} disponível{qtdPreps !== 1 ? 'is' : ''}</p>
+                <button type="button" style={styles.cardButton}>Ver cursos →</button>
               </div>
             );
           })}
         </div>
-        {subCarreiras.length === 0 && <p style={styles.empty}>Nenhuma carreira cadastrada nesta categoria ainda.</p>}
+        {carreiras.length === 0 && (
+          <p style={styles.empty}>Nenhuma carreira cadastrada nesta categoria ainda.</p>
+        )}
       </main>
     </div>
   );
@@ -85,7 +125,6 @@ const styles = {
   cardCount: { color: '#888', fontSize: '14px', marginBottom: '16px' },
   cardButton: { padding: '10px 24px', backgroundColor: '#E50914', border: 'none', color: '#fff', borderRadius: '25px', cursor: 'pointer' },
   empty: { textAlign: 'center', color: '#888', padding: '40px' },
-  loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#F5F5F5' }
 };
 
 export default CategoriaPage;

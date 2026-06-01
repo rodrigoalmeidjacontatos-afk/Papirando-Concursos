@@ -495,49 +495,45 @@ function AdminPage() {
     }
   };
 
-  const importarDados = async () => {
-    if (window.confirm('Isso vai importar TODOS os dados locais (Categorias, Carreiras, Preparatórios e Vínculos) para o Supabase. Deseja continuar?')) {
-      let storedCat = JSON.parse(localStorage.getItem('app_categorias') || '[]');
-      let storedCar = JSON.parse(localStorage.getItem('app_carreiras') || '[]');
-      const storedPreps = JSON.parse(localStorage.getItem('app_preparatorios') || '[]');
-      const storedDisc = JSON.parse(localStorage.getItem('app_disciplinas') || '[]');
-      const storedMods = JSON.parse(localStorage.getItem('app_modulos') || '[]');
-      const storedAulas = JSON.parse(localStorage.getItem('app_aulas') || '[]');
-      const storedVinculos = JSON.parse(localStorage.getItem('app_vinculos') || '{}');
+  const seedDadosPadrao = async () => {
+    if (!window.confirm('Isso vai gravar/atualizar categorias e carreiras padrão diretamente no Supabase. Deseja continuar?')) return;
 
-      if (storedCat.length === 0) {
-        storedCat = [
-          { id: 'policiais', nome: 'Carreiras Policiais', icone: '👮' },
-          { id: 'fiscais', nome: 'Área Fiscal', icone: '💰' },
-          { id: 'tribunais', nome: 'Tribunais', icone: '⚖️' }
-        ];
-      }
-      if (storedCar.length === 0) {
-        storedCar = [
-          { id: 'pf', nome: 'Polícia Federal', icone: '🔫', capa: 'https://concursos.adv.br/wp-content/uploads/2022/05/Concurso-Agente-da-Policia-Federal.jpeg', categoriaId: 'policiais' },
-          { id: 'prf', nome: 'Polícia Rodoviária Federal', icone: '🚔', capa: 'https://www.gov.br/prf/pt-br/noticias/estaduais/piaui/anteriores/abril-2022/prf-divulga-balanco-final-da-operacao-semana-santa-no-piaui/whatsapp-image-2021-11-02-at-17-17-11.jpeg/@@images/84916131-eb33-481e-b737-3924fbce52a8.jpeg', categoriaId: 'policiais' },
-          { id: 'pc', nome: 'Polícia Civil', icone: '🕵️', capa: 'https://blogs.correiobraziliense.com.br/cbpoder/wp-content/uploads/sites/5/2024/07/Reprodu%C3%A7%C3%A3o-PCDF-.jpg', categoriaId: 'policiais' },
-          { id: 'pm', nome: 'Polícia Militar', icone: '👮‍♂️', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=7b2446&_nc_ohc=jaPb1lXnOtYQ7kNvwFd2w4h&_nc_oc=AdqRAdi18-lRsosZMClAHVixemUKN8_BLaJgseVZ9L0zqev80ANzYEJ6xaw-d3k7SBA&_nc_zt=23&_nc_ht=scontent.frec38-1.fna&_nc_gid=zQNq8NCuLOj7CZ5WAYm8NA&oh=00_Af2EepkR6UGkChXVY8TfY-_NxMegodD3-70kq7CsAcepTg&oe=6A12F568', categoriaId: 'policiais' },
-          { id: 'bombeiros', nome: 'Corpo de Bombeiros Militar', icone: '🚒', capa: 'https://i.pinimg.com/1200x/85/a6/6c/85a66c7c0d717b1629dfc314673e6e87.jpg', categoriaId: 'policiais' },
-          { id: 'policia_penal', nome: 'Polícia Penal', icone: '🔒', capa: 'https://agencia.ac.gov.br/wp-content/uploads/2024/10/42.jpg', categoriaId: 'policiais' },
-          { id: 'gm', nome: 'Guarda Municipal', icone: '🏛️', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', categoriaId: 'policiais' },
-          { id: 'receita_federal', nome: 'Receita Federal', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=RFB', categoriaId: 'fiscais' },
-          { id: 'sefaz', nome: 'SEFAZ', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=SEFAZ', categoriaId: 'fiscais' },
-          { id: 'tj_sp', nome: 'TJ SP', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TJSP', categoriaId: 'tribunais' },
-          { id: 'trt', nome: 'TRT', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TRT', categoriaId: 'tribunais' },
-          { id: 'stf', nome: 'STF', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=STF', categoriaId: 'tribunais' }
-        ];
-      }
+    const categoriasPadrao = [
+      { id: 'policiais', nome: 'Carreiras Policiais', icone: '👮', tipo_acesso: 'livre' },
+      { id: 'fiscais', nome: 'Área Fiscal', icone: '💰', tipo_acesso: 'livre' },
+      { id: 'tribunais', nome: 'Tribunais', icone: '⚖️', tipo_acesso: 'livre' },
+    ];
 
-      if (storedCat.length > 0) await supabase.from('categorias').upsert(storedCat);
-      if (storedCar.length > 0) await supabase.from('carreiras').upsert(storedCar);
-      if (storedPreps.length > 0) await supabase.from('preparatorios').upsert(storedPreps);
-      if (storedDisc.length > 0) await supabase.from('disciplinas').upsert(storedDisc.map(d => ({ ...d, preparatorio_id: d.preparatorio_id || d.preparatorioId })));
-      if (storedMods.length > 0) await supabase.from('modulos').upsert(storedMods.map(m => ({ ...m, disciplina_id: m.disciplina_id || m.disciplinaId })));
-      if (storedAulas.length > 0) await supabase.from('aulas').upsert(storedAulas.map(a => ({ ...a, video_id: a.video_id || a.videoId, modulo_id: a.modulo_id || a.moduloId })));
-      setVinculos(storedVinculos);
+    const carreirasPadrao = [
+      { id: 'pf', nome: 'Polícia Federal', icone: '🔫', capa: 'https://concursos.adv.br/wp-content/uploads/2022/05/Concurso-Agente-da-Policia-Federal.jpeg', categoria_id: 'policiais' },
+      { id: 'prf', nome: 'Polícia Rodoviária Federal', icone: '🚔', capa: 'https://www.gov.br/prf/pt-br/noticias/estaduais/piaui/anteriores/abril-2022/prf-divulga-balanco-final-da-operacao-semana-santa-no-piaui/whatsapp-image-2021-11-02-at-17-17-11.jpeg/@@images/84916131-eb33-481e-b737-3924fbce52a8.jpeg', categoria_id: 'policiais' },
+      { id: 'pc', nome: 'Polícia Civil', icone: '🕵️', capa: 'https://blogs.correiobraziliense.com.br/cbpoder/wp-content/uploads/sites/5/2024/07/Reprodu%C3%A7%C3%A3o-PCDF-.jpg', categoria_id: 'policiais' },
+      { id: 'pm', nome: 'Polícia Militar', icone: '👮‍♂️', capa: 'https://scontent.frec38-1.fna.fbcdn.net/v/t1.6435-9/183442705_4145240842165162_4708866907158417749_n.jpg', categoria_id: 'policiais' },
+      { id: 'bombeiros', nome: 'Corpo de Bombeiros Militar', icone: '🚒', capa: 'https://i.pinimg.com/1200x/85/a6/6c/85a66c7c0d717b1629dfc314673e6e87.jpg', categoria_id: 'policiais' },
+      { id: 'policia_penal', nome: 'Polícia Penal', icone: '🔒', capa: 'https://agencia.ac.gov.br/wp-content/uploads/2024/10/42.jpg', categoria_id: 'policiais' },
+      { id: 'gm', nome: 'Guarda Municipal', icone: '🏛️', capa: 'https://boavista.rr.gov.br/storage/Noticias/2023/ABRIL/gcm.jpg', categoria_id: 'policiais' },
+      { id: 'receita_federal', nome: 'Receita Federal', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=RFB', categoria_id: 'fiscais' },
+      { id: 'sefaz', nome: 'SEFAZ', icone: '💰', capa: 'https://via.placeholder.com/300x450?text=SEFAZ', categoria_id: 'fiscais' },
+      { id: 'tj_sp', nome: 'TJ SP', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TJSP', categoria_id: 'tribunais' },
+      { id: 'trt', nome: 'TRT', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=TRT', categoria_id: 'tribunais' },
+      { id: 'stf', nome: 'STF', icone: '⚖️', capa: 'https://via.placeholder.com/300x450?text=STF', categoria_id: 'tribunais' },
+    ];
 
-      alert('✅ Todos os dados sincronizados com sucesso!');
+    try {
+      const { error: catErr } = await supabase.from('categorias').upsert(categoriasPadrao);
+      if (catErr) throw catErr;
+
+      const { error: carErr } = await supabase.from('carreiras').upsert(carreirasPadrao);
+      if (carErr) throw carErr;
+
+      setCategorias(categoriasPadrao);
+      setCarreiras(carreirasPadrao.map((c) => ({ ...c, categoriaId: c.categoria_id })));
+
+      alert('✅ Dados padrão gravados no Supabase!');
+      window.location.reload();
+    } catch (err) {
+      console.error('[Admin] Erro ao gravar dados padrão:', err);
+      alert(`❌ Erro: ${err.message}`);
     }
   };
 
@@ -1198,7 +1194,7 @@ function AdminPage() {
           <button onClick={() => setIsDarkMode(!isDarkMode)} style={{padding: '8px 16px', borderRadius: '8px', backgroundColor: isDarkMode ? '#333' : '#E0E0E0', border: 'none', color: isDarkMode ? '#FFF' : '#333', cursor: 'pointer'}}>
             {isDarkMode ? '☀️ Modo Claro' : '🌙 Modo Escuro'}
           </button>
-          <button onClick={importarDados} style={{...styles.saveButtonSmall, backgroundColor: '#FF9800', padding: '8px 16px'}}>⬇ Sincronizar com a Home</button>
+          <button onClick={seedDadosPadrao} style={{...styles.saveButtonSmall, backgroundColor: '#FF9800', padding: '8px 16px'}}>⬇ Inicializar dados padrão</button>
           <button onClick={salvarTudo} style={{...styles.saveButtonSmall, padding: '8px 16px'}}>💾 Salvar Tudo</button>
         </div>
       </header>
