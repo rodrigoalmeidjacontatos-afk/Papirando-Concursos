@@ -73,7 +73,8 @@ function AulaPage() {
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const hasResumedRef = useRef(false);
   const lastSaveTimeRef = useRef(0);
-
+  const unmountSaveRef = useRef({ tempo: 0, duracao: 0, aulaId: null, userId: null });
+  
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
   
@@ -96,6 +97,29 @@ function AulaPage() {
   }, [aulaId, videoId]);
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+  // Mantém os dados atualizados na ref para o momento em que o componente for desmontado ou a aula mudar
+  useEffect(() => {
+    unmountSaveRef.current = { tempo: tempoAtual, duracao: duracao, aulaId: aulaId, userId: user?.id };
+  }, [tempoAtual, duracao, aulaId, user]);
+
+  // Salva o progresso no banco de dados automaticamente caso o usuário saia da página ou troque de aula
+  useEffect(() => {
+    const currentAulaId = aulaId;
+    return () => {
+      const state = unmountSaveRef.current;
+      if (state.aulaId === currentAulaId && state.tempo > 0 && state.userId && state.duracao > 0) {
+        const isConcluida = state.tempo > (state.duracao * 0.9);
+        supabase.from('progresso').upsert({
+          user_id: state.userId,
+          aula_id: state.aulaId,
+          tempo_assistido: Math.floor(state.tempo),
+          concluida: isConcluida,
+          ultimo_acesso: new Date()
+        }, { onConflict: 'user_id,aula_id' }).then(() => {});
+      }
+    };
+  }, [aulaId]);
 
   // Pegar usuário logado e monitorar sessão com alta persistência
   useEffect(() => {

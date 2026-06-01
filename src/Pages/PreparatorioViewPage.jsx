@@ -172,8 +172,7 @@ function PreparatorioViewPage() {
           const { data: progressoData } = await supabase
             .from('progresso')
             .select('aula_id, tempo_assistido, concluida')
-            .eq('user_id', currentUser.id)
-            .in('aula_id', aulasFinal.map(a => a.id));
+            .eq('user_id', currentUser.id);
 
           if (progressoData) {
             progressoData.forEach(p => {
