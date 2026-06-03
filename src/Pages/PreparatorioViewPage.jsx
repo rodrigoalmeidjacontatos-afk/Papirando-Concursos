@@ -463,6 +463,7 @@ function PreparatorioViewPage() {
           </div>
         )}
 
+        {/*
         {continuarItem && (planoUsuario !== 'basico' || isAdmin) && (
           <ContinuarEstudandoHero
             item={continuarItem}
@@ -474,6 +475,7 @@ function PreparatorioViewPage() {
             }}
           />
         )}
+        */}
 
         {disciplinasFiltradas.map(disciplina => {
           const isDisciplinaExpanded = disciplinasExpandidas[disciplina.id] || false;
