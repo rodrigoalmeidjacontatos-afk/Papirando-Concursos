@@ -696,8 +696,17 @@ function AulaPage() {
     }, 1000);
   };
 
+  // ─── Ref para manter a referência atualizada do videoId dentro dos callbacks do player ───
+  const videoIdRef = useRef(videoId);
+  useEffect(() => { videoIdRef.current = videoId; }, [videoId]);
+
+  // ─── INICIALIZAÇÃO DO PLAYER ───
+  const playerInitializedRef = useRef(false);
+
   useEffect(() => {
-    // Carregar a API do YouTube se ainda não estiver carregada
+    // Só inicializa se tivermos um videoId e ainda não tiver sido inicializado
+    if (!videoId || playerInitializedRef.current) return;
+
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
@@ -705,17 +714,16 @@ function AulaPage() {
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
-    const initPlayer = () => {
-      if (!videoId) return; 
-      
+    const criarPlayer = () => {
       const targetEl = isIOS ? iosIframeRef.current : playerRef.current;
       if (!targetEl) return;
 
       setPlayerReady(false);
       stopProgressTracking();
-      
-      if (player) {
-        try { player.destroy(); } catch (e) {}
+
+      if (playerInstanceRef.current) {
+        try { playerInstanceRef.current.destroy(); } catch (e) {}
+        playerInstanceRef.current = null;
       }
 
       const config = {
@@ -725,8 +733,7 @@ function AulaPage() {
             const videoDur = event.target.getDuration();
             setDuracao(videoDur);
             if (videoDur > 0) duracaoRef.current = videoDur;
-            
-            // Salvar duração no banco se ainda não tiver (para aparecer na barra lateral depois)
+
             if (aulaId && (!aulaPlaying?.duracao)) {
               supabase
                 .from('aulas')
@@ -734,13 +741,11 @@ function AulaPage() {
                 .eq('id', aulaId)
                 .then(({ error }) => {
                   if (!error) {
-                    // Atualiza a lista local para refletir na barra lateral imediatamente
                     setListaAulas(prev => prev.map(a => a.id === aulaId ? { ...a, duracao: videoDur } : a));
                   }
                 });
             }
 
-            // Se o tempo atual for > 0 (progresso), seek logo no início
             if (tempoAtual > 0) {
               event.target.seekTo(tempoAtual, true);
               hasResumedRef.current = true;
@@ -780,7 +785,7 @@ function AulaPage() {
       };
 
       if (!isIOS) {
-        config.videoId = videoId;
+        config.videoId = videoIdRef.current;
         config.host = 'https://www.youtube-nocookie.com';
         config.playerVars = {
           controls: 0,
@@ -800,24 +805,70 @@ function AulaPage() {
       const newPlayer = new window.YT.Player(targetEl, config);
       setPlayer(newPlayer);
       playerInstanceRef.current = newPlayer;
+      playerInitializedRef.current = true;
     };
 
-    if (videoId) {
-      if (window.YT && window.YT.Player) {
-        initPlayer();
-      } else {
-        window.onYouTubeIframeAPIReady = initPlayer;
+    const tryInit = () => {
+      if (videoIdRef.current) {
+        criarPlayer();
       }
+    };
+
+    if (window.YT && window.YT.Player) {
+      tryInit();
+    } else {
+      window.onYouTubeIframeAPIReady = tryInit;
     }
 
+    return () => {
+      // O cleanup original aqui causava problemas porque desmontava o player ao mudar o videoId (quando usávamos a dependência antiga).
+      // Como agora usamos playerInitializedRef, não vamos destruir o player no cleanup do effect a menos que o componente desmonte.
+    };
+  }, [videoId]); // Vai rodar quando o videoId chegar, inicializando 1 única vez thanks to playerInitializedRef
+
+  // Limpeza real na desmontagem do componente
+  useEffect(() => {
     return () => {
       stopProgressTracking();
       if (playerInstanceRef.current) {
         try { playerInstanceRef.current.destroy(); } catch (e) {}
         playerInstanceRef.current = null;
       }
+      setPlayer(null);
+      setPlayerReady(false);
+      playerInitializedRef.current = false;
     };
-  }, [videoId === null]); // Só inicializa na primeira vez que o videoId deixa de ser null
+  }, []);
+
+  // ─── TROCA DE VÍDEO: quando videoId muda, carrega o novo vídeo no player existente ───
+  const prevVideoIdRef = useRef(null);
+  useEffect(() => {
+    if (!videoId) return;
+    // Ignora na primeira renderização (o init já cuida disso)
+    if (prevVideoIdRef.current === null) {
+      prevVideoIdRef.current = videoId;
+      return;
+    }
+    if (prevVideoIdRef.current === videoId) return;
+    prevVideoIdRef.current = videoId;
+
+    // Reseta estados de duração/tempo para o novo vídeo
+    setTempoAtual(0);
+    setDuracao(0);
+    duracaoRef.current = 0;
+    hasResumedRef.current = false;
+    stopProgressTracking();
+
+    const inst = playerInstanceRef.current;
+    if (inst && typeof inst.loadVideoById === 'function') {
+      try {
+        inst.loadVideoById(videoId);
+        setIsPlaying(true);
+      } catch (e) {
+        console.error('[AulaPage] Erro ao trocar vídeo via loadVideoById:', e);
+      }
+    }
+  }, [videoId]);
 
   // Efeito para esconder os controles do iOS automaticamente quando está tocando
   useEffect(() => {
@@ -875,15 +926,6 @@ function AulaPage() {
     }
   };
   
-  // Efeito para trocar de vídeo sem destruir o player (mais rápido)
-  useEffect(() => {
-    if (player && playerReady && videoId && typeof player.loadVideoById === 'function') {
-      player.loadVideoById(videoId);
-      setIsPlaying(true);
-    }
-  }, [videoId, player, playerReady]);
-
-
   // Aplicar volume quando o player estiver pronto
   useEffect(() => {
     if (player && playerReady && typeof player.setVolume === 'function') {

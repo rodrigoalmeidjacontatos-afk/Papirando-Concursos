@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import './Home.css';
 
 function Home() {
   const navigate = useNavigate();
@@ -273,19 +274,38 @@ function Home() {
         let categoriasSupabase = [];
         let carreirasSupabase = [];
 
+        // 1. Tentar carregar do cache da sessão (instantâneo)
+        const cacheCat = sessionStorage.getItem('papirando_cats');
+        const cacheCar = sessionStorage.getItem('papirando_cars');
+        let usouCache = false;
+
+        if (cacheCat && cacheCar) {
+          try {
+            const parsedCat = JSON.parse(cacheCat);
+            const parsedCar = JSON.parse(cacheCar);
+            if (parsedCat.length > 0) {
+              processarCategorias(parsedCat, parsedCar);
+              usouCache = true;
+            }
+          } catch (e) { console.warn('Erro ao ler cache:', e); }
+        }
+
+        // 2. Buscar atualizado em segundo plano
         try {
           const resCat = await withTimeout(supabase.from('categorias').select('*'), 5000);
           categoriasSupabase = resCat.data || [];
+          if (categoriasSupabase.length > 0) sessionStorage.setItem('papirando_cats', JSON.stringify(categoriasSupabase));
         } catch (e) { console.warn('Timeout categorias', e); }
 
         try {
           const resCar = await withTimeout(supabase.from('carreiras').select('*'), 5000);
           carreirasSupabase = resCar.data || [];
+          if (carreirasSupabase.length > 0) sessionStorage.setItem('papirando_cars', JSON.stringify(carreirasSupabase));
         } catch (e) { console.warn('Timeout carreiras', e); }
 
         if (categoriasSupabase.length > 0) {
           processarCategorias(categoriasSupabase, carreirasSupabase);
-        } else {
+        } else if (!usouCache) {
           setCategorias([{ id: 'emergencia', nome: '⚠️ Erro de Conexão - Verifique sua internet', cursos: [] }]);
         }
 
@@ -731,9 +751,9 @@ function Home() {
         </div>
       </div>
 
-      <main style={styles.main}>
+      <main style={styles.main} className="main-content">
         {/* NAVEGAÇÃO DE TABS DA HOME */}
-        <div style={{
+        <div className="tab-container" style={{
           display: 'flex',
           gap: '15px',
           borderBottom: '1px solid #1c1c1f',
@@ -956,7 +976,7 @@ function Home() {
                         pointerEvents: bloqueado ? 'none' : 'auto',
                         userSelect: bloqueado ? 'none' : 'auto',
                       }}>
-                        <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft}>‹</button>
+                        <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft} className="scroll-btn-left">‹</button>
                         <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
                           {categoria.cursos.map((curso, idx) => (
                             <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
@@ -1000,7 +1020,7 @@ function Home() {
                             </div>
                           ))}
                         </div>
-                        <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight}>›</button>
+                        <button onClick={() => scrollHorizontal(categoria.id, 'right')} style={styles.scrollButtonRight} className="scroll-btn-right">›</button>
                       </div>
                     </div>
 
@@ -1103,7 +1123,7 @@ function Home() {
             </h2>
 
             {/* Grid de Cards de Estatísticas */}
-            <div style={{
+            <div className="stats-grid" style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               gap: '20px',
@@ -1449,7 +1469,8 @@ const styles = {
     color: '#fff',
     marginBottom: '30px',
     fontWeight: 'bold',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    wordBreak: 'break-word'
   },
   heroSubtitle: {
     fontSize: '25px',
@@ -1495,7 +1516,8 @@ const styles = {
     padding: '20px 40px',
     marginTop: '-80px',
     position: 'relative',
-    zIndex: 1
+    zIndex: 1,
+    overflowX: 'hidden'
   },
   category: {
     marginBottom: '40px'

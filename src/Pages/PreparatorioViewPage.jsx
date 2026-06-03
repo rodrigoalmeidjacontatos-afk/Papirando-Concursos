@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import ContinuarEstudandoHero from '../components/ContinuarEstudandoHero';
+import { formatarUltimoAcesso, indiceAulaNoModulo, rotuloNumeroAula } from '../utils/aulaDuracao';
 
 function PreparatorioViewPage() {
   const { carreiraId, preparatorioId } = useParams();
@@ -171,7 +173,7 @@ function PreparatorioViewPage() {
         if (currentUser && aulasFinal.length > 0) {
           const { data: progressoData } = await supabase
             .from('progresso')
-            .select('aula_id, tempo_assistido, concluida')
+            .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
             .eq('user_id', currentUser.id);
 
           if (progressoData) {
@@ -240,12 +242,130 @@ function PreparatorioViewPage() {
     return <span style={{fontSize: '24px'}}>{iconStr}</span>;
   };
 
+  const disciplinasFiltradas = useMemo(
+    () => disciplinas
+      .filter((d) => modulos.some((m) => (m.disciplina_id || m.disciplinaId) === d.id))
+      .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))),
+    [disciplinas, modulos]
+  );
+
+  const statsPorDisciplina = useMemo(() => {
+    const map = {};
+    disciplinasFiltradas.forEach((disc) => {
+      const mods = getModulosDaDisciplina(disc.id);
+      const todasAulas = mods.flatMap((m) => getAulasDoModulo(m.id));
+      const total = todasAulas.length;
+      const concluidas = todasAulas.filter((a) => progressoAulas[a.id]?.concluida).length;
+      const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+      let ultimoAcesso = null;
+      let aulaEmProgresso = null;
+      todasAulas.forEach((aulaItem) => {
+        const prog = progressoAulas[aulaItem.id];
+        if (!prog) return;
+        if (prog.ultimo_acesso) {
+          if (!ultimoAcesso || new Date(prog.ultimo_acesso) > new Date(ultimoAcesso)) {
+            ultimoAcesso = prog.ultimo_acesso;
+          }
+        }
+        if (prog.concluida) return;
+        const mod = mods.find((m) => m.id === (aulaItem.modulo_id || aulaItem.moduloId));
+        const aulasMod = mod ? getAulasDoModulo(mod.id) : [];
+        const indice = indiceAulaNoModulo(aulaItem, aulasMod);
+        const candidato = {
+          titulo: aulaItem.titulo,
+          indice,
+          ultimo_acesso: prog.ultimo_acesso,
+          tempo: prog.tempo_assistido,
+        };
+        if (!aulaEmProgresso) {
+          aulaEmProgresso = candidato;
+        } else if (prog.ultimo_acesso) {
+          const ant = aulaEmProgresso.ultimo_acesso ? new Date(aulaEmProgresso.ultimo_acesso) : 0;
+          if (new Date(prog.ultimo_acesso) > ant) aulaEmProgresso = candidato;
+        }
+      });
+
+      map[disc.id] = {
+        pct,
+        totalModulos: mods.length,
+        totalAulas: total,
+        ultimoAcesso,
+        aulaEmProgresso,
+      };
+    });
+    return map;
+  }, [disciplinasFiltradas, progressoAulas, modulos, aulas]);
+
+  const continuarItem = useMemo(() => {
+    if (!aulas.length) return null;
+
+    const montarItem = (aula, progressoReg) => {
+      if (!aula) return null;
+      const modulo = modulos.find((m) => m.id === (aula.modulo_id || aula.moduloId));
+      const disciplina = disciplinas.find((d) => d.id === (modulo?.disciplina_id || modulo?.disciplinaId));
+      if (!modulo || !disciplina) return null;
+      const aulasMod = aulas
+        .filter((a) => (a.modulo_id || a.moduloId) === modulo.id)
+        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+      return {
+        aula,
+        modulo,
+        disciplina,
+        progresso: progressoReg || null,
+        indiceAula: indiceAulaNoModulo(aula, aulasMod),
+        totalAulasModulo: aulasMod.length,
+      };
+    };
+
+    const idsPrep = new Set(aulas.map((a) => a.id));
+    const lista = Object.entries(progressoAulas)
+      .filter(([aid]) => idsPrep.has(aid))
+      .map(([aid, prog]) => ({ aula_id: aid, ...prog }))
+      .sort((a, b) => {
+        const ta = a.ultimo_acesso ? new Date(a.ultimo_acesso).getTime() : 0;
+        const tb = b.ultimo_acesso ? new Date(b.ultimo_acesso).getTime() : 0;
+        return tb - ta;
+      });
+
+    if (lista.length > 0) {
+      const escolhido = lista.find((p) => !p.concluida) || lista[0];
+      const aula = aulas.find((a) => a.id === escolhido.aula_id);
+      return montarItem(aula, escolhido);
+    }
+
+    const discsOrdenadas = [...disciplinas].sort(
+      (a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))
+    );
+    for (const disc of discsOrdenadas) {
+      const mods = modulos
+        .filter((m) => (m.disciplina_id || m.disciplinaId) === disc.id)
+        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+      for (const mod of mods) {
+        const aulasMod = aulas
+          .filter((a) => (a.modulo_id || a.moduloId) === mod.id)
+          .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+        const emAndamento = aulasMod.find((a) => {
+          const p = progressoAulas[a.id];
+          return p && !p.concluida;
+        });
+        const escolhida = emAndamento || aulasMod[0];
+        if (escolhida) {
+          return montarItem(escolhida, progressoAulas[escolhida.id] || null);
+        }
+      }
+    }
+    return null;
+  }, [aulas, modulos, disciplinas, progressoAulas]);
+
+  const irParaAula = (aula, mod, disc) => {
+    if (!aula || !mod || !disc) return;
+    navigate(`/aula/${carreiraId}/${preparatorioId}/${disc.id}/${mod.id}/${aula.id}`);
+  };
+
   if (carregando || planoUsuario === 'carregando') return <LoadingScreen text="Verificando seu acesso..." />;
   if (erro) return <div style={styles.loading}>Erro: {erro}</div>;
   if (!preparatorio) return <LoadingScreen />;
-
-  // Filtrar disciplinas que possuem módulos permitidos
-  const disciplinasFiltradas = disciplinas.filter(d => getModulosDaDisciplina(d.id).length > 0).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
 
   // Imagem de fundo fixa (soldado SWAT - Pinterest)
   const bgImage = '/images/bg-swat.jpg';
@@ -343,9 +463,23 @@ function PreparatorioViewPage() {
           </div>
         )}
 
+        {continuarItem && (planoUsuario !== 'basico' || isAdmin) && (
+          <ContinuarEstudandoHero
+            item={continuarItem}
+            preparatorio={preparatorio}
+            onContinuar={() => irParaAula(continuarItem.aula, continuarItem.modulo, continuarItem.disciplina)}
+            onVerHistorico={() => {
+              const discId = continuarItem.disciplina?.id;
+              if (discId) setDisciplinasExpandidas((prev) => ({ ...prev, [discId]: true }));
+            }}
+          />
+        )}
+
         {disciplinasFiltradas.map(disciplina => {
           const isDisciplinaExpanded = disciplinasExpandidas[disciplina.id] || false;
-          const totalAulas = getModulosDaDisciplina(disciplina.id).reduce(
+          const stats = statsPorDisciplina[disciplina.id] || {};
+          const totalModulos = stats.totalModulos ?? getModulosDaDisciplina(disciplina.id).length;
+          const totalAulas = stats.totalAulas ?? getModulosDaDisciplina(disciplina.id).reduce(
             (acc, m) => acc + getAulasDoModulo(m.id).length, 0
           );
           const discTemNovidades = getModulosDaDisciplina(disciplina.id).some(
@@ -353,45 +487,63 @@ function PreparatorioViewPage() {
           );
           return (
             <div key={disciplina.id} style={styles.disciplinaCard}>
-              {/* Header clicável da disciplina */}
               <div
                 style={{
                   ...styles.disciplinaHeader,
                   cursor: 'pointer',
                   userSelect: 'none',
-                  transition: 'background-color 0.2s'
+                  transition: 'background-color 0.2s',
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  gap: '10px',
                 }}
                 onClick={() => toggleDisciplina(disciplina.id)}
               >
-                <span style={styles.disciplinaIcon}>{disciplina.icone}</span>
-                <h2 style={{...styles.disciplinaTitle, flex: 1, display: 'flex', alignItems: 'center'}}>
-                  {disciplina.nome}
-                  {discTemNovidades && (
-                    <span style={{
-                      backgroundColor: 'rgba(229, 9, 20, 0.15)',
-                      color: '#E50914',
-                      border: '1px solid #E50914',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      marginLeft: '12px',
-                      letterSpacing: '0.5px'
-                    }}>
-                      ⚡ NOVO CONTEÚDO
-                    </span>
-                  )}
-                </h2>
-                <span style={{ color: '#888', fontSize: '12px', marginRight: '12px' }}>
-                  {getModulosDaDisciplina(disciplina.id).length} módulos · {totalAulas} aulas
-                </span>
-                <span style={{
-                  color: '#AAA',
-                  fontSize: '18px',
-                  transition: 'transform 0.3s',
-                  transform: isDisciplinaExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  display: 'inline-block'
-                }}>▾</span>
+                <div style={styles.disciplinaHeaderRow}>
+                  <span style={styles.disciplinaIcon}>{disciplina.icone}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{ ...styles.disciplinaTitle, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', margin: 0 }}>
+                      {disciplina.nome}
+                      {discTemNovidades && (
+                        <span style={{
+                          backgroundColor: 'rgba(229, 9, 20, 0.15)',
+                          color: '#E50914',
+                          border: '1px solid #E50914',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          letterSpacing: '0.5px',
+                        }}>
+                          ⚡ NOVO CONTEÚDO
+                        </span>
+                      )}
+                    </h2>
+                    {stats.aulaEmProgresso && (
+                      <p style={styles.disciplinaContinuar}>
+                        Parou na {rotuloNumeroAula(stats.aulaEmProgresso.indice)}: {stats.aulaEmProgresso.titulo}
+                      </p>
+                    )}
+                    <p style={styles.disciplinaMeta}>
+                      {totalModulos} módulos · {totalAulas} aulas
+                      {stats.ultimoAcesso ? ` · ${formatarUltimoAcesso(stats.ultimoAcesso)}` : ''}
+                    </p>
+                  </div>
+                  <div style={styles.disciplinaProgressCol}>
+                    <span style={styles.disciplinaPct}>{stats.pct || 0}%</span>
+                    <div style={styles.disciplinaProgressTrack}>
+                      <div style={{ ...styles.disciplinaProgressFill, width: `${stats.pct || 0}%` }} />
+                    </div>
+                  </div>
+                  <span style={{
+                    color: '#AAA',
+                    fontSize: '18px',
+                    transition: 'transform 0.3s',
+                    transform: isDisciplinaExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block',
+                    alignSelf: 'center',
+                  }}>▾</span>
+                </div>
               </div>
 
               {/* Conteúdo colapsável */}
@@ -558,11 +710,18 @@ const styles = {
   },
   backButton: { padding: '8px 20px', backgroundColor: '#333', border: 'none', color: '#F5F5F5', borderRadius: '8px', cursor: 'pointer' },
   title: { color: '#F5F5F5', fontSize: '24px', margin: 0 },
-  main: { maxWidth: '1000px', margin: '0 auto', padding: '48px 20px' },
+  main: { maxWidth: '1100px', margin: '0 auto', padding: '48px 20px' },
   disciplinaCard: { backgroundColor: '#1A1A1A', borderRadius: '16px', marginBottom: '24px', overflow: 'hidden', border: '1px solid #333' },
-  disciplinaHeader: { display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 24px', backgroundColor: '#222', borderBottom: '1px solid #333' },
-  disciplinaIcon: { fontSize: '28px' },
-  disciplinaTitle: { color: '#F5F5F5', fontSize: '20px', fontWeight: 'bold', margin: 0 },
+  disciplinaHeader: { padding: '20px 24px', backgroundColor: '#222', borderBottom: '1px solid #333' },
+  disciplinaHeaderRow: { display: 'flex', alignItems: 'flex-start', gap: '14px' },
+  disciplinaIcon: { fontSize: '28px', flexShrink: 0 },
+  disciplinaTitle: { color: '#F5F5F5', fontSize: '20px', fontWeight: 'bold' },
+  disciplinaContinuar: { margin: '6px 0 0', fontSize: '12px', color: '#AAA', fontWeight: '600' },
+  disciplinaMeta: { margin: '4px 0 0', fontSize: '12px', color: '#888' },
+  disciplinaProgressCol: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', minWidth: '88px', flexShrink: 0 },
+  disciplinaPct: { fontSize: '13px', fontWeight: '800', color: '#F5F5F5' },
+  disciplinaProgressTrack: { width: '88px', height: '6px', background: '#2A2A2A', borderRadius: '3px', overflow: 'hidden' },
+  disciplinaProgressFill: { height: '100%', background: '#E50914', borderRadius: '3px', transition: 'width 0.3s' },
   moduloContainer: { borderBottom: '1px solid #2A2A2A' },
   moduloHeader: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 24px', cursor: 'pointer', backgroundColor: '#1A1A1A' },
   moduloIcon: { fontSize: '20px' },

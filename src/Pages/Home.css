@@ -1,0 +1,175 @@
+/* =============================================
+   HOME PAGE – RESPONSIVE STYLES
+   Breakpoints:
+     mobile  : max-width 480px
+     tablet  : max-width 768px
+     desktop : default (inline styles)
+   ============================================= */
+
+/* ---- HEADER CONTENT ---- */
+.header-content {
+  padding: 0 20px !important;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ---- HERO ---- */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 42px !important;
+    white-space: normal !important;
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  .hero-subtitle {
+    font-size: 14px !important;
+    letter-spacing: 1px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 26px !important;
+  }
+
+  .hero-subtitle {
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+  }
+}
+
+/* ---- NAV ---- */
+@media (max-width: 768px) {
+  .nav-area {
+    display: none !important;
+  }
+}
+
+/* ---- LOGO ---- */
+@media (max-width: 480px) {
+  .logo-area h1 {
+    font-size: 22px !important;
+    letter-spacing: 2px !important;
+  }
+
+  .logo-area img {
+    width: 35px !important;
+    height: 35px !important;
+  }
+}
+
+/* ---- MAIN CONTENT ---- */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px 12px !important;
+    margin-top: -40px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 10px 8px !important;
+    margin-top: -30px !important;
+  }
+}
+
+/* ---- TAB BUTTONS ---- */
+.tab-container {
+  flex-wrap: wrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-container::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .tab-container {
+    gap: 8px !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 20px !important;
+  }
+}
+
+/* ---- CONTINUE ASSISTINDO GRID ---- */
+@media (max-width: 600px) {
+  /* Force single column for very small screens */
+  .continue-assistindo-card {
+    min-width: 0 !important;
+  }
+}
+
+/* ---- CARROSSEL DE CURSOS ---- */
+/* Esconde botões de scroll nos carrosseis em touch */
+@media (max-width: 768px) {
+  .scroll-btn-left,
+  .scroll-btn-right {
+    display: none !important;
+  }
+}
+
+/* ---- STATS GRID ---- */
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---- CARD HOVER (animação de escala) ---- */
+.card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+.card-hover:hover {
+  transform: scale(1.04);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Em touch, desabilita hover de escala */
+@media (hover: none) {
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
+/* ---- FOOTER ---- */
+@media (max-width: 768px) {
+  .footer-links {
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: center;
+  }
+}
+
+/* ---- MODAL ---- */
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 24px 16px !important;
+    margin: 0 12px !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+}
+
+/* ---- BLOQUEIO OVERLAY (ajuste mobile) ---- */
+@media (max-width: 480px) {
+  /* Overlay de bloqueio de categoria */
+  .overlay-block-box {
+    padding: 24px 20px !important;
+  }
+}
+
+/* ---- USER AREA (simplifica em mobile) ---- */
+@media (max-width: 480px) {
+  .user-area {
+    gap: 6px !important;
+  }
+}
