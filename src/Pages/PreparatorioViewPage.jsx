@@ -493,17 +493,7 @@ function PreparatorioViewPage() {
           </div>
         )}
 
-        {continuarItem && (planoUsuario !== 'basico' || isAdmin) && (
-          <ContinuarEstudandoHero
-            item={continuarItem}
-            preparatorio={preparatorio}
-            onContinuar={() => irParaAula(continuarItem.aula, continuarItem.modulo, continuarItem.disciplina)}
-            onVerHistorico={() => {
-              const discId = continuarItem.disciplina?.id;
-              if (discId) setDisciplinasExpandidas((prev) => ({ ...prev, [discId]: true }));
-            }}
-          />
-        )}
+
 
         {disciplinasFiltradas.map(disciplina => {
           const isDisciplinaExpanded = disciplinasExpandidas[disciplina.id] || false;
