@@ -328,16 +328,46 @@ function PreparatorioViewPage() {
         return tb - ta;
       });
 
-    if (lista.length > 0) {
-      const escolhido = lista.find((p) => !p.concluida) || lista[0];
-      const aula = aulas.find((a) => a.id === escolhido.aula_id);
-      return montarItem(aula, escolhido);
-    }
-
+    // Criar o currículo linear e totalmente ordenado para conseguir encontrar a 'próxima' aula
+    const aulasCurriculo = [];
     const discsOrdenadas = [...disciplinas].sort(
       (a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))
     );
     for (const disc of discsOrdenadas) {
+      const mods = modulos
+        .filter((m) => (m.disciplina_id || m.disciplinaId) === disc.id)
+        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+      for (const mod of mods) {
+        const aulasMod = aulas
+          .filter((a) => (a.modulo_id || a.moduloId) === mod.id)
+          .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+        aulasCurriculo.push(...aulasMod);
+      }
+    }
+
+    if (lista.length > 0) {
+      const maisRecente = lista[0];
+      
+      // Se a última aula que o usuário acessou já está concluída, sugere a PRÓXIMA
+      if (maisRecente.concluida) {
+        const idx = aulasCurriculo.findIndex(a => a.id === maisRecente.aula_id);
+        if (idx >= 0 && idx < aulasCurriculo.length - 1) {
+          const proximaAula = aulasCurriculo[idx + 1];
+          const proximoProgresso = progressoAulas[proximaAula.id] || null;
+          return montarItem(proximaAula, proximoProgresso);
+        }
+      }
+      
+      // Caso contrário (ainda em andamento ou última aula do curso), continua de onde parou
+      const escolhido = lista.find((p) => !p.concluida) || maisRecente;
+      const aula = aulas.find((a) => a.id === escolhido.aula_id);
+      return montarItem(aula, escolhido);
+    }
+
+    const fallbackDiscsOrdenadas = [...disciplinas].sort(
+      (a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))
+    );
+    for (const disc of fallbackDiscsOrdenadas) {
       const mods = modulos
         .filter((m) => (m.disciplina_id || m.disciplinaId) === disc.id)
         .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
@@ -463,7 +493,6 @@ function PreparatorioViewPage() {
           </div>
         )}
 
-        {/*
         {continuarItem && (planoUsuario !== 'basico' || isAdmin) && (
           <ContinuarEstudandoHero
             item={continuarItem}
@@ -475,7 +504,6 @@ function PreparatorioViewPage() {
             }}
           />
         )}
-        */}
 
         {disciplinasFiltradas.map(disciplina => {
           const isDisciplinaExpanded = disciplinasExpandidas[disciplina.id] || false;

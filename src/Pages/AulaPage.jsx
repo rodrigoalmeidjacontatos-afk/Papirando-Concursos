@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
@@ -72,9 +72,11 @@ function AulaPage() {
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const hasResumedRef = useRef(false);
+  const seekTimePendenteRef = useRef(0);
   const lastSaveTimeRef = useRef(0);
   const duracaoRef = useRef(0);
   const unmountSaveRef = useRef({ tempo: 0, duracao: 0, aulaId: null, userId: null });
+  const velocidadeRef = useRef(1); // Ref para manter velocidade atualizada nos callbacks do player
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -471,7 +473,11 @@ function AulaPage() {
               if (player && playerReady) {
                 player.seekTo(seekTime, true);
                 hasResumedRef.current = true;
+              } else {
+                seekTimePendenteRef.current = seekTime;
               }
+            } else {
+               hasResumedRef.current = true;
             }
           }
         }
@@ -550,6 +556,11 @@ function AulaPage() {
   // Salvar progresso no Supabase
   const salvarProgresso = async (tempo, forceSave = false, marcarConcluida = false) => {
     if (!user || !temAcesso) return;
+    
+    // Evita sobrescrever o histórico com 0:00 se a aula ainda está aguardando para pular pro minuto certo
+    if (!hasResumedRef.current && tempo < 5 && !marcarConcluida) {
+      return;
+    }
 
     const durEfetiva = Math.max(
       duracaoRef.current || 0,
@@ -746,9 +757,11 @@ function AulaPage() {
                 });
             }
 
-            if (tempoAtual > 0) {
-              event.target.seekTo(tempoAtual, true);
+            if (seekTimePendenteRef.current > 0) {
+              event.target.seekTo(seekTimePendenteRef.current, true);
+              setTempoAtual(seekTimePendenteRef.current);
               hasResumedRef.current = true;
+              seekTimePendenteRef.current = 0;
             }
           },
           onStateChange: (event) => {
@@ -758,6 +771,10 @@ function AulaPage() {
               if (currentDur > 0 && duracaoRef.current === 0) {
                 setDuracao(currentDur);
                 duracaoRef.current = currentDur;
+              }
+              // Reaplicar velocidade caso o YouTube tenha resetado (ex: loadVideoById sempre reseta para 1x)
+              if (velocidadeRef.current !== 1 && typeof event.target.setPlaybackRate === 'function') {
+                try { event.target.setPlaybackRate(velocidadeRef.current); } catch (_) {}
               }
               startProgressTracking(event.target);
             } else {
@@ -857,6 +874,7 @@ function AulaPage() {
     setDuracao(0);
     duracaoRef.current = 0;
     hasResumedRef.current = false;
+    seekTimePendenteRef.current = 0;
     stopProgressTracking();
 
     const inst = playerInstanceRef.current;
@@ -864,11 +882,12 @@ function AulaPage() {
       try {
         inst.loadVideoById(videoId);
         setIsPlaying(true);
+        // Nota: a velocidade será reaplicada automaticamente pelo onStateChange=PLAYING via velocidadeRef
       } catch (e) {
         console.error('[AulaPage] Erro ao trocar vídeo via loadVideoById:', e);
       }
     }
-  }, [videoId]);
+  }, [videoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Efeito para esconder os controles do iOS automaticamente quando está tocando
   useEffect(() => {
@@ -1002,6 +1021,7 @@ function AulaPage() {
   };
 
   const mudarVelocidade = (novaVelocidade) => {
+    velocidadeRef.current = novaVelocidade; // mantém o ref atualizado para callbacks do player
     setVelocidade(novaVelocidade);
     if (player && typeof player.setPlaybackRate === 'function') {
       player.setPlaybackRate(novaVelocidade);
@@ -1019,33 +1039,45 @@ function AulaPage() {
   const temModuloAnterior = currentModuloIndex > 0;
   const temAnterior = temAnteriorNaMesmaLista || temModuloAnterior;
 
-  const irParaProximaAula = () => {
-    if (temProximaNaMesmaLista) {
-      const proxima = listaAulas[currentIndex + 1];
+  const irParaProximaAula = useCallback(() => {
+    const idx = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+    const modIdx = listaModulos.findIndex(m => String(m.id) === String(moduloId));
+    const temProxNaLista = idx !== -1 && idx < listaAulas.length - 1;
+    const temProxMod = modIdx !== -1 && modIdx < listaModulos.length - 1;
+
+    if (temProxNaLista) {
+      const proxima = listaAulas[idx + 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${proxima.id}`);
-    } else if (temProximoModulo) {
-      const proximoMod = listaModulos[currentModuloIndex + 1];
+    } else if (temProxMod) {
+      const proximoMod = listaModulos[modIdx + 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${proximoMod.id}/primeira_aula`);
     }
-  };
+  }, [listaAulas, listaModulos, aulaId, moduloId, carreiraId, preparatorioId, disciplinaId, navigate]);
 
-  const irParaAulaAnterior = () => {
-    if (temAnteriorNaMesmaLista) {
-      const anterior = listaAulas[currentIndex - 1];
+  const irParaAulaAnterior = useCallback(() => {
+    const idx = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+    const modIdx = listaModulos.findIndex(m => String(m.id) === String(moduloId));
+    const temAntNaLista = idx > 0;
+    const temAntMod = modIdx > 0;
+
+    if (temAntNaLista) {
+      const anterior = listaAulas[idx - 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${anterior.id}`);
-    } else if (temModuloAnterior) {
-      const modAnterior = listaModulos[currentModuloIndex - 1];
+    } else if (temAntMod) {
+      const modAnterior = listaModulos[modIdx - 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${modAnterior.id}/primeira_aula`);
     }
-  };
+  }, [listaAulas, listaModulos, aulaId, moduloId, carreiraId, preparatorioId, disciplinaId, navigate]);
 
   const irParaProximaAulaRef = useRef(irParaProximaAula);
   const irParaAulaAnteriorRef = useRef(irParaAulaAnterior);
 
+  // Sempre mantém os refs atualizados com a versão mais recente das funções
+  // (importante para o callback do player YouTube que captura o ref em closure)
   useEffect(() => {
     irParaProximaAulaRef.current = irParaProximaAula;
     irParaAulaAnteriorRef.current = irParaAulaAnterior;
-  }, [irParaProximaAula, irParaAulaAnterior]);
+  });
 
   useEffect(() => {
     const handleKeyDown = (e) => {
