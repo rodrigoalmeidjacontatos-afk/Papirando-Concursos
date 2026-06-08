@@ -786,16 +786,17 @@ function AulaPage() {
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
-                (async () => {
-                  if (marcarAulaComoAssistidaRef.current) {
-                    await marcarAulaComoAssistidaRef.current(event.target);
-                  }
-                  if (irParaProximaAulaRef.current) {
-                    irParaProximaAulaRef.current();
-                  }
-                })();
+                // Não bloquear a navegação esperando o salvamento no banco
+                if (marcarAulaComoAssistidaRef.current) {
+                  marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e));
+                }
+                
+                // Pular imediatamente para a próxima aula (gatilho)
+                if (irParaProximaAulaRef.current) {
+                  irParaProximaAulaRef.current();
+                }
+                stopProgressTracking();
               }
-              stopProgressTracking();
             }
           }
         }
@@ -924,12 +925,13 @@ function AulaPage() {
         }
       }
 
-      if (payload?.event === 'onStateChange' && payload.info === 0) {
-        (async () => {
-          if (marcarAulaComoAssistidaRef.current) {
-            await marcarAulaComoAssistidaRef.current(playerInstanceRef.current);
-          }
-        })();
+      if (payload?.event === 'onStateChange' && payload.info === 0) { // 0 = ENDED
+        if (marcarAulaComoAssistidaRef.current) {
+          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(e => console.error(e));
+        }
+        if (irParaProximaAulaRef.current) {
+          irParaProximaAulaRef.current();
+        }
       }
     };
 
