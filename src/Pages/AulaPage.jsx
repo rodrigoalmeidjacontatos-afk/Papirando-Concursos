@@ -1030,25 +1030,51 @@ function AulaPage() {
     }
   };
 
-  const currentIndex = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+  // Filtra apenas aulas do módulo atual para calcular navegação correta
+  // (listaAulas pode conter aulas de outro módulo quando o usuário navega pela barra lateral)
+  const aulasDoModuloAtual = listaAulas.filter(a => String(a.modulo_id || a.moduloId) === String(moduloId));
+  const currentIndex = aulasDoModuloAtual.findIndex(a => String(a.id) === String(aulaId));
   const currentModuloIndex = listaModulos.findIndex(m => String(m.id) === String(moduloId));
   
-  const temProximaNaMesmaLista = currentIndex !== -1 && currentIndex < listaAulas.length - 1;
+  // Se currentIndex === -1 significa que a lista local ainda não carregou as aulas do módulo correto.
+  // Nesse caso habilitamos os botões (a função async irá buscar do banco e navegar corretamente).
+  const listaLocalValida = currentIndex !== -1;
+  const temProximaNaMesmaLista = listaLocalValida && currentIndex < aulasDoModuloAtual.length - 1;
   const temProximoModulo = currentModuloIndex !== -1 && currentModuloIndex < listaModulos.length - 1;
-  const temProxima = temProximaNaMesmaLista || temProximoModulo;
+  const temProxima = temProximaNaMesmaLista || temProximoModulo || !listaLocalValida;
   
-  const temAnteriorNaMesmaLista = currentIndex > 0;
+  const temAnteriorNaMesmaLista = listaLocalValida && currentIndex > 0;
   const temModuloAnterior = currentModuloIndex > 0;
-  const temAnterior = temAnteriorNaMesmaLista || temModuloAnterior;
+  const temAnterior = temAnteriorNaMesmaLista || temModuloAnterior || (!listaLocalValida && currentModuloIndex > 0);
 
-  const irParaProximaAula = useCallback(() => {
-    const idx = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+  const irParaProximaAula = useCallback(async () => {
+    // Primeiro tenta usar a lista local (caso o browsing seja do módulo correto)
+    let aulasDoModulo = listaAulas.filter(a => String(a.modulo_id || a.moduloId) === String(moduloId));
+
+    // Se a lista local não pertence ao módulo atual (usuário estava navegando em outro módulo),
+    // busca diretamente do banco para garantir dados corretos
+    if (aulasDoModulo.length === 0 || !aulasDoModulo.find(a => String(a.id) === String(aulaId))) {
+      try {
+        const { data: aulasDB } = await supabase
+          .from('aulas')
+          .select('*')
+          .eq('modulo_id', moduloId)
+          .order('ordem', { ascending: true });
+        if (aulasDB && aulasDB.length > 0) {
+          aulasDoModulo = aulasDB.map(a => ({ ...a, moduloId: a.modulo_id, videoId: a.video_id }));
+        }
+      } catch (e) {
+        console.error('[irParaProximaAula] Erro ao buscar aulas do banco:', e);
+      }
+    }
+
+    const idx = aulasDoModulo.findIndex(a => String(a.id) === String(aulaId));
     const modIdx = listaModulos.findIndex(m => String(m.id) === String(moduloId));
-    const temProxNaLista = idx !== -1 && idx < listaAulas.length - 1;
+    const temProxNaLista = idx !== -1 && idx < aulasDoModulo.length - 1;
     const temProxMod = modIdx !== -1 && modIdx < listaModulos.length - 1;
 
     if (temProxNaLista) {
-      const proxima = listaAulas[idx + 1];
+      const proxima = aulasDoModulo[idx + 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${proxima.id}`);
     } else if (temProxMod) {
       const proximoMod = listaModulos[modIdx + 1];
@@ -1056,14 +1082,33 @@ function AulaPage() {
     }
   }, [listaAulas, listaModulos, aulaId, moduloId, carreiraId, preparatorioId, disciplinaId, navigate]);
 
-  const irParaAulaAnterior = useCallback(() => {
-    const idx = listaAulas.findIndex(a => String(a.id) === String(aulaId));
+  const irParaAulaAnterior = useCallback(async () => {
+    // Primeiro tenta usar a lista local (caso o browsing seja do módulo correto)
+    let aulasDoModulo = listaAulas.filter(a => String(a.modulo_id || a.moduloId) === String(moduloId));
+
+    // Se a lista local não pertence ao módulo atual, busca do banco
+    if (aulasDoModulo.length === 0 || !aulasDoModulo.find(a => String(a.id) === String(aulaId))) {
+      try {
+        const { data: aulasDB } = await supabase
+          .from('aulas')
+          .select('*')
+          .eq('modulo_id', moduloId)
+          .order('ordem', { ascending: true });
+        if (aulasDB && aulasDB.length > 0) {
+          aulasDoModulo = aulasDB.map(a => ({ ...a, moduloId: a.modulo_id, videoId: a.video_id }));
+        }
+      } catch (e) {
+        console.error('[irParaAulaAnterior] Erro ao buscar aulas do banco:', e);
+      }
+    }
+
+    const idx = aulasDoModulo.findIndex(a => String(a.id) === String(aulaId));
     const modIdx = listaModulos.findIndex(m => String(m.id) === String(moduloId));
     const temAntNaLista = idx > 0;
     const temAntMod = modIdx > 0;
 
     if (temAntNaLista) {
-      const anterior = listaAulas[idx - 1];
+      const anterior = aulasDoModulo[idx - 1];
       navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${anterior.id}`);
     } else if (temAntMod) {
       const modAnterior = listaModulos[modIdx - 1];
