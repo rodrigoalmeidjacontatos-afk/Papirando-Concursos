@@ -9,6 +9,7 @@ import AdminPage from './Pages/AdminPage';
 import LoginPage from './Pages/LoginPage';
 import PlanosPage from './Pages/PlanosPage';
 import DocumentosPage from './Pages/DocumentosPage';
+import QuestoesPage from './Pages/QuestoesPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/planos" element={<PlanosPage />} />
           <Route path="/documentos" element={<DocumentosPage />} />
+          <Route path="/questoes" element={<QuestoesPage />} />
         </Routes>
       </div>
     </Router>

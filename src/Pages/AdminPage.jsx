@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import AdminQuestoes from '../components/AdminQuestoes';
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -79,7 +80,8 @@ function AdminPage() {
   // ========== CONFIGURAÇÃO DE ABAS ==========
   const [configAbas, setConfigAbas] = useState({
     documentos: { ativo: true, plano: 'basico' },
-    evolucao: { ativo: true, plano: 'basico' }
+    evolucao: { ativo: true, plano: 'basico' },
+    questoes: { ativo: true, plano: 'basico' }
   });
 
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
@@ -1190,8 +1192,9 @@ function AdminPage() {
     { id: 'vincular', nome: '🔗 Vincular', icone: '🔗' },
     { id: 'documentos', nome: '📄 Documentos', icone: '📄' },
     { id: 'usuarios', nome: '👥 Usuários', icone: '👥' },
-    { id: 'metricas', nome: '📈 Indicadores', icone: '📈' },
+    { id: 'metricas', nome: '📊 Indicadores', icone: '📊' },
     { id: 'config_abas', nome: '⚙️ Abas do Site', icone: '⚙️' },
+    { id: 'questoes', nome: '📝 Banco de Questões', icone: '📝' },
   ];
 
   if (!authChecked) {
@@ -1244,6 +1247,7 @@ function AdminPage() {
                     <option value="basico">🟢 Básico</option>
                     <option value="medio">🔵 Médio</option>
                     <option value="premium">🟡 Premium</option>
+                    <option value="admin">🔴 Admin (Apenas Admins)</option>
                   </select>
                   <button style={styles.addButton} onClick={addCategoria}>Adicionar</button>
                 </div>
@@ -1264,6 +1268,7 @@ function AdminPage() {
                           <option value="basico">🟢 Básico</option>
                           <option value="medio">🔵 Médio</option>
                           <option value="premium">🟡 Premium</option>
+                          <option value="admin">🔴 Admin (Apenas Admins)</option>
                         </select>
                         <div style={{display: 'flex', gap: '8px'}}>
                           <button style={styles.saveButton} onClick={saveEditCategoria}>Salvar</button>
@@ -1333,6 +1338,7 @@ function AdminPage() {
                       <option value="basico">🟢 Básico (Todos)</option>
                       <option value="medio">🔵 Médio</option>
                       <option value="premium">🟡 Premium</option>
+                      <option value="admin">🔴 Admin (Apenas Admins)</option>
                     </select>
                   </div>
                 </div>
@@ -1361,6 +1367,36 @@ function AdminPage() {
                       <option value="basico">🟢 Básico (Todos)</option>
                       <option value="medio">🔵 Médio</option>
                       <option value="premium">🟡 Premium</option>
+                      <option value="admin">🔴 Admin (Apenas Admins)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{...styles.formCard, marginTop: '20px'}}>
+                <h3 style={{color: '#F5F5F5', marginBottom: '15px'}}>Aba: Questões</h3>
+                <div style={{display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap'}}>
+                  <label style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', cursor: 'pointer'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={configAbas.questoes?.ativo ?? true}
+                      onChange={e => setConfigAbas({...configAbas, questoes: {...configAbas.questoes, ativo: e.target.checked}})}
+                      style={{width: '18px', height: '18px'}}
+                    />
+                    Aba Ativa (Visível)
+                  </label>
+                  
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{color: '#AAA'}}>Plano Mínimo:</span>
+                    <select 
+                      style={styles.select}
+                      value={configAbas.questoes?.plano || 'basico'}
+                      onChange={e => setConfigAbas({...configAbas, questoes: {...configAbas.questoes, plano: e.target.value}})}
+                    >
+                      <option value="basico">🟢 Básico (Todos)</option>
+                      <option value="medio">🔵 Médio</option>
+                      <option value="premium">🟡 Premium</option>
+                      <option value="admin">🔴 Admin (Apenas Admins)</option>
                     </select>
                   </div>
                 </div>
@@ -1384,6 +1420,10 @@ function AdminPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {activeMenu === 'questoes' && (
+            <AdminQuestoes />
           )}
 
           {activeMenu === 'carreiras' && (
@@ -1641,6 +1681,7 @@ function AdminPage() {
                                                     <option value="basico">📘 Básico (livre)</option>
                                                     <option value="medio">🥈 Médio</option>
                                                     <option value="premium">🔒 Premium</option>
+                                                    <option value="admin">🔴 Admin (Apenas Admins)</option>
                                                   </select>
                                                 </div>
                                                 <button style={{...styles.smallButton, backgroundColor: '#4CAF50', alignSelf: 'flex-end'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
@@ -1687,6 +1728,7 @@ function AdminPage() {
                                                             <option value="basico">📘 Básico</option>
                                                             <option value="medio">🥈 Médio</option>
                                                             <option value="premium">🔒 Premium</option>
+                                                            <option value="admin">🔴 Admin (Apenas Admins)</option>
                                                           </select>
                                                         </div>
                                                         <div style={{display: 'flex', gap: '4px', alignSelf: 'flex-end'}}>
