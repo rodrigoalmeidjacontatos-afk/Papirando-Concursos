@@ -247,7 +247,7 @@ export default function AdminQuestoes() {
           </div>
         </div>
 
-        <textarea placeholder="Comentário do Professor" value={form.comentario} onChange={e=>setForm({...form, comentario: e.target.value})} style={{...inputStyle, width: '100%', height: '80px', marginBottom: '16px', resize: 'vertical'}} />
+        <textarea placeholder="Explicação da Banca" value={form.comentario} onChange={e=>setForm({...form, comentario: e.target.value})} style={{...inputStyle, width: '100%', height: '80px', marginBottom: '16px', resize: 'vertical'}} />
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={salvarQuestao} style={{ backgroundColor: '#4CAF50', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
