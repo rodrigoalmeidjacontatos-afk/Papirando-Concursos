@@ -7,6 +7,7 @@ import QuestaoCard from '../components/QuestaoCard';
 export default function QuestoesPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const isAdmin = user?.email?.toLowerCase()?.includes('rodrigoalmeidja');
   
   const [questoes, setQuestoes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,8 +169,14 @@ export default function QuestoesPage() {
           <h2 style={{ margin: 0, fontSize: '22px', color: '#FFF', fontWeight: 'bold' }}>Papirando Questões</h2>
         </div>
 
-        {/* ESPAÇO À DIREITA (para equilibrar o flex e manter o título no centro exato) */}
-        <div style={{ flex: 1 }}></div>
+        {/* ESPAÇO À DIREITA */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {isAdmin && (
+            <button onClick={() => navigate('/admin')} style={{ background: 'none', border: '1px solid #E50914', color: '#E50914', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', transition: 'background 0.3s' }}>
+              Painel Admin
+            </button>
+          )}
+        </div>
 
       </header>
 

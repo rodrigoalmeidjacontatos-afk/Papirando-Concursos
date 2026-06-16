@@ -324,7 +324,7 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
                   cursor: 'pointer'
                 }}
               >
-                {mostrarComentario ? 'Ocultar Comentários' : 'Ver Comentários'}
+                {mostrarComentario ? 'Ocultar Explicação' : 'Ver Explicação'}
               </button>
             </div>
           )}
@@ -341,9 +341,9 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
           borderLeft: `4px solid ${corPrimaria}`,
           animation: 'fadeIn 0.3s'
         }}>
-          <h4 style={{ margin: '0 0 12px 0', color: corPrimaria }}>Comentário do Professor</h4>
+          <h4 style={{ margin: '0 0 12px 0', color: corPrimaria }}>Explicação</h4>
           <div style={{ fontSize: '15px', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#DDD' }}>
-            {questao.comentario || 'Nenhum comentário disponível para esta questão no momento.'}
+            {questao.comentario || 'Nenhuma explicação disponível para esta questão no momento.'}
           </div>
           {questao.referencia_legal && (
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#333', borderRadius: '6px', fontSize: '14px', color: '#CCC' }}>

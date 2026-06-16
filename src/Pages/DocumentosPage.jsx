@@ -295,6 +295,7 @@ function DocumentosPage() {
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
   const [viewMode, setViewMode] = useState('shelves'); // 'shelves' para prateleiras Netflix, 'grid' para grade classica
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
   const shelfCategories = ['Simulado', 'Apostila', 'Edital', 'Outros'];
@@ -342,6 +343,7 @@ function DocumentosPage() {
           
           if (isOwner) {
             setPlanoUsuario('premium');
+            setIsAdmin(true);
           } else {
             const { data: profile } = await supabase
               .from('profiles')
@@ -448,6 +450,11 @@ function DocumentosPage() {
           </div>
           <nav style={styles.nav}>
             <button style={styles.navButton} onClick={() => navigate('/')}>Início</button>
+            {isAdmin && (
+              <button onClick={() => navigate('/admin')} style={{ background: 'none', border: '1px solid #E50914', color: '#E50914', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', transition: 'background 0.3s' }}>
+                Painel Admin
+              </button>
+            )}
           </nav>
         </div>
       </header>
