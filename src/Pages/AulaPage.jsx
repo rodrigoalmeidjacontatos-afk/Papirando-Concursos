@@ -77,6 +77,8 @@ function AulaPage() {
   const duracaoRef = useRef(0);
   const unmountSaveRef = useRef({ tempo: 0, duracao: 0, aulaId: null, userId: null });
   const velocidadeRef = useRef(1); // Ref para manter velocidade atualizada nos callbacks do player
+  const prevVideoIdRef = useRef(null); // Ref para detectar troca de videoId
+  const prevAulaIdRef = useRef(null);  // Ref para detectar troca de aulaId
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -98,6 +100,45 @@ function AulaPage() {
   useEffect(() => {
     hasResumedRef.current = false;
   }, [aulaId, videoId]);
+
+  // ─── FORÇA TROCA DE VÍDEO ao mudar de aulaId (mesmo que videoId seja igual) ───
+  // Isso resolve o caso em que duas aulas têm o mesmo video_id:
+  // o effect de troca de vídeo seria ignorado pois videoId não muda,
+  // mas aqui reagimos diretamente ao aulaId para garantir o reset/reload.
+  useEffect(() => {
+    if (!aulaId) return;
+    if (prevAulaIdRef.current === null) {
+      prevAulaIdRef.current = aulaId;
+      return;
+    }
+    if (prevAulaIdRef.current === aulaId) return;
+    prevAulaIdRef.current = aulaId;
+
+    // Reseta estados do player
+    setTempoAtual(0);
+    setDuracao(0);
+    duracaoRef.current = 0;
+    hasResumedRef.current = false;
+    seekTimePendenteRef.current = 0;
+    lastSaveTimeRef.current = 0;
+    stopProgressTracking();
+
+    // Se o videoId já estiver disponível E for igual ao anterior
+    // (caso em que o effect de videoId não vai disparar), força o reload agora
+    const currentVideoId = videoIdRef.current;
+    if (currentVideoId && prevVideoIdRef.current === currentVideoId) {
+      const inst = playerInstanceRef.current;
+      if (inst && typeof inst.loadVideoById === 'function') {
+        try {
+          inst.loadVideoById(currentVideoId);
+          setIsPlaying(true);
+        } catch (e) {
+          console.error('[AulaPage] Erro ao forçar reload do vídeo por aulaId:', e);
+        }
+      }
+    }
+    // Se videoId vai mudar, o effect de videoId (linha ~863) já cuida do loadVideoById
+  }, [aulaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -859,7 +900,6 @@ function AulaPage() {
   }, []);
 
   // ─── TROCA DE VÍDEO: quando videoId muda, carrega o novo vídeo no player existente ───
-  const prevVideoIdRef = useRef(null);
   useEffect(() => {
     if (!videoId) return;
     // Ignora na primeira renderização (o init já cuida disso)
