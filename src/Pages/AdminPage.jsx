@@ -76,6 +76,12 @@ function AdminPage() {
   const [novoDocumento, setNovoDocumento] = useState({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
   const [editandoDocumento, setEditandoDocumento] = useState(null);
 
+  // ========== CONFIGURAÇÃO DE ABAS ==========
+  const [configAbas, setConfigAbas] = useState({
+    documentos: { ativo: true, plano: 'basico' },
+    evolucao: { ativo: true, plano: 'basico' }
+  });
+
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
   const [usuarioEditandoAcesso, setUsuarioEditandoAcesso] = useState(null); // {id, email, preparatorios_liberados: []}
 
@@ -372,6 +378,15 @@ function AdminPage() {
         setModulos((mods || []).map(m => ({ ...m, disciplinaId: m.disciplinaId || m.disciplina_id })));
         setAulas((aulasData || []).map(a => ({ ...a, moduloId: a.moduloId || a.modulo_id, videoId: a.videoId || a.video_id })));
         setDocumentos(docsData || []);
+
+        if (cat) {
+          const sysConfig = cat.find(c => c.id === 'sys_config_abas');
+          if (sysConfig && sysConfig.nome) {
+            try {
+               setConfigAbas(JSON.parse(sysConfig.nome));
+            } catch(e) {}
+          }
+        }
 
         if (vData) {
           const obj = {};
@@ -1176,6 +1191,7 @@ function AdminPage() {
     { id: 'documentos', nome: '📄 Documentos', icone: '📄' },
     { id: 'usuarios', nome: '👥 Usuários', icone: '👥' },
     { id: 'metricas', nome: '📈 Indicadores', icone: '📈' },
+    { id: 'config_abas', nome: '⚙️ Abas do Site', icone: '⚙️' },
   ];
 
   if (!authChecked) {
@@ -1233,7 +1249,7 @@ function AdminPage() {
                 </div>
               </div>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {categorias.map(cat => (
+                {categorias.filter(c => c.id !== 'sys_config_abas').map(cat => (
                   <div key={cat.id} style={styles.item}>
                     {editandoCategoria?.id === cat.id ? (
                       <div style={{display: 'flex', gap: '8px', flex: 1, alignItems: 'center', flexWrap: 'wrap'}}>
@@ -1286,6 +1302,86 @@ function AdminPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'config_abas' && (
+            <div>
+              <h2 style={{color: '#fff', marginBottom: 20}}>Gerenciar Abas do Site</h2>
+              
+              <div style={styles.formCard}>
+                <h3 style={{color: '#F5F5F5', marginBottom: '15px'}}>Aba: Documentos</h3>
+                <div style={{display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap'}}>
+                  <label style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', cursor: 'pointer'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={configAbas.documentos?.ativo ?? true}
+                      onChange={e => setConfigAbas({...configAbas, documentos: {...configAbas.documentos, ativo: e.target.checked}})}
+                      style={{width: '18px', height: '18px'}}
+                    />
+                    Aba Ativa (Visível)
+                  </label>
+                  
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{color: '#AAA'}}>Plano Mínimo:</span>
+                    <select 
+                      style={styles.select}
+                      value={configAbas.documentos?.plano || 'basico'}
+                      onChange={e => setConfigAbas({...configAbas, documentos: {...configAbas.documentos, plano: e.target.value}})}
+                    >
+                      <option value="basico">🟢 Básico (Todos)</option>
+                      <option value="medio">🔵 Médio</option>
+                      <option value="premium">🟡 Premium</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{...styles.formCard, marginTop: '20px'}}>
+                <h3 style={{color: '#F5F5F5', marginBottom: '15px'}}>Aba: Minha Evolução</h3>
+                <div style={{display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap'}}>
+                  <label style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', cursor: 'pointer'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={configAbas.evolucao?.ativo ?? true}
+                      onChange={e => setConfigAbas({...configAbas, evolucao: {...configAbas.evolucao, ativo: e.target.checked}})}
+                      style={{width: '18px', height: '18px'}}
+                    />
+                    Aba Ativa (Visível)
+                  </label>
+                  
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{color: '#AAA'}}>Plano Mínimo:</span>
+                    <select 
+                      style={styles.select}
+                      value={configAbas.evolucao?.plano || 'basico'}
+                      onChange={e => setConfigAbas({...configAbas, evolucao: {...configAbas.evolucao, plano: e.target.value}})}
+                    >
+                      <option value="basico">🟢 Básico (Todos)</option>
+                      <option value="medio">🔵 Médio</option>
+                      <option value="premium">🟡 Premium</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{marginTop: '30px'}}>
+                <button 
+                  onClick={async () => {
+                    const { error } = await supabase.from('categorias').upsert([{ 
+                      id: 'sys_config_abas', 
+                      nome: JSON.stringify(configAbas), 
+                      icone: '', 
+                      tipo_acesso: 'admin' 
+                    }]);
+                    if (!error) alert('Configurações de Abas salvas com sucesso!');
+                    else alert('Erro ao salvar: ' + error.message);
+                  }} 
+                  style={{...styles.saveButton, padding: '12px 24px', fontSize: '16px'}}
+                >
+                  💾 Salvar Configuração de Abas
+                </button>
               </div>
             </div>
           )}

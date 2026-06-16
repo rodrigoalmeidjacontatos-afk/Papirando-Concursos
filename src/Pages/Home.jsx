@@ -15,6 +15,10 @@ function Home() {
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
   const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+  const [configAbas, setConfigAbas] = useState({
+    documentos: { ativo: true, plano: 'basico' },
+    evolucao: { ativo: true, plano: 'basico' }
+  });
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
     horasLiquidas: '0.0',
@@ -243,7 +247,14 @@ function Home() {
       const processarCategorias = (catData, carData) => {
         if (!catData || !carData || catData.length === 0) return false;
 
-        const categoriasComCursos = catData.map(cat => ({
+        const sysConfig = catData.find(c => c.id === 'sys_config_abas');
+        if (sysConfig && sysConfig.nome) {
+          try {
+            setConfigAbas(JSON.parse(sysConfig.nome));
+          } catch(e){}
+        }
+
+        const categoriasComCursos = catData.filter(c => c.id !== 'sys_config_abas').map(cat => ({
           id: cat.id,
           nome: cat.nome,
           tipo_acesso: cat.tipo_acesso || 'livre',
@@ -597,7 +608,6 @@ function Home() {
           </div>
           <nav style={styles.nav} className="nav-area">
             <button style={styles.navButton} onClick={() => navigate('/')}>Início</button>
-            <button style={styles.navButton} onClick={() => navigate('/documentos')}>Documentos</button>
             {isAdmin && (
               <button onClick={() => navigate('/admin')} style={styles.adminButton}>
                 Painel Admin
@@ -753,15 +763,31 @@ function Home() {
 
       <main style={styles.main} className="main-content">
         {/* NAVEGAÇÃO DE TABS DA HOME */}
-        <div className="tab-container" style={{
-          display: 'flex',
-          gap: '15px',
-          borderBottom: '1px solid #1c1c1f',
-          paddingBottom: '15px',
-          marginBottom: '35px',
-          paddingLeft: '10px'
-        }}>
-          <button
+        {(() => {
+          const getPlanLevel = (p) => {
+            if (p === 'premium' || p === 'vip') return 3;
+            if (p === 'medio' || p === 'intermediario') return 2;
+            return 1;
+          };
+          const podeVerAba = (abaConfig) => {
+            if (!abaConfig?.ativo) return false;
+            if (!abaConfig.plano || abaConfig.plano === 'livre' || abaConfig.plano === 'basico') return true;
+            return getPlanLevel(planoUsuario) >= getPlanLevel(abaConfig.plano);
+          };
+
+          const showEvolucao = podeVerAba(configAbas.evolucao);
+          const showDocumentos = podeVerAba(configAbas.documentos);
+
+          return (
+            <div className="tab-container" style={{
+              display: 'flex',
+              gap: '15px',
+              borderBottom: '1px solid #1c1c1f',
+              paddingBottom: '15px',
+              marginBottom: '35px',
+              paddingLeft: '10px'
+            }}>
+              <button
             onClick={() => setActiveHomeTab('inicio')}
             style={{
               background: activeHomeTab === 'inicio' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
@@ -781,32 +807,59 @@ function Home() {
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Início
           </button>
-          <button
-            onClick={() => { setActiveHomeTab('evolucao'); setStatsRefreshKey(k => k + 1); }}
-            style={{
-              background: activeHomeTab === 'evolucao' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
-              border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : planoUsuario === 'basico' ? '1px solid rgba(255,179,0,0.3)' : '1px solid #333',
-              color: activeHomeTab === 'evolucao' ? '#FFF' : planoUsuario === 'basico' ? '#ffb300' : '#888',
-              padding: '10px 22px',
-              borderRadius: '999px',
-              fontSize: '13px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.25s',
-              boxShadow: activeHomeTab === 'evolucao' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none',
-              opacity: planoUsuario === 'basico' ? 0.75 : 1
-            }}
-          >
-            {planoUsuario === 'basico' ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-            )} Minha Evolução
-          </button>
+          
+          {showEvolucao && (
+            <button
+              onClick={() => { setActiveHomeTab('evolucao'); setStatsRefreshKey(k => k + 1); }}
+              style={{
+                background: activeHomeTab === 'evolucao' ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
+                border: activeHomeTab === 'evolucao' ? '1px solid #E50914' : planoUsuario === 'basico' ? '1px solid rgba(255,179,0,0.3)' : '1px solid #333',
+                color: activeHomeTab === 'evolucao' ? '#FFF' : planoUsuario === 'basico' ? '#ffb300' : '#888',
+                padding: '10px 22px',
+                borderRadius: '999px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.25s',
+                boxShadow: activeHomeTab === 'evolucao' ? '0 0 12px rgba(229, 9, 20, 0.45)' : 'none',
+                opacity: planoUsuario === 'basico' ? 0.75 : 1
+              }}
+            >
+              {planoUsuario === 'basico' ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              )} Minha Evolução
+            </button>
+          )}
+
+          {showDocumentos && (
+            <button
+              onClick={() => navigate('/documentos')}
+              style={{
+                background: 'transparent',
+                border: '1px solid #333',
+                color: '#888',
+                padding: '10px 22px',
+                borderRadius: '999px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.25s'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Documentos
+            </button>
+          )}
         </div>
+        );
+        })()}
 
         {/* TAB INÍCIO (Netflix Shelves & Continue Watching) */}
         {activeHomeTab === 'inicio' && (

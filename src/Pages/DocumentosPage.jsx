@@ -448,7 +448,6 @@ function DocumentosPage() {
           </div>
           <nav style={styles.nav}>
             <button style={styles.navButton} onClick={() => navigate('/')}>Início</button>
-            <button style={{...styles.navButton, color: '#E50914', fontWeight: 'bold'}}>Documentos</button>
           </nav>
         </div>
       </header>
