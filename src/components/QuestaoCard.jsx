@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
-export default function QuestaoCard({ questao, userEmail, userId, onRespondeu }) {
+export default function QuestaoCard({ questao, numero, userEmail, userId, onRespondeu }) {
   const [eliminadas, setEliminadas] = useState([]);
   const [respostaMarcada, setRespostaMarcada] = useState(null);
   const [status, setStatus] = useState(null); // 'acertou', 'errou', ou null
@@ -153,10 +153,10 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
         flexWrap: 'wrap'
       }}>
         {/* Número da questão */}
-        {questao.numero_questao && (
-          <span style={{ fontSize: '13px', color: '#BBB', fontWeight: '600', minWidth: '20px' }}>
-            {questao.numero_questao}
-          </span>
+        {(numero || questao.numero_questao) && (
+          <div style={{ backgroundColor: corPrimaria, color: '#FFF', fontWeight: 'bold', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', letterSpacing: '0.5px' }}>
+            Questão {numero || questao.numero_questao}
+          </div>
         )}
 
         {/* Breadcrumb Disciplina > Assunto */}

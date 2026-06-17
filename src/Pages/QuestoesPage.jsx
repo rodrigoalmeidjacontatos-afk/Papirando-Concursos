@@ -274,10 +274,11 @@ export default function QuestoesPage() {
             <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>Carregando questões...</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {questoes.map((q) => (
+              {questoes.map((q, index) => (
                 <QuestaoCard 
                   key={q.id} 
                   questao={q} 
+                  numero={((paginaAtual - 1) * porPagina) + index + 1}
                   userEmail={user?.email}
                   userId={user?.id}
                 />
