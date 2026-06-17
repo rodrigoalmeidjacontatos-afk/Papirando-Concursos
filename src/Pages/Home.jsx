@@ -475,6 +475,15 @@ function Home() {
         // Continue Assistindo
         setContinueAssistindo(progressoCompleto.filter(p => !p.concluida).slice(0, 8));
 
+        // Ajusta as estatísticas para não contabilizar aulas deletadas
+        const aulasConcluidasValidas = progressoCompleto.filter(p => p.concluida).length;
+        const aulasEmProgressoValidas = progressoCompleto.filter(p => !p.concluida).length;
+        setEstatisticasEstudo(prev => ({
+          ...prev,
+          aulasConcluidas: aulasConcluidasValidas,
+          aulasEmProgresso: aulasEmProgressoValidas
+        }));
+
         // Total real de aulas por preparatorio
         const prepIds = [...new Set(preparatoriosData.map(p => p.id))];
         const { data: todasDiscPreps } = await supabase.from('disciplinas').select('id, preparatorio_id').in('preparatorio_id', prepIds);

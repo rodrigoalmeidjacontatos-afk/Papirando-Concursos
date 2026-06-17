@@ -611,7 +611,8 @@ function AulaPage() {
     const tempoFinal = marcarConcluida && durEfetiva > 0
       ? Math.max(tempo, durEfetiva)
       : tempo;
-    const isConcluida = marcarConcluida
+    const jaEstavaConcluida = progressoAulas[aulaId]?.concluida || false;
+    const isConcluida = jaEstavaConcluida || marcarConcluida
       || (durEfetiva > 0 && tempoFinal >= durEfetiva * 0.9);
 
     // Atualiza o progresso em tempo real no estado local
