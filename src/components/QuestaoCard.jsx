@@ -68,7 +68,7 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
     if (status) return; // já respondeu
 
     setLoading(true);
-    const correta = respostaMarcada === questao.gabarito;
+    const correta = respostaMarcada === gabaritoNormalizado;
     
     try {
       if (userEmail) {
@@ -91,13 +91,39 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
     }
   };
 
-  const alternativas = [
+  // Detecta se é questão Certo/Errado
+  const isCertoErrado = questao.modalidade === 'Certo/Errado'
+    || questao.gabarito === 'Certo' || questao.gabarito === 'Errado'
+    || (questao.gabarito && questao.gabarito.toLowerCase() === 'certo')
+    || (questao.gabarito && questao.gabarito.toLowerCase() === 'errado');
+
+  // Monta as alternativas
+  let alternativas = [
     { letra: 'A', texto: questao.alternativa_a },
     { letra: 'B', texto: questao.alternativa_b },
     { letra: 'C', texto: questao.alternativa_c },
     { letra: 'D', texto: questao.alternativa_d },
     { letra: 'E', texto: questao.alternativa_e },
   ].filter(alt => alt.texto && String(alt.texto).trim() !== '');
+
+  // Se é Certo/Errado e não tem alternativas, gera automaticamente
+  if (isCertoErrado && alternativas.length === 0) {
+    alternativas = [
+      { letra: 'A', texto: 'Certo' },
+      { letra: 'B', texto: 'Errado' },
+    ];
+  }
+
+  // Normaliza o gabarito: 'Certo' → 'A', 'Errado' → 'B'
+  let gabaritoNormalizado = questao.gabarito;
+  if (isCertoErrado) {
+    const gabLower = (questao.gabarito || '').toLowerCase().trim();
+    if (gabLower === 'certo' || gabLower === 'c') {
+      gabaritoNormalizado = 'A';
+    } else if (gabLower === 'errado' || gabLower === 'e') {
+      gabaritoNormalizado = 'B';
+    }
+  }
 
   const corPrimaria = '#2196F3';
   const corAcerto = '#4CAF50';
@@ -203,7 +229,7 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
         {alternativas.map(alt => {
           const isEliminada = eliminadas.includes(alt.letra);
           const isSelecionada = respostaMarcada === alt.letra;
-          const isGabarito = status && alt.letra === questao.gabarito;
+          const isGabarito = status && alt.letra === gabaritoNormalizado;
           const isErroUser = status && isSelecionada && !isGabarito;
 
           let bgColor = '#2A2A33';

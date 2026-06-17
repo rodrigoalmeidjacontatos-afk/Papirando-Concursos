@@ -16,29 +16,39 @@ export default function EvolucaoQuestoes({ userEmail }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const { data: respostas, error } = await supabase
+      // PASSO 1: Busca as respostas do usuário (sem join FK)
+      const { data: respostasRaw, error: errRespostas } = await supabase
         .from('questoes_respostas')
-        .select(`
-          correta,
-          created_at,
-          alternativa_marcada,
-          questoes (
-            disciplina,
-            assunto,
-            banca,
-            dificuldade
-          )
-        `)
+        .select('correta, created_at, alternativa_marcada, questao_id')
         .eq('user_email', userEmail)
         .gte('created_at', new Date(Date.now() - periodoSelecionado * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      if (!respostas || respostas.length === 0) {
+      if (errRespostas) throw errRespostas;
+      if (!respostasRaw || respostasRaw.length === 0) {
         setStats({ vazio: true });
         setLoading(false);
         return;
       }
+
+      // PASSO 2: Busca os dados das questões correspondentes (sem depender de FK)
+      const questaoIds = [...new Set(respostasRaw.map(r => r.questao_id).filter(Boolean))];
+      let questoesMap = {};
+      if (questaoIds.length > 0) {
+        const { data: questoesData } = await supabase
+          .from('questoes')
+          .select('id, disciplina, assunto, banca, dificuldade')
+          .in('id', questaoIds);
+        if (questoesData) {
+          questoesData.forEach(q => { questoesMap[q.id] = q; });
+        }
+      }
+
+      // Mescla os dados
+      const respostas = respostasRaw.map(r => ({
+        ...r,
+        questoes: questoesMap[r.questao_id] || null
+      }));
 
       const total = respostas.length;
       const acertos = respostas.filter(r => r.correta).length;
@@ -100,6 +110,8 @@ export default function EvolucaoQuestoes({ userEmail }) {
       setStats({ total, acertos, erros, taxaAcerto, rankDisciplinas, rankBancas, evolucaoDiaria });
     } catch (e) {
       console.error('Erro ao buscar stats de questões:', e);
+      // Se a tabela não existir ou der erro de permissão, mostra vazio ao invés de travar
+      setStats({ vazio: true });
     } finally {
       setLoading(false);
     }
@@ -224,10 +236,124 @@ export default function EvolucaoQuestoes({ userEmail }) {
   );
 
   if (!stats || stats.vazio) return (
-    <div style={{ textAlign: 'center', padding: '60px', color: '#666' }}>
-      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-      <p style={{ fontSize: '16px', color: '#888' }}>Nenhuma questão respondida ainda.</p>
-      <p style={{ fontSize: '13px', color: '#555' }}>Acesse a aba <strong style={{ color: '#F0AD4E' }}>Questões</strong> e comece a praticar!</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '8px', position: 'relative' }}>
+
+      {/* TÍTULO PLACEHOLDER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', color: '#FFF', fontWeight: '800', letterSpacing: '0.5px', opacity: 0.4 }}>
+          🎯 Desempenho em Questões
+        </h3>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {['Hoje', '7 dias', '30 dias', '90 dias'].map((l, i) => (
+            <span key={i} style={{
+              backgroundColor: i === 0 ? 'rgba(240,173,78,0.15)' : 'transparent',
+              color: i === 0 ? '#F0AD4E55' : '#33333388',
+              border: `1px solid ${i === 0 ? '#F0AD4E33' : '#222'}`,
+              padding: '6px 14px', borderRadius: '999px',
+              fontSize: '12px', fontWeight: 'bold'
+            }}>{l}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* CARDS DE RESUMO PLACEHOLDER */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+        {[
+          { label: 'Total Respondidas', cor: '#2196F3', icon: '📝' },
+          { label: 'Acertos', cor: '#4CAF50', icon: '✅' },
+          { label: 'Erros', cor: '#E53935', icon: '❌' },
+          { label: 'Taxa de Acerto', cor: '#FFC107', icon: '🏆' },
+        ].map((item, i) => (
+          <div key={i} style={{
+            backgroundColor: 'rgba(20,20,25,0.85)', border: `1px solid ${item.cor}15`,
+            borderRadius: '14px', padding: '20px', textAlign: 'center',
+            boxShadow: `0 4px 20px ${item.cor}08`
+          }}>
+            <div style={{ fontSize: '28px', marginBottom: '4px', opacity: 0.3 }}>{item.icon}</div>
+            <div style={{ fontSize: '28px', fontWeight: '900', color: item.cor, lineHeight: 1, opacity: 0.15 }}>—</div>
+            <div style={{ fontSize: '11px', color: '#555', marginTop: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* GRÁFICO E EVOLUÇÃO PLACEHOLDER */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px' }}>
+        {/* Donut placeholder */}
+        <div style={{ backgroundColor: 'rgba(20, 20, 25, 0.85)', border: '1px solid #1C1C2A', borderRadius: '16px', padding: '24px', minWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+          <h4 style={{ margin: 0, fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.3 }}>Acertos vs Erros</h4>
+          <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '10px solid #1a1a24', position: 'relative', opacity: 0.25 }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: '#555', fontSize: '13px', fontWeight: '700' }}>0%</div>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', opacity: 0.25 }}>
+            <span style={{ fontSize: '12px', color: '#4CAF50' }}>● Acertos (0)</span>
+            <span style={{ fontSize: '12px', color: '#E53935' }}>● Erros (0)</span>
+          </div>
+        </div>
+        {/* Evolução diária placeholder */}
+        <div style={{ backgroundColor: 'rgba(20, 20, 25, 0.85)', border: '1px solid #1C1C2A', borderRadius: '16px', padding: '24px' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.3 }}>Evolução Diária</h4>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px', opacity: 0.12 }}>
+            {[30, 55, 20, 70, 45, 35, 60, 50, 25, 65, 40, 55, 30].map((h, i) => (
+              <div key={i} style={{ flex: 1, height: `${h}%`, backgroundColor: '#F0AD4E', borderRadius: '3px 3px 0 0' }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* DISCIPLINA E BANCA PLACEHOLDER */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ backgroundColor: 'rgba(20, 20, 25, 0.85)', border: '1px solid #1C1C2A', borderRadius: '16px', padding: '24px' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.3 }}>Por Disciplina</h4>
+          {[75, 55, 40].map((w, i) => (
+            <div key={i} style={{ marginBottom: '10px' }}>
+              <div style={{ height: '10px', backgroundColor: '#1a1a24', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ width: `${w}%`, height: '100%', backgroundColor: '#4CAF50', opacity: 0.12, borderRadius: '6px' }} />
+              </div>
+              <div style={{ height: '8px', width: `${40 + i * 15}%`, backgroundColor: '#1a1a24', borderRadius: '4px', marginTop: '6px', opacity: 0.4 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ backgroundColor: 'rgba(20, 20, 25, 0.85)', border: '1px solid #1C1C2A', borderRadius: '16px', padding: '24px' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.3 }}>Por Banca</h4>
+          {[60, 45].map((w, i) => (
+            <div key={i} style={{ marginBottom: '10px' }}>
+              <div style={{ height: '10px', backgroundColor: '#1a1a24', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ width: `${w}%`, height: '100%', backgroundColor: '#2196F3', opacity: 0.12, borderRadius: '6px' }} />
+              </div>
+              <div style={{ height: '8px', width: `${50 + i * 20}%`, backgroundColor: '#1a1a24', borderRadius: '4px', marginTop: '6px', opacity: 0.4 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* OVERLAY CTA - glassmorphism */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'radial-gradient(ellipse at center, rgba(10,10,15,0.6) 0%, rgba(10,10,15,0.85) 70%)',
+        borderRadius: '16px',
+        zIndex: 2
+      }}>
+        <div style={{
+          textAlign: 'center',
+          backgroundColor: 'rgba(20,20,30,0.8)',
+          border: '1px solid rgba(240,173,78,0.2)',
+          borderRadius: '20px',
+          padding: '40px 50px',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)'
+        }}>
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>🎯</div>
+          <h3 style={{ color: '#FFF', fontSize: '20px', fontWeight: '800', margin: '0 0 10px' }}>Comece a Praticar!</h3>
+          <p style={{ color: '#888', fontSize: '14px', margin: '0 0 6px', lineHeight: 1.6 }}>
+            Responda questões para acompanhar sua evolução.
+          </p>
+          <p style={{ color: '#555', fontSize: '13px', margin: 0 }}>
+            Acesse a aba <strong style={{ color: '#F0AD4E' }}>Questões</strong> e comece agora!
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 

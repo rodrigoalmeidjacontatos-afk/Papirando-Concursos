@@ -16,6 +16,7 @@ function Home() {
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
   const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+  const [aulasAndamentoAberto, setAulasAndamentoAberto] = useState(false);
   const [configAbas, setConfigAbas] = useState({
     documentos: { ativo: true, plano: 'basico' },
     evolucao: { ativo: true, plano: 'basico' },
@@ -23,7 +24,7 @@ function Home() {
   });
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
-    horasLiquidas: '0.0',
+    minutosEstudados: 0,
     aulasConcluidas: 0,
     aulasEmProgresso: 0,
     streak: 0,
@@ -361,12 +362,12 @@ function Home() {
     carregarESincronizarDados();
   }, []);
 
-  // Buscar progresso recente e Estatísticas de Estudo (Netflix Style)
+  // Buscar progresso recente e Estatisticas de Estudo (Netflix Style)
   useEffect(() => {
     async function carregarDadosProgresso() {
       if (!user) return;
       try {
-        // 1. Buscar todo o histórico de progresso do usuário
+        // 1. Buscar todo o historico de progresso do usuario
         const { data: todosProgressos } = await supabase
           .from('progresso')
           .select('*')
@@ -375,210 +376,147 @@ function Home() {
 
         if (!todosProgressos || todosProgressos.length === 0) return;
 
-        // --- CÁLCULO DE ESTATÍSTICAS ---
-        // A. Tempo total assistido
+        // --- CALCULO DE ESTATISTICAS BASICAS ---
         const totalSegundos = todosProgressos.reduce((acc, curr) => acc + (curr.tempo_assistido || 0), 0);
-        const horasLiquidas = (totalSegundos / 3600).toFixed(1);
-
-        // B. Aulas Concluídas e Em Progresso
+        const minutosEstudados = Math.round(totalSegundos / 60);
         const aulasConcluidas = todosProgressos.filter(p => p.concluida).length;
         const aulasEmProgresso = todosProgressos.filter(p => !p.concluida).length;
 
-        // C. Ofensiva / Streak 🔥
+        // Ofensiva / Streak
         let streak = 0;
-        
-        // Helper para formatar a data local em YYYY-MM-DD
         const obterDataLocalStr = (dateObj) => {
           const y = dateObj.getFullYear();
           const m = String(dateObj.getMonth() + 1).padStart(2, '0');
           const d = String(dateObj.getDate()).padStart(2, '0');
           return `${y}-${m}-${d}`;
         };
-
         const datasUnicas = Array.from(new Set(
-          todosProgressos
-            .map(p => {
-              if (!p.ultimo_acesso) return null;
-              return obterDataLocalStr(new Date(p.ultimo_acesso));
-            })
-            .filter(Boolean)
+          todosProgressos.map(p => p.ultimo_acesso ? obterDataLocalStr(new Date(p.ultimo_acesso)) : null).filter(Boolean)
         )).sort((a, b) => b.localeCompare(a));
-
         if (datasUnicas.length > 0) {
           const hojeStr = obterDataLocalStr(new Date());
-          const ontem = new Date();
-          ontem.setDate(ontem.getDate() - 1);
+          const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
           const ontemStr = obterDataLocalStr(ontem);
-          
           const temHoje = datasUnicas.includes(hojeStr);
           const temOntem = datasUnicas.includes(ontemStr);
-          
           if (temHoje || temOntem) {
             streak = 1;
             let dataRef = temHoje ? new Date() : ontem;
             while (true) {
               dataRef.setDate(dataRef.getDate() - 1);
               const refStr = obterDataLocalStr(dataRef);
-              if (datasUnicas.includes(refStr)) {
-                streak++;
-              } else {
-                break;
-              }
+              if (datasUnicas.includes(refStr)) { streak++; } else { break; }
             }
           }
         }
 
-        // --- CARREGAR INFOS COMPLEMENTARES ---
-        const aulaIds = todosProgressos.map(p => p.aula_id);
+        // Salva as estatisticas basicas IMEDIATAMENTE (independente do historico de cursos)
+        setEstatisticasEstudo(prev => ({ ...prev, minutosEstudados, aulasConcluidas, aulasEmProgresso, streak }));
+
+        // --- CARREGAR HISTORICO DE CURSOS (complementar) ---
+        const aulaIds = todosProgressos.map(p => p.aula_id).filter(Boolean);
+        if (!aulaIds.length) return;
+
         const { data: aulasData } = await supabase.from('aulas').select('*').in('id', aulaIds);
-        
-        if (aulasData && aulasData.length > 0) {
-          const moduloIds = aulasData.map(a => a.modulo_id || a.moduloId).filter(Boolean);
-          const { data: modulosData } = await supabase.from('modulos').select('*').in('id', moduloIds);
-          
-          if (modulosData && modulosData.length > 0) {
-            const disciplinaIds = modulosData.map(m => m.disciplina_id || m.disciplinaId).filter(Boolean);
-            const { data: disciplinasData } = await supabase.from('disciplinas').select('*').in('id', disciplinaIds);
-            
-            if (disciplinasData && disciplinasData.length > 0) {
-              const preparatorioIds = disciplinasData.map(d => d.preparatorio_id || d.preparatorioId).filter(Boolean);
-              const { data: preparatoriosData } = await supabase.from('preparatorios').select('*').in('id', preparatorioIds);
-              
-              const { data: vinculosData } = await supabase.from('vinculos').select('*');
 
-              // Mapeia todos os progressos enriquecidos
-              const progressoCompleto = todosProgressos.map(p => {
-                const aula = aulasData.find(a => a.id === p.aula_id);
-                if (!aula) return null;
-                const modulo = modulosData.find(m => m.id === (aula.modulo_id || aula.moduloId));
-                if (!modulo) return null;
-                const disciplina = disciplinasData.find(d => d.id === (modulo.disciplina_id || modulo.disciplinaId));
-                if (!disciplina) return null;
-                const preparatorio = preparatoriosData.find(prep => prep.id === (disciplina.preparatorio_id || disciplina.preparatorioId));
-                if (!preparatorio) return null;
+        // Busca dados complementares (sem bloquear se algum falhar)
+        const moduloIds = (aulasData || []).map(a => a.modulo_id || a.moduloId).filter(Boolean);
+        const { data: modulosData } = moduloIds.length
+          ? await supabase.from('modulos').select('*').in('id', moduloIds)
+          : { data: [] };
 
-                let carreiraId = null;
-                if (vinculosData) {
-                  const individual = vinculosData.find(v => !v.data && v.preparatorio_id === preparatorio.id);
-                  if (individual) {
-                    carreiraId = individual.carreira_id;
-                  } else {
-                    const legadoRow = vinculosData.find(v => v.data);
-                    if (legadoRow && legadoRow.data) {
-                      for (const [cId, prepsMap] of Object.entries(legadoRow.data)) {
-                        if (prepsMap && prepsMap[preparatorio.id]) {
-                          carreiraId = cId;
-                          break;
-                        }
-                      }
-                    }
-                  }
-                }
-                if (!carreiraId) carreiraId = 'policiais';
+        const disciplinaIds = (modulosData || []).map(m => m.disciplina_id || m.disciplinaId).filter(Boolean);
+        const { data: disciplinasData } = disciplinaIds.length
+          ? await supabase.from('disciplinas').select('*').in('id', disciplinaIds)
+          : { data: [] };
 
-                return {
-                  id: p.id,
-                  aula,
-                  modulo,
-                  disciplina,
-                  preparatorio,
-                  carreiraId,
-                  tempo: p.tempo_assistido,
-                  concluida: p.concluida,
-                  ultimoAcesso: p.ultimo_acesso
-                };
-              }).filter(Boolean);
+        const preparatorioIds = (disciplinasData || []).map(d => d.preparatorio_id || d.preparatorioId).filter(Boolean);
+        const { data: preparatoriosData } = preparatorioIds.length
+          ? await supabase.from('preparatorios').select('*').in('id', preparatorioIds)
+          : { data: [] };
 
-              // 1. Filtrar os primeiros 8 não concluídos para o "Continue Assistindo"
-              const videosEmProgresso = progressoCompleto.filter(p => !p.concluida);
-              setContinueAssistindo(videosEmProgresso.slice(0, 8));
+        const { data: vinculosData } = await supabase.from('vinculos').select('*');
 
-              // 2. Buscar total real de aulas por preparatório (para o % de progresso correto)
-              const prepIds = [...new Set(preparatoriosData.map(p => p.id))];
-
-              // Buscar todas as disciplinas dos preparatórios acessados
-              const { data: todasDiscPreps } = await supabase
-                .from('disciplinas')
-                .select('id, preparatorio_id')
-                .in('preparatorio_id', prepIds);
-
-              const totalAulasPorPrep = {};
-
-              if (todasDiscPreps && todasDiscPreps.length > 0) {
-                const todasDiscIds = todasDiscPreps.map(d => d.id);
-
-                // Buscar todos os módulos dessas disciplinas
-                const { data: todosModsPreps } = await supabase
-                  .from('modulos')
-                  .select('id, disciplina_id')
-                  .in('disciplina_id', todasDiscIds);
-
-                if (todosModsPreps && todosModsPreps.length > 0) {
-                  const todosModIds = todosModsPreps.map(m => m.id);
-
-                  // Buscar todas as aulas desses módulos
-                  const { data: todasAulasPreps } = await supabase
-                    .from('aulas')
-                    .select('id, modulo_id')
-                    .in('modulo_id', todosModIds);
-
-                  if (todasAulasPreps && todasAulasPreps.length > 0) {
-                    // Montar mapa: modulo_id -> preparatorio_id
-                    const modToDisc = {};
-                    todosModsPreps.forEach(m => { modToDisc[m.id] = m.disciplina_id; });
-
-                    const discToPrep = {};
-                    todasDiscPreps.forEach(d => { discToPrep[d.id] = d.preparatorio_id; });
-
-                    // Contar total de aulas por preparatório
-                    todasAulasPreps.forEach(a => {
-                      const discId = modToDisc[a.modulo_id];
-                      const prepId = discToPrep[discId];
-                      if (prepId) {
-                        totalAulasPorPrep[prepId] = (totalAulasPorPrep[prepId] || 0) + 1;
-                      }
-                    });
-                  }
+        // Mapeia todos os progressos enriquecidos (não retorna null se faltar dados, usa fallback)
+        const progressoCompleto = todosProgressos.map(p => {
+          const aula = (aulasData || []).find(a => a.id === p.aula_id);
+          if (!aula) return null;
+          const modulo = (modulosData || []).find(m => m.id === (aula.modulo_id || aula.moduloId));
+          const disciplina = modulo ? (disciplinasData || []).find(d => d.id === (modulo.disciplina_id || modulo.disciplinaId)) : null;
+          const preparatorio = disciplina ? (preparatoriosData || []).find(prep => prep.id === (disciplina.preparatorio_id || disciplina.preparatorioId)) : null;
+          let carreiraId = null;
+          if (vinculosData && preparatorio) {
+            const individual = vinculosData.find(v => !v.data && v.preparatorio_id === preparatorio.id);
+            if (individual) {
+              carreiraId = individual.carreira_id;
+            } else {
+              const legadoRow = vinculosData.find(v => v.data);
+              if (legadoRow && legadoRow.data) {
+                for (const [cId, prepsMap] of Object.entries(legadoRow.data)) {
+                  if (prepsMap && prepsMap[preparatorio.id]) { carreiraId = cId; break; }
                 }
               }
+            }
+          }
+          if (!carreiraId) carreiraId = 'policiais';
+          return {
+            id: p.id,
+            aula,
+            modulo: modulo || { id: 'unknown', nome: '' },
+            disciplina: disciplina || { id: 'unknown', nome: '' },
+            preparatorio: preparatorio || { id: 'unknown', nome: aula.nome || 'Curso' },
+            carreiraId,
+            tempo: p.tempo_assistido,
+            concluida: p.concluida,
+            ultimoAcesso: p.ultimo_acesso
+          };
+        }).filter(Boolean);
 
-              // 3. Agrupar progresso por preparatório para o "Histórico de Cursos"
-              const cursosMap = {};
-              progressoCompleto.forEach(item => {
-                const pId = item.preparatorio.id;
-                if (!cursosMap[pId]) {
-                  cursosMap[pId] = {
-                    preparatorio: item.preparatorio,
-                    // Usa o total real do banco; se não encontrou, usa as assistidas como fallback
-                    totalAulas: totalAulasPorPrep[pId] || 0,
-                    concluidas: 0,
-                    ultimoAcesso: item.ultimoAcesso
-                  };
-                }
-                // Atualiza o ultimoAcesso para o mais recente
-                if (new Date(item.ultimoAcesso) > new Date(cursosMap[pId].ultimoAcesso)) {
-                  cursosMap[pId].ultimoAcesso = item.ultimoAcesso;
-                }
-                if (item.concluida) {
-                  cursosMap[pId].concluidas++;
-                }
-              });
+        // Continue Assistindo
+        setContinueAssistindo(progressoCompleto.filter(p => !p.concluida).slice(0, 8));
 
-              const historicoCursos = Object.values(cursosMap).sort((a, b) => new Date(b.ultimoAcesso) - new Date(a.ultimoAcesso));
-
-              // 4. Atualizar Estado Geral de Estatísticas
-              setEstatisticasEstudo({
-                horasLiquidas,
-                aulasConcluidas,
-                aulasEmProgresso,
-                streak,
-                historicoCursos
+        // Total real de aulas por preparatorio
+        const prepIds = [...new Set(preparatoriosData.map(p => p.id))];
+        const { data: todasDiscPreps } = await supabase.from('disciplinas').select('id, preparatorio_id').in('preparatorio_id', prepIds);
+        const totalAulasPorPrep = {};
+        if (todasDiscPreps && todasDiscPreps.length > 0) {
+          const todasDiscIds = todasDiscPreps.map(d => d.id);
+          const { data: todosModsPreps } = await supabase.from('modulos').select('id, disciplina_id').in('disciplina_id', todasDiscIds);
+          if (todosModsPreps && todosModsPreps.length > 0) {
+            const todosModIds = todosModsPreps.map(m => m.id);
+            const { data: todasAulasPreps } = await supabase.from('aulas').select('id, modulo_id').in('modulo_id', todosModIds);
+            if (todasAulasPreps && todasAulasPreps.length > 0) {
+              const modToDisc = {};
+              todosModsPreps.forEach(m => { modToDisc[m.id] = m.disciplina_id; });
+              const discToPrep = {};
+              todasDiscPreps.forEach(d => { discToPrep[d.id] = d.preparatorio_id; });
+              todasAulasPreps.forEach(a => {
+                const discId = modToDisc[a.modulo_id];
+                const prepId = discToPrep[discId];
+                if (prepId) { totalAulasPorPrep[prepId] = (totalAulasPorPrep[prepId] || 0) + 1; }
               });
             }
           }
         }
+
+        // Agrupar por preparatorio
+        const cursosMap = {};
+        progressoCompleto.forEach(item => {
+          const pId = item.preparatorio.id;
+          if (!cursosMap[pId]) {
+            cursosMap[pId] = { preparatorio: item.preparatorio, totalAulas: totalAulasPorPrep[pId] || 0, concluidas: 0, ultimoAcesso: item.ultimoAcesso };
+          }
+          if (new Date(item.ultimoAcesso) > new Date(cursosMap[pId].ultimoAcesso)) {
+            cursosMap[pId].ultimoAcesso = item.ultimoAcesso;
+          }
+          if (item.concluida) { cursosMap[pId].concluidas++; }
+        });
+
+        const historicoCursos = Object.values(cursosMap).sort((a, b) => new Date(b.ultimoAcesso) - new Date(a.ultimoAcesso));
+        setEstatisticasEstudo(prev => ({ ...prev, historicoCursos }));
+
       } catch (err) {
-        console.error("Erro ao carregar dados de progresso e estatísticas:", err);
+        console.error("Erro ao carregar dados de progresso e estatisticas:", err);
       }
     }
     carregarDadosProgresso();
@@ -1119,7 +1057,7 @@ function Home() {
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
-                    {estatisticasEstudo.horasLiquidas}h
+                    {estatisticasEstudo.minutosEstudados}m
                   </h3>
                   <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Tempo Estudado
@@ -1149,19 +1087,26 @@ function Home() {
                 </div>
               </div>
 
-              {/* Card Aulas Iniciadas */}
-              <div style={{
-                background: 'rgba(20, 20, 25, 0.75)',
-                border: '1px solid #1c1c1f',
-                borderRadius: '16px',
-                padding: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '20px',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
-              }}>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2196F3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(33,150,243,0.3))' }}><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-                <div>
+              {/* Card Aulas Em Andamento - clicável */}
+              <div
+                onClick={() => setAulasAndamentoAberto(v => !v)}
+                style={{
+                  background: aulasAndamentoAberto ? 'rgba(33,150,243,0.12)' : 'rgba(20, 20, 25, 0.75)',
+                  border: aulasAndamentoAberto ? '1px solid rgba(33,150,243,0.4)' : '1px solid #1c1c1f',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s'
+                }}
+                onMouseEnter={e => { if (!aulasAndamentoAberto) e.currentTarget.style.border = '1px solid rgba(33,150,243,0.3)'; }}
+                onMouseLeave={e => { if (!aulasAndamentoAberto) e.currentTarget.style.border = '1px solid #1c1c1f'; }}
+              >
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2196F3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(33,150,243,0.3))', flexShrink: 0 }}><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                <div style={{ flex: 1 }}>
                   <h3 style={{ fontSize: '28px', color: '#2196F3', margin: '0 0 4px', fontWeight: '900' }}>
                     {estatisticasEstudo.aulasEmProgresso}
                   </h3>
@@ -1169,8 +1114,70 @@ function Home() {
                     Aulas Em Andamento
                   </p>
                 </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" style={{ transform: aulasAndamentoAberto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
               </div>
             </div>
+
+            {/* DRAWER: Aulas Em Andamento */}
+            {aulasAndamentoAberto && continueAssistindo.length > 0 && (
+              <div style={{
+                backgroundColor: 'rgba(20,20,30,0.9)',
+                border: '1px solid rgba(33,150,243,0.25)',
+                borderRadius: '16px',
+                padding: '20px',
+                animation: 'fadeIn 0.25s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '40px'
+              }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#2196F3', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>▶ Continue de onde parou</h4>
+                {continueAssistindo.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => navigate(`/aula/${item.carreiraId}/${item.preparatorio.id}/${item.disciplina.id}/${item.modulo.id}/${item.aula.id}`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(33,150,243,0.06)',
+                      border: '1px solid rgba(33,150,243,0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(33,150,243,0.14)'; e.currentTarget.style.borderColor = 'rgba(33,150,243,0.35)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(33,150,243,0.06)'; e.currentTarget.style.borderColor = 'rgba(33,150,243,0.1)'; }}
+                  >
+                    {/* Mini capa */}
+                    <div style={{ width: '72px', height: '44px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#000', flexShrink: 0 }}>
+                      {item.preparatorio.capa
+                        ? <img src={item.preparatorio.capa} alt="capa" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a24' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2196F3" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                          </div>
+                      }
+                    </div>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: '#FFF', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.aula.nome}</div>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preparatorio.nome} • {item.disciplina.nome}</div>
+                    </div>
+                    {/* Botão continuar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#2196F3', padding: '6px 14px', borderRadius: '999px', fontSize: '12px', color: '#FFF', fontWeight: '700', flexShrink: 0 }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="#FFF"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                      Continuar
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {aulasAndamentoAberto && continueAssistindo.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '30px', color: '#555', fontSize: '13px', backgroundColor: 'rgba(20,20,30,0.8)', borderRadius: '16px', border: '1px solid #222', marginBottom: '40px' }}>
+                Nenhuma aula em andamento encontrada.
+              </div>
+            )}
 
             {/* Listagem de Preparatórios Estudados */}
             <div style={{
