@@ -63,6 +63,45 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
     }
   };
 
+  const gabLower = (questao.gabarito || '').toLowerCase().trim();
+  
+  // Detecta de forma mais robusta se é Certo/Errado
+  const isCertoErrado = questao.modalidade === 'Certo/Errado'
+    || gabLower === 'certo' || gabLower === 'errado'
+    || gabLower === 'c' || gabLower === 'e'
+    || (questao.alternativa_a && questao.alternativa_a.toLowerCase().includes('certo') && questao.alternativa_b && questao.alternativa_b.toLowerCase().includes('errado'));
+
+  // Normaliza o gabarito: 'Certo' ou 'C' → 'A', 'Errado' ou 'E' → 'B'
+  let gabaritoNormalizado = questao.gabarito;
+  if (isCertoErrado) {
+    if (gabLower === 'certo' || gabLower === 'c') {
+      gabaritoNormalizado = 'A';
+    } else if (gabLower === 'errado' || gabLower === 'e') {
+      gabaritoNormalizado = 'B';
+    }
+  }
+
+  // Monta as alternativas
+  let alternativas = [
+    { letra: 'A', texto: questao.alternativa_a },
+    { letra: 'B', texto: questao.alternativa_b },
+    { letra: 'C', texto: questao.alternativa_c },
+    { letra: 'D', texto: questao.alternativa_d },
+    { letra: 'E', texto: questao.alternativa_e },
+  ].filter(alt => alt.texto && String(alt.texto).trim() !== '');
+
+  // Se é Certo/Errado e não tem alternativas, gera automaticamente
+  if (isCertoErrado && alternativas.length === 0) {
+    alternativas = [
+      { letra: 'A', texto: 'Certo' },
+      { letra: 'B', texto: 'Errado' },
+    ];
+  } else if (isCertoErrado && alternativas.length > 0) {
+    // Garante que o texto fique legível se vier como apenas "C" ou "E"
+    if (alternativas[0].texto.toLowerCase().trim() === 'c') alternativas[0].texto = 'Certo';
+    if (alternativas[1] && alternativas[1].texto.toLowerCase().trim() === 'e') alternativas[1].texto = 'Errado';
+  }
+
   const responder = async () => {
     if (!respostaMarcada) return alert('Selecione uma alternativa.');
     if (status) return; // já respondeu
@@ -90,40 +129,6 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
       setLoading(false);
     }
   };
-
-  // Detecta se é questão Certo/Errado
-  const isCertoErrado = questao.modalidade === 'Certo/Errado'
-    || questao.gabarito === 'Certo' || questao.gabarito === 'Errado'
-    || (questao.gabarito && questao.gabarito.toLowerCase() === 'certo')
-    || (questao.gabarito && questao.gabarito.toLowerCase() === 'errado');
-
-  // Monta as alternativas
-  let alternativas = [
-    { letra: 'A', texto: questao.alternativa_a },
-    { letra: 'B', texto: questao.alternativa_b },
-    { letra: 'C', texto: questao.alternativa_c },
-    { letra: 'D', texto: questao.alternativa_d },
-    { letra: 'E', texto: questao.alternativa_e },
-  ].filter(alt => alt.texto && String(alt.texto).trim() !== '');
-
-  // Se é Certo/Errado e não tem alternativas, gera automaticamente
-  if (isCertoErrado && alternativas.length === 0) {
-    alternativas = [
-      { letra: 'A', texto: 'Certo' },
-      { letra: 'B', texto: 'Errado' },
-    ];
-  }
-
-  // Normaliza o gabarito: 'Certo' → 'A', 'Errado' → 'B'
-  let gabaritoNormalizado = questao.gabarito;
-  if (isCertoErrado) {
-    const gabLower = (questao.gabarito || '').toLowerCase().trim();
-    if (gabLower === 'certo' || gabLower === 'c') {
-      gabaritoNormalizado = 'A';
-    } else if (gabLower === 'errado' || gabLower === 'e') {
-      gabaritoNormalizado = 'B';
-    }
-  }
 
   const corPrimaria = '#2196F3';
   const corAcerto = '#4CAF50';
@@ -337,7 +342,7 @@ export default function QuestaoCard({ questao, userEmail, userId, onRespondeu })
                 color: status === 'acertou' ? corAcerto : corErro,
                 border: `1px solid ${status === 'acertou' ? corAcerto : corErro}`
               }}>
-                {status === 'acertou' ? 'Você Acertou! 🎉' : 'Você Errou! 😢'}
+                {status === 'acertou' ? 'Você Acertou!' : 'Você Errou!'}
               </span>
               <button
                 onClick={() => setMostrarComentario(!mostrarComentario)}
