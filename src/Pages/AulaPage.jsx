@@ -48,6 +48,7 @@ function AulaPage() {
   const [listaModulos, setListaModulos] = useState([]); // Lista de todos os módulos da disciplina
   const [listaAulas, setListaAulas] = useState([]);
   const [progressoAulas, setProgressoAulas] = useState({});
+  const progressoAulasLoadedRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('video'); // 'video', 'pdf'
   const [showModulosMenu, setShowModulosMenu] = useState(false);
@@ -504,6 +505,7 @@ function AulaPage() {
             progressoMap[p.aula_id] = p;
           });
           setProgressoAulas(progressoMap);
+          progressoAulasLoadedRef.current = true;
           
           // Se a aula atual tiver progresso salvo e ainda não foi resumida
           const progressoAtual = progressoMap[aulaId];
@@ -597,6 +599,7 @@ function AulaPage() {
   // Salvar progresso no Supabase
   const salvarProgresso = async (tempo, forceSave = false, marcarConcluida = false) => {
     if (!user || !temAcesso) return;
+    if (!progressoAulasLoadedRef.current) return; // Aguarda carregar dados reais do DB antes de sobrescrever
     
     // Evita sobrescrever o histórico com 0:00 se a aula ainda está aguardando para pular pro minuto certo
     if (!hasResumedRef.current && tempo < 5 && !marcarConcluida) {
