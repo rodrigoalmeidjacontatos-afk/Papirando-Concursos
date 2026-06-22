@@ -1657,9 +1657,8 @@ function AulaPage() {
 
                     <div style={styles.controlsGroupRight}>
                       <div 
-                        style={styles.speedSelectorWrapper}
-                        onMouseEnter={() => setShowSpeedMenu(true)}
-                        onMouseLeave={() => setShowSpeedMenu(false)}
+                        style={{...styles.speedSelectorWrapper, cursor: 'pointer'}}
+                        onClick={() => setShowSpeedMenu(prev => !prev)}
                       >
                         <span style={styles.speedLabel}>{velocidade}x</span>
                         {showSpeedMenu && (
@@ -1667,7 +1666,7 @@ function AulaPage() {
                             {velocidades.map(v => (
                               <div
                                 key={v}
-                                onClick={() => { mudarVelocidade(v); setShowSpeedMenu(false); }}
+                                onClick={(e) => { e.stopPropagation(); mudarVelocidade(v); setShowSpeedMenu(false); }}
                                 style={{
                                   ...styles.speedMenuItem,
                                   backgroundColor: velocidade === v ? 'rgba(33, 150, 243, 0.2)' : 'transparent',
