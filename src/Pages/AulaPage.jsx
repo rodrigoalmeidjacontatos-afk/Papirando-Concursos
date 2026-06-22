@@ -52,7 +52,6 @@ function AulaPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('video'); // 'video', 'pdf'
   const [showModulosMenu, setShowModulosMenu] = useState(false);
-  const [showModulosMenu, setShowModulosMenu] = useState(false);
   const [showDisciplinasMenu, setShowDisciplinasMenu] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
