@@ -161,14 +161,22 @@ function AulaPage() {
     return () => {
       const state = unmountSaveRef.current;
       if (state.aulaId === currentAulaId && state.tempo > 0 && state.userId && state.duracao > 0) {
-        const isConcluida = state.tempo >= state.duracao * 0.9;
-        supabase.from('progresso').upsert({
-          user_id: state.userId,
-          aula_id: state.aulaId,
-          tempo_assistido: Math.floor(state.tempo),
-          concluida: isConcluida,
-          ultimo_acesso: new Date().toISOString()
-        }, { onConflict: 'user_id,aula_id' }).then(() => {});
+        
+        // RECUPERA o status atual de conclusão para NÃO sobrescrever com "false" se já estava "true"
+        setProgressoAulas(prev => {
+          const jaEstavaConcluida = prev[state.aulaId]?.concluida || false;
+          const isConcluida = jaEstavaConcluida || (state.tempo >= state.duracao * 0.9);
+          
+          supabase.from('progresso').upsert({
+            user_id: state.userId,
+            aula_id: state.aulaId,
+            tempo_assistido: Math.floor(state.tempo),
+            concluida: isConcluida,
+            ultimo_acesso: new Date().toISOString()
+          }, { onConflict: 'user_id,aula_id' }).then(() => {});
+
+          return prev;
+        });
       }
     };
   }, [aulaId]);
