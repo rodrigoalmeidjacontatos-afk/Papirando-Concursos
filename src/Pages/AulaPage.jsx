@@ -85,6 +85,10 @@ function AulaPage() {
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
   
+  const [videoId, setVideoId] = useState(null);
+  const videoIdRef = useRef(videoId);
+  useEffect(() => { videoIdRef.current = videoId; }, [videoId]);
+
   const forceReloadRef = useRef(null);
 
   useEffect(() => {
@@ -767,9 +771,6 @@ function AulaPage() {
     }, 1000);
   };
 
-  // ─── Ref para manter a referência atualizada do videoId dentro dos callbacks do player ───
-  const videoIdRef = useRef(videoId);
-  useEffect(() => { videoIdRef.current = videoId; }, [videoId]);
 
   // ─── INICIALIZAÇÃO DO PLAYER ───
   const playerInitializedRef = useRef(false);
