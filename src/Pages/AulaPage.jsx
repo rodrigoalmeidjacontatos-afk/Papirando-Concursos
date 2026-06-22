@@ -69,11 +69,11 @@ function AulaPage() {
 
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
-  const playerRef = useRef(null);
   const playerInstanceRef = useRef(null);
+  const playerRef = useRef(null);
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
-  const hasResumedRef = useRef(false);
+  const playerContainerRef = useRef(null); // Container imutável para não quebrar o React
   const seekTimePendenteRef = useRef(0);
   const lastSaveTimeRef = useRef(0);
   const duracaoRef = useRef(0);
@@ -741,6 +741,18 @@ function AulaPage() {
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
+    const container = isIOS ? null : playerContainerRef.current;
+    if (!isIOS && container) {
+      // Esvazia manualmente o container DOM
+      container.innerHTML = '';
+      // Cria a div filha onde a API do YouTube vai injetar o iframe
+      const div = document.createElement('div');
+      div.style.width = '100%';
+      div.style.height = '100%';
+      container.appendChild(div);
+      playerRef.current = div;
+    }
+
     const criarPlayer = () => {
       const targetEl = isIOS ? iosIframeRef.current : playerRef.current;
       if (!targetEl) return;
@@ -845,6 +857,7 @@ function AulaPage() {
       }
       setPlayer(null);
       setPlayerReady(false);
+      if (!isIOS && container) container.innerHTML = '';
     };
   }, [videoId, videoKey, isIOS]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1491,7 +1504,8 @@ function AulaPage() {
               onMouseEnter={() => setShowControls(true)}
               onMouseLeave={() => !isFullscreen && setShowControls(false)}
             >
-              <div key={videoKey} ref={playerRef} style={styles.player}></div>
+              {/* React nunca vai destruir isso, a gente destrói o iframe interno via innerHTML = '' */}
+              <div ref={playerContainerRef} style={styles.player}></div>
               
               {/* Camadas de bloqueio para evitar saída para o YouTube */}
               <div style={isFullscreen ? styles.blockTopFullscreen : styles.blockTop}></div>
