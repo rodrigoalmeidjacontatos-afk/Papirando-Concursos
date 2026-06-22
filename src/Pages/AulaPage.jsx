@@ -464,15 +464,24 @@ function AulaPage() {
           .in('aula_id', idsAulas);
         
         if (data && !error) {
-          const progressoMap = {};
-          data.forEach(p => {
-            progressoMap[p.aula_id] = p;
+          setProgressoAulas(prev => {
+            const novoMap = { ...prev };
+            data.forEach(p => {
+              const atual = prev[p.aula_id];
+              novoMap[p.aula_id] = {
+                ...p,
+                // Preserva o concluida=true local, pois o banco pode estar desatualizado (race condition do upsert otimista)
+                concluida: (atual && atual.concluida) ? true : p.concluida,
+                // Preserva o maior tempo assistido
+                tempo_assistido: Math.max(atual?.tempo_assistido || 0, p.tempo_assistido || 0)
+              };
+            });
+            return novoMap;
           });
-          setProgressoAulas(progressoMap);
           progressoAulasLoadedRef.current = true;
           
           // Se a aula atual tiver progresso salvo e ainda não foi resumida
-          const progressoAtual = progressoMap[aulaId];
+          const progressoAtual = data.find(p => String(p.aula_id) === String(aulaId));
           if (!hasResumedRef.current && progressoAtual) {
             const seekTime = progressoAtual.tempo_assistido || 0;
             if (seekTime > 0) {
