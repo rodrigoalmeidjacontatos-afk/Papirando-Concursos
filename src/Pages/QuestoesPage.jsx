@@ -128,7 +128,7 @@ export default function QuestoesPage() {
       // Paginação
       const de = (paginaAtual - 1) * porPagina;
       const ate = de + porPagina - 1;
-      query = query.range(de, ate).order('created_at', { ascending: true });
+      query = query.range(de, ate).order('created_at', { ascending: true }).order('id', { ascending: true });
 
       const { data, count, error } = await query;
       if (error) throw error;

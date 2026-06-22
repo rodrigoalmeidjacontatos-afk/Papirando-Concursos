@@ -52,7 +52,9 @@ function AulaPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('video'); // 'video', 'pdf'
   const [showModulosMenu, setShowModulosMenu] = useState(false);
+  const [showModulosMenu, setShowModulosMenu] = useState(false);
   const [showDisciplinasMenu, setShowDisciplinasMenu] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   // Estados de navegação local (para explorar sem trocar o vídeo)
   const [browsingDisciplinaId, setBrowsingDisciplinaId] = useState(disciplinaId);
@@ -1711,15 +1713,36 @@ function AulaPage() {
                     </div>
 
                     <div style={styles.controlsGroupRight}>
-                      <div style={styles.speedSelectorWrapper}>
+                      <div 
+                        style={styles.speedSelectorWrapper}
+                        onMouseEnter={() => setShowSpeedMenu(true)}
+                        onMouseLeave={() => setShowSpeedMenu(false)}
+                      >
                         <span style={styles.speedLabel}>{velocidade}x</span>
-                        <select 
-                          value={velocidade} 
-                          onChange={(e) => mudarVelocidade(parseFloat(e.target.value))} 
-                          style={styles.hiddenSpeedSelect}
-                        >
-                          {velocidades.map(v => <option key={v} value={v}>{v}x</option>)}
-                        </select>
+                        {showSpeedMenu && (
+                          <div style={styles.speedMenuOverlay}>
+                            {velocidades.map(v => (
+                              <div
+                                key={v}
+                                onClick={() => { mudarVelocidade(v); setShowSpeedMenu(false); }}
+                                style={{
+                                  ...styles.speedMenuItem,
+                                  backgroundColor: velocidade === v ? 'rgba(33, 150, 243, 0.2)' : 'transparent',
+                                  color: velocidade === v ? '#2196F3' : '#FFF',
+                                  fontWeight: velocidade === v ? 'bold' : 'normal',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (velocidade !== v) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (velocidade !== v) e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {v}x
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {!isFullscreen ? (
@@ -2470,6 +2493,32 @@ const styles = {
     height: '100%',
     opacity: 0,
     cursor: 'pointer',
+  },
+  speedMenuOverlay: {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    marginBottom: '10px',
+    backgroundColor: 'rgba(20, 20, 25, 0.85)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '8px',
+    padding: '8px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+    zIndex: 100,
+    minWidth: '80px',
+  },
+  speedMenuItem: {
+    padding: '8px 16px',
+    color: '#EEE',
+    fontSize: '14px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   
   modulosMenu: {

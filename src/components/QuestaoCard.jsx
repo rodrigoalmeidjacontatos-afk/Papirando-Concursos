@@ -102,6 +102,11 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
     if (alternativas[1] && alternativas[1].texto.toLowerCase().trim() === 'e') alternativas[1].texto = 'Errado';
   }
 
+  // Removemos qualquer numeração que venha no texto (ex: "14. ", "14 - ") para evitar confusão com o contador real
+  const enunciadoLimpo = questao.enunciado 
+    ? questao.enunciado.replace(/^\s*\d+[\.\-\)]\s*/, '')
+    : '';
+
   const responder = async () => {
     if (!respostaMarcada) return alert('Selecione uma alternativa.');
     if (status) return; // já respondeu
@@ -225,7 +230,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
       <div style={{ padding: '20px 20px 0 20px' }}>
         {/* ENUNCIADO */}
         <div style={{ fontSize: '15px', lineHeight: '1.75', marginBottom: '20px', color: '#FFF', whiteSpace: 'pre-wrap' }}>
-          {questao.enunciado}
+          {enunciadoLimpo}
         </div>
       </div>
 
@@ -338,11 +343,16 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
                 padding: '10px 24px', 
                 borderRadius: '8px', 
                 fontWeight: 'bold', 
-                backgroundColor: status === 'acertou' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                backdropFilter: 'blur(4px)',
                 color: status === 'acertou' ? corAcerto : corErro,
-                border: `1px solid ${status === 'acertou' ? corAcerto : corErro}`
+                border: `1px solid ${status === 'acertou' ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)'}`,
+                boxShadow: `0 4px 12px ${status === 'acertou' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)'}`,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontSize: '13px'
               }}>
-                {status === 'acertou' ? 'Você Acertou!' : 'Você Errou!'}
+                {status === 'acertou' ? 'Você Acertou' : 'Você Errou'}
               </span>
               <button
                 onClick={() => setMostrarComentario(!mostrarComentario)}
