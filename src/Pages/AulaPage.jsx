@@ -89,68 +89,12 @@ function AulaPage() {
   const videoIdRef = useRef(videoId);
   useEffect(() => { videoIdRef.current = videoId; }, [videoId]);
 
-  const forceReloadRef = useRef(null);
-
+  // Atualiza o videoId a partir dos dados da aula carregada
   useEffect(() => {
     const id = aulaPlaying?.video_id || aulaPlaying?.videoId || videosPorAula[videoKey];
     const finalId = id || (aulaPlaying ? 'dQw4w9WgXcQ' : null);
-
-    if (finalId) {
-      if (finalId === videoIdRef.current) {
-        // Se a nova aula usa exatamente o MESMO videoId da anterior,
-        // o state 'videoId' não muda e o effect de [videoId] não dispara.
-        // Forçamos o reload do player aqui para recomeçar o vídeo do zero:
-        if (forceReloadRef.current !== aulaId) {
-          forceReloadRef.current = aulaId;
-          const inst = playerInstanceRef.current;
-          if (inst && typeof inst.loadVideoById === 'function') {
-            try {
-              inst.loadVideoById(finalId);
-              setIsPlaying(true);
-            } catch (e) {
-              console.error('[AulaPage] Erro ao forçar reload de vídeo repetido:', e);
-            }
-          }
-        }
-      } else {
-        // Vídeo diferente: apenas atualiza o state, o effect [videoId] assume daqui
-        forceReloadRef.current = aulaId;
-        setVideoId(finalId);
-      }
-    }
-  }, [aulaPlaying, videoKey, aulaId]);
-
-  // Reset do controle de resumo ao trocar de vídeo/aula
-  useEffect(() => {
-    hasResumedRef.current = false;
-  }, [aulaId, videoId]);
-
-  // ─── FORÇA TROCA DE VÍDEO ao mudar de aulaId (mesmo que videoId seja igual) ───
-  // Isso resolve o caso em que duas aulas têm o mesmo video_id:
-  // o effect de troca de vídeo seria ignorado pois videoId não muda,
-  // mas aqui reagimos diretamente ao aulaId para garantir o reset/reload.
-  useEffect(() => {
-    if (!aulaId) return;
-    if (prevAulaIdRef.current === null) {
-      prevAulaIdRef.current = aulaId;
-      return;
-    }
-    if (prevAulaIdRef.current === aulaId) return;
-    prevAulaIdRef.current = aulaId;
-
-    // Reseta estados do player
-    setTempoAtual(0);
-    setDuracao(0);
-    duracaoRef.current = 0;
-    hasResumedRef.current = false;
-    seekTimePendenteRef.current = 0;
-    lastSaveTimeRef.current = 0;
-    stopProgressTracking();
-
-    // OBS: O código que forçava inst.loadVideoById(currentVideoId) aqui foi removido,
-    // pois chamava o vídeo antigo ANTES do novo chegar, "congelando" o player no 00:00.
-    // Agora isso é gerenciado corretamente no effect de [aulaPlaying] logo acima!
-  }, [aulaId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (finalId) setVideoId(finalId);
+  }, [aulaPlaying, videoKey]);
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -772,12 +716,23 @@ function AulaPage() {
   };
 
 
-  // ─── INICIALIZAÇÃO DO PLAYER ───
-  const playerInitializedRef = useRef(false);
-
+  // ─── INICIALIZAÇÃO E GERENCIAMENTO DO PLAYER ───
+  // Recria o player 100% do zero sempre que a aula ou o vídeo muda, evitando bugs da API do YouTube
   useEffect(() => {
-    // Só inicializa se tivermos um videoId e ainda não tiver sido inicializado
-    if (!videoId || playerInitializedRef.current) return;
+    if (!videoId) return;
+
+    if (playerInstanceRef.current) {
+      try { playerInstanceRef.current.destroy(); } catch (e) {}
+      playerInstanceRef.current = null;
+      setPlayerReady(false);
+    }
+
+    setTempoAtual(0);
+    setDuracao(0);
+    duracaoRef.current = 0;
+    hasResumedRef.current = false;
+    seekTimePendenteRef.current = 0;
+    stopProgressTracking();
 
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -789,14 +744,6 @@ function AulaPage() {
     const criarPlayer = () => {
       const targetEl = isIOS ? iosIframeRef.current : playerRef.current;
       if (!targetEl) return;
-
-      setPlayerReady(false);
-      stopProgressTracking();
-
-      if (playerInstanceRef.current) {
-        try { playerInstanceRef.current.destroy(); } catch (e) {}
-        playerInstanceRef.current = null;
-      }
 
       const config = {
         events: {
@@ -833,7 +780,6 @@ function AulaPage() {
                 setDuracao(currentDur);
                 duracaoRef.current = currentDur;
               }
-              // Reaplicar velocidade caso o YouTube tenha resetado (ex: loadVideoById sempre reseta para 1x)
               if (velocidadeRef.current !== 1 && typeof event.target.setPlaybackRate === 'function') {
                 try { event.target.setPlaybackRate(velocidadeRef.current); } catch (_) {}
               }
@@ -847,12 +793,9 @@ function AulaPage() {
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
-                // Não bloquear a navegação esperando o salvamento no banco
                 if (marcarAulaComoAssistidaRef.current) {
                   marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e));
                 }
-                
-                // Pular imediatamente para a próxima aula (gatilho)
                 if (irParaProximaAulaRef.current) {
                   irParaProximaAulaRef.current();
                 }
@@ -864,7 +807,7 @@ function AulaPage() {
       };
 
       if (!isIOS) {
-        config.videoId = videoIdRef.current;
+        config.videoId = videoId;
         config.host = 'https://www.youtube-nocookie.com';
         config.playerVars = {
           controls: 0,
@@ -875,7 +818,7 @@ function AulaPage() {
           fs: 0,
           iv_load_policy: 3,
           cc_load_policy: 0,
-          autoplay: 0,
+          autoplay: 1, // Ativa o autoplay quando recriamos o player ao mudar de aula
           playsinline: 1,
           origin: window.location.origin
         };
@@ -884,14 +827,9 @@ function AulaPage() {
       const newPlayer = new window.YT.Player(targetEl, config);
       setPlayer(newPlayer);
       playerInstanceRef.current = newPlayer;
-      playerInitializedRef.current = true;
     };
 
-    const tryInit = () => {
-      if (videoIdRef.current) {
-        criarPlayer();
-      }
-    };
+    const tryInit = () => setTimeout(() => criarPlayer(), 50);
 
     if (window.YT && window.YT.Player) {
       tryInit();
@@ -900,14 +838,6 @@ function AulaPage() {
     }
 
     return () => {
-      // O cleanup original aqui causava problemas porque desmontava o player ao mudar o videoId (quando usávamos a dependência antiga).
-      // Como agora usamos playerInitializedRef, não vamos destruir o player no cleanup do effect a menos que o componente desmonte.
-    };
-  }, [videoId]); // Vai rodar quando o videoId chegar, inicializando 1 única vez thanks to playerInitializedRef
-
-  // Limpeza real na desmontagem do componente
-  useEffect(() => {
-    return () => {
       stopProgressTracking();
       if (playerInstanceRef.current) {
         try { playerInstanceRef.current.destroy(); } catch (e) {}
@@ -915,40 +845,8 @@ function AulaPage() {
       }
       setPlayer(null);
       setPlayerReady(false);
-      playerInitializedRef.current = false;
     };
-  }, []);
-
-  // ─── TROCA DE VÍDEO: quando videoId muda, carrega o novo vídeo no player existente ───
-  useEffect(() => {
-    if (!videoId) return;
-    // Ignora na primeira renderização (o init já cuida disso)
-    if (prevVideoIdRef.current === null) {
-      prevVideoIdRef.current = videoId;
-      return;
-    }
-    if (prevVideoIdRef.current === videoId) return;
-    prevVideoIdRef.current = videoId;
-
-    // Reseta estados de duração/tempo para o novo vídeo
-    setTempoAtual(0);
-    setDuracao(0);
-    duracaoRef.current = 0;
-    hasResumedRef.current = false;
-    seekTimePendenteRef.current = 0;
-    stopProgressTracking();
-
-    const inst = playerInstanceRef.current;
-    if (inst && typeof inst.loadVideoById === 'function') {
-      try {
-        inst.loadVideoById(videoId);
-        setIsPlaying(true);
-        // Nota: a velocidade será reaplicada automaticamente pelo onStateChange=PLAYING via velocidadeRef
-      } catch (e) {
-        console.error('[AulaPage] Erro ao trocar vídeo via loadVideoById:', e);
-      }
-    }
-  }, [videoId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [videoId, videoKey, isIOS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Efeito para esconder os controles do iOS automaticamente quando está tocando
   useEffect(() => {
@@ -1593,7 +1491,7 @@ function AulaPage() {
               onMouseEnter={() => setShowControls(true)}
               onMouseLeave={() => !isFullscreen && setShowControls(false)}
             >
-              <div ref={playerRef} style={styles.player}></div>
+              <div key={videoKey} ref={playerRef} style={styles.player}></div>
               
               {/* Camadas de bloqueio para evitar saída para o YouTube */}
               <div style={isFullscreen ? styles.blockTopFullscreen : styles.blockTop}></div>
