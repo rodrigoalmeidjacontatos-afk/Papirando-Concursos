@@ -822,13 +822,15 @@ function AulaPage() {
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
-                if (marcarAulaComoAssistidaRef.current) {
-                  marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e));
-                }
-                if (irParaProximaAulaRef.current) {
-                  irParaProximaAulaRef.current();
-                }
                 stopProgressTracking();
+                // Aguarda o save terminar ANTES de navegar, para garantir que o banco
+                // já tem concluida=true quando a Home carregar
+                const salvar = marcarAulaComoAssistidaRef.current
+                  ? marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e))
+                  : Promise.resolve();
+                salvar.finally(() => {
+                  if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+                });
               }
             }
           }
@@ -914,12 +916,13 @@ function AulaPage() {
       }
 
       if (payload?.event === 'onStateChange' && payload.info === 0) { // 0 = ENDED
-        if (marcarAulaComoAssistidaRef.current) {
-          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(e => console.error(e));
-        }
-        if (irParaProximaAulaRef.current) {
-          irParaProximaAulaRef.current();
-        }
+        // Aguarda o save terminar ANTES de navegar (mesma lógica do player desktop)
+        const salvar = marcarAulaComoAssistidaRef.current
+          ? marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(e => console.error(e))
+          : Promise.resolve();
+        salvar.finally(() => {
+          if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+        });
       }
     };
 
