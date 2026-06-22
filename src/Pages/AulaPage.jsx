@@ -648,6 +648,13 @@ function AulaPage() {
       duracaoRef.current = dur;
       setDuracao(dur);
       setTempoAtual(Math.max(tempo, dur));
+      
+      // Sincroniza a ref de desmontagem imediatamente para evitar condição de corrida
+      // onde o unmount roda antes do state atualizar e salva concluida=false por engano
+      if (unmountSaveRef.current) {
+        unmountSaveRef.current.tempo = Math.max(tempo, dur);
+        unmountSaveRef.current.duracao = dur;
+      }
     }
 
     if (salvarProgressoRef.current) {
