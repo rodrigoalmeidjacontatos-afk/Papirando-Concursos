@@ -74,6 +74,7 @@ function AulaPage() {
   const containerRef = useRef(null);
   const iosIframeRef = useRef(null); // ref do iframe nativo para fullscreen no iOS
   const playerContainerRef = useRef(null); // Container imutável para não quebrar o React
+  const hasResumedRef = useRef(false);
   const seekTimePendenteRef = useRef(0);
   const lastSaveTimeRef = useRef(0);
   const duracaoRef = useRef(0);
