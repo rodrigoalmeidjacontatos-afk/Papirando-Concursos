@@ -85,18 +85,36 @@ function AulaPage() {
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
   
-  // Só definimos o videoId se tivermos os dados ou se for um ID conhecido
-  const [videoId, setVideoId] = useState(null);
+  const forceReloadRef = useRef(null);
 
   useEffect(() => {
     const id = aulaPlaying?.video_id || aulaPlaying?.videoId || videosPorAula[videoKey];
-    if (id) {
-      setVideoId(id);
-    } else if (aulaPlaying) {
-      // Se carregou a aula e não tem ID, fallback final
-      setVideoId('dQw4w9WgXcQ');
+    const finalId = id || (aulaPlaying ? 'dQw4w9WgXcQ' : null);
+
+    if (finalId) {
+      if (finalId === videoIdRef.current) {
+        // Se a nova aula usa exatamente o MESMO videoId da anterior,
+        // o state 'videoId' não muda e o effect de [videoId] não dispara.
+        // Forçamos o reload do player aqui para recomeçar o vídeo do zero:
+        if (forceReloadRef.current !== aulaId) {
+          forceReloadRef.current = aulaId;
+          const inst = playerInstanceRef.current;
+          if (inst && typeof inst.loadVideoById === 'function') {
+            try {
+              inst.loadVideoById(finalId);
+              setIsPlaying(true);
+            } catch (e) {
+              console.error('[AulaPage] Erro ao forçar reload de vídeo repetido:', e);
+            }
+          }
+        }
+      } else {
+        // Vídeo diferente: apenas atualiza o state, o effect [videoId] assume daqui
+        forceReloadRef.current = aulaId;
+        setVideoId(finalId);
+      }
     }
-  }, [aulaPlaying, videoKey]);
+  }, [aulaPlaying, videoKey, aulaId]);
 
   // Reset do controle de resumo ao trocar de vídeo/aula
   useEffect(() => {
@@ -125,21 +143,9 @@ function AulaPage() {
     lastSaveTimeRef.current = 0;
     stopProgressTracking();
 
-    // Se o videoId já estiver disponível E for igual ao anterior
-    // (caso em que o effect de videoId não vai disparar), força o reload agora
-    const currentVideoId = videoIdRef.current;
-    if (currentVideoId && prevVideoIdRef.current === currentVideoId) {
-      const inst = playerInstanceRef.current;
-      if (inst && typeof inst.loadVideoById === 'function') {
-        try {
-          inst.loadVideoById(currentVideoId);
-          setIsPlaying(true);
-        } catch (e) {
-          console.error('[AulaPage] Erro ao forçar reload do vídeo por aulaId:', e);
-        }
-      }
-    }
-    // Se videoId vai mudar, o effect de videoId (linha ~863) já cuida do loadVideoById
+    // OBS: O código que forçava inst.loadVideoById(currentVideoId) aqui foi removido,
+    // pois chamava o vídeo antigo ANTES do novo chegar, "congelando" o player no 00:00.
+    // Agora isso é gerenciado corretamente no effect de [aulaPlaying] logo acima!
   }, [aulaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
