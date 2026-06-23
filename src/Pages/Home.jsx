@@ -25,6 +25,7 @@ function Home() {
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
     minutosEstudados: 0,
+    totalSegundos: 0,
     aulasConcluidas: 0,
     aulasEmProgresso: 0,
     streak: 0,
@@ -411,7 +412,7 @@ function Home() {
         }
 
         // Salva as estatisticas basicas IMEDIATAMENTE (independente do historico de cursos)
-        setEstatisticasEstudo(prev => ({ ...prev, minutosEstudados, aulasConcluidas, aulasEmProgresso, streak }));
+        setEstatisticasEstudo(prev => ({ ...prev, minutosEstudados, totalSegundos, aulasConcluidas, aulasEmProgresso, streak }));
 
         // --- CARREGAR HISTORICO DE CURSOS (complementar) ---
         const aulaIds = todosProgressos.map(p => p.aula_id).filter(Boolean);
@@ -1066,7 +1067,12 @@ function Home() {
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.2))' }}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 <div>
                   <h3 style={{ fontSize: '28px', color: '#FFF', margin: '0 0 4px', fontWeight: '900' }}>
-                    {estatisticasEstudo.minutosEstudados}m
+                    {(() => {
+                      const h = Math.floor((estatisticasEstudo.totalSegundos || 0) / 3600);
+                      const m = Math.floor(((estatisticasEstudo.totalSegundos || 0) % 3600) / 60);
+                      const s = Math.floor((estatisticasEstudo.totalSegundos || 0) % 60);
+                      return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+                    })()}
                   </h3>
                   <p style={{ fontSize: '11px', color: '#888', margin: 0, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Tempo Estudado

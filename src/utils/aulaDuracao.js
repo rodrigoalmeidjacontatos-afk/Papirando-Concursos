@@ -24,17 +24,17 @@ export function formatarSegundos(segundos) {
 }
 
 export function formatarUltimoAcesso(iso) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return '—';
+  if (Number.isNaN(data.getTime())) return '-';
   const agora = new Date();
   const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
   const dia = new Date(data.getFullYear(), data.getMonth(), data.getDate());
   const diff = (hoje - dia) / (1000 * 60 * 60 * 24);
-  const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  if (diff === 0) return `hoje, ${hora}`;
-  if (diff === 1) return `ontem, ${hora}`;
-  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + `, ${hora}`;
+  
+  if (diff === 0) return `hoje`;
+  if (diff === 1) return `ontem`;
+  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
 /** Número da aula na lista ordenada do módulo (1-based). */
