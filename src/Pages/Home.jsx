@@ -720,7 +720,10 @@ function Home() {
             return 1;
           };
           const podeVerAba = (abaConfig) => {
+            const isAdmin = user?.email?.toLowerCase()?.includes('rodrigoalmeidja');
+            if (isAdmin) return true; // Admin tem acesso irrestrito
             if (!abaConfig?.ativo) return false;
+            if (abaConfig.plano === 'admin') return false; // Se a aba for exclusiva para admin e não for admin, bloqueia
             if (!abaConfig.plano || abaConfig.plano === 'livre' || abaConfig.plano === 'basico') return true;
             return getPlanLevel(planoUsuario) >= getPlanLevel(abaConfig.plano);
           };
