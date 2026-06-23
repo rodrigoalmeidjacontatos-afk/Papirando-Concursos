@@ -21,7 +21,8 @@ export default function QuestoesPage() {
     cargo: '',
     orgao: '',
     ano: '',
-    dificuldade: ''
+    dificuldade: '',
+    ocultarResolvidas: true
   });
   const [palavraChave, setPalavraChave] = useState(''); // Controlado separadamente - dispara na lupa/Enter
   
@@ -105,7 +106,12 @@ export default function QuestoesPage() {
   const fetchQuestoes = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('questoes').select('*', { count: 'exact' });
+      let query;
+      if (filtros.ocultarResolvidas && user?.email) {
+        query = supabase.rpc('get_questoes_nao_respondidas', { p_email: user.email }).select('*', { count: 'exact' });
+      } else {
+        query = supabase.from('questoes').select('*', { count: 'exact' });
+      }
       
       // Aplica Filtros
       if (filtros.disciplina) query = query.ilike('disciplina', `%${filtros.disciplina}%`);
@@ -143,7 +149,7 @@ export default function QuestoesPage() {
   };
 
   const clearFiltros = () => {
-    setFiltros({ disciplina: '', assunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '' });
+    setFiltros({ disciplina: '', assunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '', ocultarResolvidas: true });
     setPalavraChave('');
     setPaginaAtual(1);
   };
@@ -236,14 +242,25 @@ export default function QuestoesPage() {
           </div>
 
           {/* BOTÕES DE AÇÃO */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '32px', borderTop: '1px solid #2A2A35', paddingTop: '24px', gap: '16px' }}>
-            <button onClick={clearFiltros} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-              Limpar
-            </button>
-            <button onClick={() => setPaginaAtual(1)} style={{ backgroundColor: '#F0AD4E', color: '#FFF', border: 'none', padding: '12px 32px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>
-              Filtrar
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px', borderTop: '1px solid #2A2A35', paddingTop: '24px', gap: '16px', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#DDD', fontSize: '14px', userSelect: 'none' }}>
+              <input 
+                type="checkbox" 
+                checked={filtros.ocultarResolvidas} 
+                onChange={(e) => setFiltros({...filtros, ocultarResolvidas: e.target.checked})}
+                style={{ width: '18px', height: '18px', accentColor: '#E50914', cursor: 'pointer' }}
+              />
+              Priorizar (Ocultar) Questões Já Respondidas
+            </label>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <button onClick={clearFiltros} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                Limpar
+              </button>
+              <button onClick={() => setPaginaAtual(1)} style={{ backgroundColor: '#F0AD4E', color: '#FFF', border: 'none', padding: '12px 32px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>
+                Filtrar
+              </button>
+            </div>
           </div>
         </section>
 
