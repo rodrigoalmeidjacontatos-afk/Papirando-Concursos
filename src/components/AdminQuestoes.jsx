@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import Papa from 'papaparse';
 
@@ -8,6 +8,10 @@ export default function AdminQuestoes() {
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
   const porPagina = 10;
+
+  const [busca, setBusca] = useState('');
+  const [buscaAtiva, setBuscaAtiva] = useState('');
+  const buscaInputRef = useRef(null);
 
   const [form, setForm] = useState({
     concurso: '', orgao: '', cargo: '', banca: '', ano: '', 
@@ -20,23 +24,34 @@ export default function AdminQuestoes() {
   });
 
   const [editandoId, setEditandoId] = useState(null);
+  const [idCopiado, setIdCopiado] = useState(null);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    fetchQuestoes();
-  }, [pagina]);
-
-  const fetchQuestoes = async () => {
+  const fetchQuestoes = useCallback(async (pg = pagina, buscaFiltro = buscaAtiva) => {
     setLoading(true);
     try {
-      const de = (pagina - 1) * porPagina;
+      const de = (pg - 1) * porPagina;
       const ate = de + porPagina - 1;
-      const { data, count, error } = await supabase
+      let query = supabase
         .from('questoes')
         .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(de, ate);
-      
+        .order('created_at', { ascending: false });
+
+      if (buscaFiltro.trim()) {
+        let kw = buscaFiltro.trim();
+        // Se o usuário digitou o ID formatado (ex: PC-A1B2C), tira o prefixo para buscar no UUID original
+        const matchIdFormatado = kw.match(/^PC-?([a-zA-Z0-9\-]+)/i);
+        if (matchIdFormatado) {
+          kw = matchIdFormatado[1];
+        }
+        
+        // Busca por ID parcial (UUID) ou qualquer campo de texto
+        query = query.or(
+          `id.ilike.%${kw}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%`
+        );
+      }
+
+      const { data, count, error } = await query.range(de, ate);
       if (error) throw error;
       setQuestoes(data || []);
       setTotal(count || 0);
@@ -46,6 +61,28 @@ export default function AdminQuestoes() {
     } finally {
       setLoading(false);
     }
+  }, [pagina, buscaAtiva]);
+
+  useEffect(() => {
+    fetchQuestoes(pagina, buscaAtiva);
+  }, [pagina, buscaAtiva]);
+
+  const handleBuscar = () => {
+    setPagina(1);
+    setBuscaAtiva(busca);
+  };
+
+  const handleLimparBusca = () => {
+    setBusca('');
+    setBuscaAtiva('');
+    setPagina(1);
+  };
+
+  const copiarId = (id) => {
+    navigator.clipboard.writeText(id).then(() => {
+      setIdCopiado(id);
+      setTimeout(() => setIdCopiado(null), 2000);
+    });
   };
 
   const salvarQuestao = async () => {
@@ -67,7 +104,8 @@ export default function AdminQuestoes() {
         gabarito: 'A', comentario: '', referencia_legal: '', link_prova: ''
       });
       setEditandoId(null);
-      fetchQuestoes();
+      fetchQuestoes(1, buscaAtiva);
+      setPagina(1);
     } catch (e) {
       console.error(e);
       alert('Erro ao salvar questão');
@@ -77,6 +115,7 @@ export default function AdminQuestoes() {
   const editarQuestao = (q) => {
     setForm(q);
     setEditandoId(q.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const excluirQuestao = async (id) => {
@@ -84,7 +123,7 @@ export default function AdminQuestoes() {
     try {
       const { error } = await supabase.from('questoes').delete().eq('id', id);
       if (error) throw error;
-      fetchQuestoes();
+      fetchQuestoes(pagina, buscaAtiva);
     } catch (e) {
       alert('Erro ao excluir: ' + e.message);
     }
@@ -97,13 +136,11 @@ export default function AdminQuestoes() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      // Força a detecção do ponto e vírgula se o Excel brasileiro foi usado
       transformHeader: (header) => header.trim(),
       complete: async (results) => {
         const rows = results.data;
         if (rows.length === 0) return alert('O arquivo CSV está vazio.');
         
-        // Limpar dados antes de enviar pro banco
         const colunasValidas = [
           'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
           'disciplina', 'assunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
@@ -114,12 +151,11 @@ export default function AdminQuestoes() {
         const cleanRows = rows.map(row => {
           const cleanRow = {};
           for (const key in row) {
-            if (!colunasValidas.includes(key)) continue; // Ignora colunas extras como __parsed_extra
-            
+            if (!colunasValidas.includes(key)) continue;
             let val = row[key];
             if (typeof val === 'string') val = val.trim();
             if (val === '') {
-              cleanRow[key] = null; // Campos vazios viram null
+              cleanRow[key] = null;
             } else if (key === 'ano' || key === 'numero_questao') {
               cleanRow[key] = parseInt(val, 10);
               if (isNaN(cleanRow[key])) cleanRow[key] = null;
@@ -135,7 +171,8 @@ export default function AdminQuestoes() {
           const { error } = await supabase.from('questoes').insert(cleanRows);
           if (error) throw error;
           alert(`${cleanRows.length} questões importadas com sucesso!`);
-          fetchQuestoes();
+          fetchQuestoes(1, buscaAtiva);
+          setPagina(1);
         } catch (err) {
           console.error('Erro Supabase:', err);
           alert(`Erro ao importar: ${err.message || err.details || 'Desconhecido'}. Verifique os dados do seu CSV.`);
@@ -154,7 +191,6 @@ export default function AdminQuestoes() {
       'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
       'gabarito', 'comentario', 'referencia_legal', 'link_prova'
     ];
-    // Usa ponto e vírgula por padrão para compatibilidade com Excel em PT-BR
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + colunas.join(";");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -164,6 +200,8 @@ export default function AdminQuestoes() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const totalPaginas = Math.ceil(total / porPagina);
 
   return (
     <div>
@@ -189,7 +227,7 @@ export default function AdminQuestoes() {
 
       {/* FORMULÁRIO */}
       <div style={{ backgroundColor: '#1E1E24', padding: '24px', borderRadius: '12px', border: '1px solid #333', marginBottom: '24px' }}>
-        <h3 style={{ color: '#FFF', marginBottom: '16px' }}>{editandoId ? 'Editar Questão' : 'Nova Questão'}</h3>
+        <h3 style={{ color: '#FFF', marginBottom: '16px' }}>{editandoId ? `Editar Questão — ID: PC-${editandoId.substring(0, 6).toUpperCase()}` : 'Nova Questão'}</h3>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
           <input placeholder="Banca (Ex: Cebraspe)" value={form.banca} onChange={e=>setForm({...form, banca: e.target.value})} style={inputStyle} />
@@ -254,7 +292,7 @@ export default function AdminQuestoes() {
             {editandoId ? 'Atualizar Questão' : 'Cadastrar Questão'}
           </button>
           {editandoId && (
-            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', gabarito: 'A'})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', gabarito: 'A', dificuldade: 'Media', modalidade: 'Multipla Escolha', concurso: '', orgao: '', cargo: '', ano: '', estado: '', fase: '', numero_questao: '', disciplina: '', assunto: '', palavra_chave: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '', comentario: '', referencia_legal: '', link_prova: ''})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               Cancelar Edição
             </button>
           )}
@@ -263,43 +301,114 @@ export default function AdminQuestoes() {
 
       {/* LISTAGEM */}
       <div style={{ backgroundColor: '#1E1E24', padding: '24px', borderRadius: '12px', border: '1px solid #333' }}>
-        <h3 style={{ color: '#FFF', marginBottom: '16px' }}>Questões Cadastradas ({total})</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <h3 style={{ color: '#FFF', margin: 0 }}>Questões Cadastradas ({total})</h3>
+
+          {/* BARRA DE BUSCA */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '480px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#888', fontSize: '16px', pointerEvents: 'none' }}>🔍</span>
+              <input
+                ref={buscaInputRef}
+                type="text"
+                placeholder="Buscar por ID, enunciado, banca, disciplina..."
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleBuscar()}
+                style={{ ...inputStyle, paddingLeft: '38px', paddingRight: busca ? '32px' : '12px' }}
+              />
+              {busca && (
+                <button
+                  onClick={handleLimparBusca}
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
+                >×</button>
+              )}
+            </div>
+            <button
+              onClick={handleBuscar}
+              style={{ backgroundColor: '#2196F3', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
+            >
+              Buscar
+            </button>
+          </div>
+        </div>
+
+        {buscaAtiva && (
+          <p style={{ color: '#888', fontSize: '13px', marginBottom: '12px' }}>
+            Mostrando resultados para: <strong style={{ color: '#2196F3' }}>"{buscaAtiva}"</strong>
+            {' '}— <span style={{ cursor: 'pointer', color: '#F44336', textDecoration: 'underline' }} onClick={handleLimparBusca}>Limpar</span>
+          </p>
+        )}
         
         {loading ? <p style={{color: '#888'}}>Carregando...</p> : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', color: '#CCC', fontSize: '14px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #444', textAlign: 'left' }}>
-                <th style={{ padding: '10px' }}>ID</th>
-                <th style={{ padding: '10px' }}>Banca/Órgão</th>
-                <th style={{ padding: '10px' }}>Disciplina</th>
-                <th style={{ padding: '10px' }}>Enunciado</th>
-                <th style={{ padding: '10px' }}>Gabarito</th>
-                <th style={{ padding: '10px' }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {questoes.map(q => (
-                <tr key={q.id} style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '10px' }}>{q.id.substring(0,6)}</td>
-                  <td style={{ padding: '10px' }}>{q.banca} - {q.orgao}</td>
-                  <td style={{ padding: '10px' }}>{q.disciplina}</td>
-                  <td style={{ padding: '10px' }}>{q.enunciado.substring(0, 50)}...</td>
-                  <td style={{ padding: '10px', color: '#4CAF50', fontWeight: 'bold' }}>{q.gabarito}</td>
-                  <td style={{ padding: '10px' }}>
-                    <button onClick={() => editarQuestao(q)} style={{ background: '#2196F3', color: '#FFF', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>✏️</button>
-                    <button onClick={() => excluirQuestao(q.id)} style={{ background: '#F44336', color: '#FFF', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>🗑️</button>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', color: '#CCC', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #444', textAlign: 'left' }}>
+                  <th style={{ padding: '10px', whiteSpace: 'nowrap', color: '#888' }}>ID</th>
+                  <th style={{ padding: '10px' }}>Banca / Órgão</th>
+                  <th style={{ padding: '10px' }}>Disciplina</th>
+                  <th style={{ padding: '10px' }}>Enunciado</th>
+                  <th style={{ padding: '10px' }}>Gabarito</th>
+                  <th style={{ padding: '10px' }}>Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {questoes.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>Nenhuma questão encontrada.</td></tr>
+                )}
+                {questoes.map(q => {
+                  const displayId = `PC-${q.id.substring(0, 6).toUpperCase()}`;
+                  const copiado = idCopiado === q.id;
+                  return (
+                    <tr key={q.id} style={{ borderBottom: '1px solid #2a2a2a', transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#25252e'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: '10px' }}>
+                        <div
+                          title={`ID completo: ${q.id}\nClique para copiar`}
+                          onClick={() => copiarId(q.id)}
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            backgroundColor: copiado ? '#1a3a1a' : '#141419',
+                            color: copiado ? '#4CAF50' : '#7eb8f7',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            border: `1px solid ${copiado ? '#4CAF50' : '#2a3a4a'}`,
+                            display: 'inline-block',
+                            userSelect: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {copiado ? '✓ Copiado!' : displayId}
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px' }}>{q.banca}{q.orgao ? ` — ${q.orgao}` : ''}</td>
+                      <td style={{ padding: '10px' }}>{q.disciplina || '—'}</td>
+                      <td style={{ padding: '10px', maxWidth: '320px' }}>
+                        <span title={q.enunciado}>{q.enunciado ? q.enunciado.substring(0, 60) + (q.enunciado.length > 60 ? '…' : '') : '—'}</span>
+                      </td>
+                      <td style={{ padding: '10px', color: '#4CAF50', fontWeight: 'bold' }}>{q.gabarito}</td>
+                      <td style={{ padding: '10px' }}>
+                        <button onClick={() => editarQuestao(q)} title="Editar" style={{ background: '#2196F3', color: '#FFF', border: 'none', padding: '5px 9px', borderRadius: '4px', cursor: 'pointer', marginRight: '6px' }}>✏️</button>
+                        <button onClick={() => excluirQuestao(q.id)} title="Excluir" style={{ background: '#F44336', color: '#FFF', border: 'none', padding: '5px 9px', borderRadius: '4px', cursor: 'pointer' }}>🗑️</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {total > 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '20px' }}>
-            <button disabled={pagina === 1} onClick={() => setPagina(p=>p-1)} style={{ padding: '6px 12px', cursor: pagina===1 ? 'not-allowed' : 'pointer' }}>Anterior</button>
-            <span style={{ color: '#888' }}>Página {pagina}</span>
-            <button disabled={pagina * porPagina >= total} onClick={() => setPagina(p=>p+1)} style={{ padding: '6px 12px', cursor: pagina*porPagina>=total ? 'not-allowed' : 'pointer' }}>Próxima</button>
+            <button disabled={pagina === 1} onClick={() => setPagina(p => p - 1)} style={{ padding: '6px 14px', cursor: pagina === 1 ? 'not-allowed' : 'pointer', backgroundColor: pagina === 1 ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>← Anterior</button>
+            <span style={{ color: '#888' }}>Página {pagina} de {totalPaginas}</span>
+            <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)} style={{ padding: '6px 14px', cursor: pagina >= totalPaginas ? 'not-allowed' : 'pointer', backgroundColor: pagina >= totalPaginas ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>Próxima →</button>
           </div>
         )}
       </div>

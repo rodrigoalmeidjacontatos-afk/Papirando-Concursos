@@ -612,7 +612,7 @@ function AulaPage() {
     });
 
     const now = Date.now();
-    if (!forceSave && !marcarConcluida && now - lastSaveTimeRef.current < 10000) {
+    if (!forceSave && now - lastSaveTimeRef.current < 10000) {
       return;
     }
     lastSaveTimeRef.current = now;
@@ -719,10 +719,10 @@ function AulaPage() {
           const dur = duracaoRef.current || duracao;
           if (dur > 0 && tempo >= dur * 0.9) {
             if (salvarProgressoRef.current) {
-              salvarProgressoRef.current(tempo, true, true);
+              salvarProgressoRef.current(tempo, false, true);
             }
           } else if (salvarProgressoRef.current) {
-            salvarProgressoRef.current(tempo);
+            salvarProgressoRef.current(tempo, false, false);
           }
         } catch (e) {
           console.error('Erro no tracking de progresso:', e);
@@ -819,6 +819,7 @@ function AulaPage() {
                 if (salvarProgressoRef.current && typeof event.target.getCurrentTime === 'function') {
                   salvarProgressoRef.current(event.target.getCurrentTime(), true);
                 }
+                stopProgressTracking();
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);

@@ -157,6 +157,15 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
         backgroundColor: '#25252D',
         flexWrap: 'wrap'
       }}>
+        {/* Badge ID PC */}
+        {questao.id && (
+          <div 
+            title="ID Único da Questão"
+            style={{ backgroundColor: '#444', color: '#FFF', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', letterSpacing: '0.5px', fontFamily: 'monospace' }}
+          >
+            PC-{questao.id.substring(0, 6).toUpperCase()}
+          </div>
+        )}
         {/* Número da questão */}
         {(numero || questao.numero_questao) && (
           <div style={{ backgroundColor: corPrimaria, color: '#FFF', fontWeight: 'bold', padding: '6px 12px', borderRadius: '4px', fontSize: '14px', letterSpacing: '0.5px' }}>
