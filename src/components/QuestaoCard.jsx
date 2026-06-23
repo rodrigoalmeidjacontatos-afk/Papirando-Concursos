@@ -103,9 +103,16 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   }
 
   // Removemos qualquer numeração que venha no texto (ex: "14. ", "14 - ") para evitar confusão com o contador real
-  const enunciadoLimpo = questao.enunciado 
+  let enunciadoLimpo = questao.enunciado 
     ? questao.enunciado.replace(/^\s*\d+[\.\-\)]\s*/, '')
     : '';
+
+  let imagemEnunciado = null;
+  const matchImg = enunciadoLimpo.match(/\[IMG:(.+?)\]/);
+  if (matchImg) {
+    imagemEnunciado = matchImg[1].trim();
+    enunciadoLimpo = enunciadoLimpo.replace(/\[IMG:(.+?)\]/, '').trim();
+  }
 
   const responder = async () => {
     if (!respostaMarcada) return alert('Selecione uma alternativa.');
@@ -241,6 +248,12 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
         <div style={{ fontSize: '15px', lineHeight: '1.75', marginBottom: '20px', color: '#FFF', whiteSpace: 'pre-wrap' }}>
           {enunciadoLimpo}
         </div>
+        {/* IMAGEM DO ENUNCIADO */}
+        {imagemEnunciado && (
+          <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+            <img src={imagemEnunciado} alt="Imagem da questão" style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid #333' }} />
+          </div>
+        )}
       </div>
 
       {/* ALTERNATIVAS */}

@@ -25,6 +25,7 @@ export default function AdminQuestoes() {
 
   const [editandoId, setEditandoId] = useState(null);
   const [idCopiado, setIdCopiado] = useState(null);
+  const [imagemAux, setImagemAux] = useState('');
   const fileInputRef = useRef(null);
 
   const fetchQuestoes = useCallback(async (pg = pagina, buscaFiltro = buscaAtiva) => {
@@ -88,12 +89,17 @@ export default function AdminQuestoes() {
   const salvarQuestao = async () => {
     if (!form.enunciado || !form.gabarito) return alert('Enunciado e gabarito são obrigatórios.');
     try {
+      const payload = { ...form };
+      if (imagemAux.trim()) {
+        payload.enunciado = payload.enunciado.trim() + `\n\n[IMG:${imagemAux.trim()}]`;
+      }
+      
       if (editandoId) {
-        const { error } = await supabase.from('questoes').update(form).eq('id', editandoId);
+        const { error } = await supabase.from('questoes').update(payload).eq('id', editandoId);
         if (error) throw error;
         alert('Questão atualizada com sucesso!');
       } else {
-        const { error } = await supabase.from('questoes').insert([form]);
+        const { error } = await supabase.from('questoes').insert([payload]);
         if (error) throw error;
         alert('Questão cadastrada com sucesso!');
       }
@@ -103,6 +109,7 @@ export default function AdminQuestoes() {
         enunciado: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '',
         gabarito: 'A', comentario: '', referencia_legal: '', link_prova: ''
       });
+      setImagemAux('');
       setEditandoId(null);
       fetchQuestoes(1, buscaAtiva);
       setPagina(1);
@@ -113,7 +120,15 @@ export default function AdminQuestoes() {
   };
 
   const editarQuestao = (q) => {
-    setForm(q);
+    let enunciadoClean = q.enunciado || '';
+    let urlImg = '';
+    const matchImg = enunciadoClean.match(/\[IMG:(.+?)\]/);
+    if (matchImg) {
+      urlImg = matchImg[1].trim();
+      enunciadoClean = enunciadoClean.replace(/\[IMG:(.+?)\]/, '').trim();
+    }
+    setForm({ ...q, enunciado: enunciadoClean });
+    setImagemAux(urlImg);
     setEditandoId(q.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -248,7 +263,9 @@ export default function AdminQuestoes() {
           </select>
         </div>
 
-        <textarea placeholder="Enunciado da Questão" value={form.enunciado} onChange={e=>setForm({...form, enunciado: e.target.value})} style={{...inputStyle, width: '100%', height: '100px', marginBottom: '16px', resize: 'vertical'}} />
+        <textarea placeholder="Enunciado da Questão" value={form.enunciado} onChange={e=>setForm({...form, enunciado: e.target.value})} style={{...inputStyle, width: '100%', height: '100px', marginBottom: '8px', resize: 'vertical'}} />
+        
+        <input placeholder="URL da Imagem para o Enunciado (Opcional) - Ex: https://site.com/charge.png" value={imagemAux} onChange={e=>setImagemAux(e.target.value)} style={{...inputStyle, width: '100%', marginBottom: '16px'}} />
 
         {form.modalidade === 'Multipla Escolha' ? (
           <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
