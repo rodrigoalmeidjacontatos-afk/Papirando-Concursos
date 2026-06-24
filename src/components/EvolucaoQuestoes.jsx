@@ -8,6 +8,13 @@ export default function EvolucaoQuestoes({ userEmail }) {
   const [disciplinaAberta, setDisciplinaAberta] = useState(null); // drill-down
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false); // modal de confirmação
   const [limpando, setLimpando] = useState(false);
+  const [configMetricas, setConfigMetricas] = useState([
+    { id: 1, icone: '🔴', nome: 'Fora da Disputa', min: 0, max: 69.99, cor: '#FF4C4C' },
+    { id: 2, icone: '🟡', nome: 'Em Formação Competitiva', min: 70, max: 79.99, cor: '#FFD700' },
+    { id: 3, icone: '🟠', nome: 'Em Disputa Direta', min: 80, max: 86.99, cor: '#FFA500' },
+    { id: 4, icone: '🟢', nome: 'Dentro das Vagas', min: 87, max: 92.99, cor: '#00FF00' },
+    { id: 5, icone: '🟣', nome: 'Topo do Ranking', min: 93, max: 100, cor: '#8A2BE2' }
+  ]);
 
   useEffect(() => {
     if (userEmail) fetchStats();
@@ -16,6 +23,12 @@ export default function EvolucaoQuestoes({ userEmail }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
+      // PASSO 0: Busca configMetricas customizadas se houver
+      const { data: sysConfigMetricas } = await supabase.from('categorias').select('nome').eq('id', 'sys_config_metricas').single();
+      if (sysConfigMetricas && sysConfigMetricas.nome) {
+        try { setConfigMetricas(JSON.parse(sysConfigMetricas.nome)); } catch (e) {}
+      }
+
       // PASSO 1: Busca as respostas do usuário (sem join FK)
       const { data: respostasRaw, error: errRespostas } = await supabase
         .from('questoes_respostas')
@@ -437,12 +450,27 @@ export default function EvolucaoQuestoes({ userEmail }) {
           { label: 'Total Respondidas', valor: stats.total, cor: '#2196F3', icon: '📝' },
           { label: 'Acertos', valor: stats.acertos, cor: '#4CAF50', icon: '✅' },
           { label: 'Erros', valor: stats.erros, cor: '#E53935', icon: '❌' },
-          { label: 'Taxa de Acerto', valor: `${stats.taxaAcerto}%`, cor: stats.taxaAcerto >= 70 ? '#4CAF50' : stats.taxaAcerto >= 50 ? '#FFC107' : '#E53935', icon: '🏆' },
+          { label: 'Taxa de Acerto', valor: `${stats.taxaAcerto}%`, cor: stats.taxaAcerto >= 70 ? '#4CAF50' : stats.taxaAcerto >= 50 ? '#FFC107' : '#E53935', icon: '🎯' },
         ].map((item, i) => (
-          <div key={i} style={{ backgroundColor: 'rgba(20,20,25,0.85)', border: `1px solid ${item.cor}33`, borderRadius: '14px', padding: '20px', textAlign: 'center', boxShadow: `0 4px 20px ${item.cor}22` }}>
+          <div key={i} style={{ backgroundColor: 'rgba(20,20,25,0.85)', border: `1px solid ${item.cor}33`, borderRadius: '14px', padding: '20px', textAlign: 'center', boxShadow: `0 4px 20px ${item.cor}22`, position: 'relative' }}>
             <div style={{ fontSize: '28px', marginBottom: '4px' }}>{item.icon}</div>
             <div style={{ fontSize: '28px', fontWeight: '900', color: item.cor, lineHeight: 1 }}>{item.valor}</div>
             <div style={{ fontSize: '11px', color: '#888', marginTop: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</div>
+            
+            {/* RANKING PARA TAXA DE ACERTO */}
+            {item.label === 'Taxa de Acerto' && (() => {
+              const metricaAtual = configMetricas.find(m => stats.taxaAcerto >= m.min && stats.taxaAcerto <= m.max) || configMetricas[0];
+              return (
+                <div style={{ 
+                  marginTop: '12px', padding: '6px', backgroundColor: `${metricaAtual.cor}22`, 
+                  borderRadius: '8px', border: `1px solid ${metricaAtual.cor}55`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}>
+                  <span>{metricaAtual.icone}</span>
+                  <span style={{ color: metricaAtual.cor, fontSize: '11px', fontWeight: 'bold' }}>{metricaAtual.nome}</span>
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>

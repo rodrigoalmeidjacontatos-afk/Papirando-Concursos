@@ -84,6 +84,15 @@ function AdminPage() {
     questoes: { ativo: true, plano: 'basico' }
   });
 
+  // ========== CONFIGURAÇÃO DE MÉTRICAS DE DESEMPENHO ==========
+  const [configMetricas, setConfigMetricas] = useState([
+    { id: 1, icone: '🔴', nome: 'Fora da Disputa', min: 0, max: 69.99, cor: '#FF4C4C' },
+    { id: 2, icone: '🟡', nome: 'Em Formação Competitiva', min: 70, max: 79.99, cor: '#FFD700' },
+    { id: 3, icone: '🟠', nome: 'Em Disputa Direta', min: 80, max: 86.99, cor: '#FFA500' },
+    { id: 4, icone: '🟢', nome: 'Dentro das Vagas', min: 87, max: 92.99, cor: '#00FF00' },
+    { id: 5, icone: '🟣', nome: 'Topo do Ranking', min: 93, max: 100, cor: '#8A2BE2' }
+  ]);
+
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
   const [usuarioEditandoAcesso, setUsuarioEditandoAcesso] = useState(null); // {id, email, preparatorios_liberados: []}
 
@@ -386,6 +395,12 @@ function AdminPage() {
           if (sysConfig && sysConfig.nome) {
             try {
                setConfigAbas(JSON.parse(sysConfig.nome));
+            } catch(e) {}
+          }
+          const sysConfigMetricas = cat.find(c => c.id === 'sys_config_metricas');
+          if (sysConfigMetricas && sysConfigMetricas.nome) {
+            try {
+               setConfigMetricas(JSON.parse(sysConfigMetricas.nome));
             } catch(e) {}
           }
         }
@@ -1194,6 +1209,7 @@ function AdminPage() {
     { id: 'usuarios', nome: '👥 Usuários', icone: '👥' },
     { id: 'metricas', nome: '📊 Indicadores', icone: '📊' },
     { id: 'config_abas', nome: '⚙️ Abas do Site', icone: '⚙️' },
+    { id: 'metricas_questoes', nome: '📈 Métricas (Questões)', icone: '📈' },
     { id: 'questoes', nome: '📝 Banco de Questões', icone: '📝' },
   ];
 
@@ -1253,7 +1269,7 @@ function AdminPage() {
                 </div>
               </div>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {categorias.filter(c => c.id !== 'sys_config_abas').map(cat => (
+                {categorias.filter(c => c.id !== 'sys_config_abas' && c.id !== 'sys_config_metricas').map(cat => (
                   <div key={cat.id} style={styles.item}>
                     {editandoCategoria?.id === cat.id ? (
                       <div style={{display: 'flex', gap: '8px', flex: 1, alignItems: 'center', flexWrap: 'wrap'}}>
@@ -1307,6 +1323,96 @@ function AdminPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'metricas_questoes' && (
+            <div>
+              <h2 style={{color: '#fff', marginBottom: 20}}>Configuração de Métricas de Desempenho</h2>
+              <div style={styles.formCard}>
+                <p style={{color: '#AAA', marginBottom: '20px'}}>
+                  Configure os níveis de desempenho baseados na Taxa de Acerto em Questões. O sistema usará esses valores na aba "Minha Evolução" do aluno.
+                </p>
+                
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                  {configMetricas.map((metrica, idx) => (
+                    <div key={metrica.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: '#1A1A20', padding: '16px', borderRadius: '8px', flexWrap: 'wrap' }}>
+                      <div style={{display: 'flex', flexDirection: 'column', width: '60px'}}>
+                        <span style={{fontSize: '12px', color: '#888'}}>Ícone</span>
+                        <input style={{...styles.input, textAlign: 'center'}} value={metrica.icone} onChange={e => {
+                          const newCfg = [...configMetricas];
+                          newCfg[idx].icone = e.target.value;
+                          setConfigMetricas(newCfg);
+                        }} />
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', flex: 1, minWidth: '200px'}}>
+                        <span style={{fontSize: '12px', color: '#888'}}>Nome do Nível</span>
+                        <input style={styles.input} value={metrica.nome} onChange={e => {
+                          const newCfg = [...configMetricas];
+                          newCfg[idx].nome = e.target.value;
+                          setConfigMetricas(newCfg);
+                        }} />
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', width: '80px'}}>
+                        <span style={{fontSize: '12px', color: '#888'}}>Mín (%)</span>
+                        <input style={styles.input} type="number" step="0.01" value={metrica.min} onChange={e => {
+                          const newCfg = [...configMetricas];
+                          newCfg[idx].min = parseFloat(e.target.value);
+                          setConfigMetricas(newCfg);
+                        }} />
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', width: '80px'}}>
+                        <span style={{fontSize: '12px', color: '#888'}}>Máx (%)</span>
+                        <input style={styles.input} type="number" step="0.01" value={metrica.max} onChange={e => {
+                          const newCfg = [...configMetricas];
+                          newCfg[idx].max = parseFloat(e.target.value);
+                          setConfigMetricas(newCfg);
+                        }} />
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', width: '100px'}}>
+                        <span style={{fontSize: '12px', color: '#888'}}>Cor (Hex)</span>
+                        <input style={styles.input} value={metrica.cor} onChange={e => {
+                          const newCfg = [...configMetricas];
+                          newCfg[idx].cor = e.target.value;
+                          setConfigMetricas(newCfg);
+                        }} />
+                      </div>
+                      <button style={{background: 'none', border: 'none', color: '#E53935', cursor: 'pointer', marginTop: '16px'}} onClick={() => {
+                        setConfigMetricas(configMetricas.filter(m => m.id !== metrica.id));
+                      }}>
+                        ❌ Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{display: 'flex', gap: '16px', marginTop: '24px'}}>
+                  <button 
+                    onClick={() => {
+                      const newId = Math.max(...configMetricas.map(m => m.id), 0) + 1;
+                      setConfigMetricas([...configMetricas, { id: newId, icone: '🎯', nome: 'Novo Nível', min: 0, max: 0, cor: '#FFFFFF' }]);
+                    }}
+                    style={{...styles.addButton, flex: 1}}
+                  >
+                    ➕ Adicionar Nível
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      const { error } = await supabase.from('categorias').upsert([{ 
+                        id: 'sys_config_metricas', 
+                        nome: JSON.stringify(configMetricas), 
+                        icone: '', 
+                        tipo_acesso: 'admin' 
+                      }]);
+                      if (!error) alert('Métricas de Desempenho salvas com sucesso!');
+                      else alert('Erro ao salvar: ' + error.message);
+                    }} 
+                    style={{...styles.saveButton, flex: 1}}
+                  >
+                    💾 Salvar Configuração de Métricas
+                  </button>
+                </div>
               </div>
             </div>
           )}
