@@ -123,12 +123,21 @@ export default function QuestoesPage() {
       if (filtros.ano) query = query.eq('ano', filtros.ano);
       if (filtros.dificuldade) query = query.eq('dificuldade', filtros.dificuldade);
 
-      // Palavra-chave: busca em enunciado, assunto, disciplina, banca e concurso ao mesmo tempo
+      // Palavra-chave: busca em enunciado, assunto, disciplina, banca, concurso e ID ao mesmo tempo
       if (palavraChave.trim()) {
         const kw = palavraChave.trim();
-        query = query.or(
-          `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
-        );
+        // Verifica se é uma busca direta por ID (UUID ou número)
+        const isIdExato = /^[0-9a-f-]{8,}$/i.test(kw) || /^\d+$/.test(kw);
+        if (isIdExato) {
+          // Busca exata por ID (compatível com UUID e integer)
+          query = query.or(
+            `id.eq.${kw},enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+          );
+        } else {
+          query = query.or(
+            `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+          );
+        }
       }
 
       // Paginação
