@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 export default function EvolucaoQuestoes({ userEmail }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [periodoSelecionado, setPeriodoSelecionado] = useState(7);
+  const [periodoSelecionado, setPeriodoSelecionado] = useState(null);
   const [disciplinaAberta, setDisciplinaAberta] = useState(null); // drill-down
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false); // modal de confirmação
   const [limpando, setLimpando] = useState(false);
@@ -30,12 +30,18 @@ export default function EvolucaoQuestoes({ userEmail }) {
       }
 
       // PASSO 1: Busca as respostas do usuário (sem join FK)
-      const { data: respostasRaw, error: errRespostas } = await supabase
+      let query = supabase
         .from('questoes_respostas')
         .select('correta, created_at, alternativa_marcada, questao_id')
         .eq('user_email', userEmail)
-        .gte('created_at', new Date(Date.now() - periodoSelecionado * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: true });
+
+      // Aplica filtro de período apenas se não for modo geral
+      if (periodoSelecionado !== null) {
+        query = query.gte('created_at', new Date(Date.now() - periodoSelecionado * 24 * 60 * 60 * 1000).toISOString());
+      }
+
+      const { data: respostasRaw, error: errRespostas } = await query;
 
       if (errRespostas) throw errRespostas;
       if (!respostasRaw || respostasRaw.length === 0) {
@@ -239,7 +245,7 @@ export default function EvolucaoQuestoes({ userEmail }) {
     </div>
   );
 
-  const periodoBtns = [{ label: 'Hoje', value: 1 }, { label: '7 dias', value: 7 }, { label: '30 dias', value: 30 }, { label: '90 dias', value: 90 }];
+  const periodoBtns = [{ label: 'Geral', value: null }, { label: 'Hoje', value: 1 }, { label: '7 dias', value: 7 }, { label: '30 dias', value: 30 }, { label: '90 dias', value: 90 }];
 
   if (loading) return (
     <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
@@ -257,7 +263,7 @@ export default function EvolucaoQuestoes({ userEmail }) {
           🎯 Desempenho em Questões
         </h3>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {['Hoje', '7 dias', '30 dias', '90 dias'].map((l, i) => (
+          {['Geral', 'Hoje', '7 dias', '30 dias', '90 dias'].map((l, i) => (
             <span key={i} style={{
               backgroundColor: i === 0 ? 'rgba(240,173,78,0.15)' : 'transparent',
               color: i === 0 ? '#F0AD4E55' : '#33333388',
@@ -420,7 +426,7 @@ export default function EvolucaoQuestoes({ userEmail }) {
         </h3>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {periodoBtns.map(p => (
-            <button key={p.value} onClick={() => setPeriodoSelecionado(p.value)} style={{
+            <button key={p.label} onClick={() => setPeriodoSelecionado(p.value)} style={{
               backgroundColor: periodoSelecionado === p.value ? '#F0AD4E' : 'transparent',
               color: periodoSelecionado === p.value ? '#000' : '#888',
               border: `1px solid ${periodoSelecionado === p.value ? '#F0AD4E' : '#333'}`,
