@@ -2,20 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import Papa from 'papaparse';
 
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://wqvtimtgvlhhpmmfhhdi.supabase.co';
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxdnRpbXRndmxoaHBtbWZoaGRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTAyMDMsImV4cCI6MjA5Mjc4NjIwM30.nrWy9vI87oqUpkHq6thdzu-ns12RmCC1R9sjxqgcGeY';
-
-// Busca IDs de questões cujo UUID (como texto) começa com o prefixo informado.
-// Usa fetch direto para evitar que o SDK encode "::" como "%3A%3A" na URL.
+// Busca todos os IDs do banco e filtra client-side pelo prefixo do UUID.
+// Abordagem simples e confiável: evita problemas com cast id::text no PostgREST.
 async function buscarIdsPorPrefixoUUID(prefixo) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/questoes?id::text=ilike.${encodeURIComponent(prefixo)}%&select=id&limit=50`;
-    const resp = await fetch(url, {
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-    });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return Array.isArray(data) ? data.map(r => r.id) : [];
+    const { data, error } = await supabase
+      .from('questoes')
+      .select('id')
+      .limit(5000);
+    if (error || !data) return [];
+    const p = prefixo.toLowerCase();
+    return data.map(r => r.id).filter(id => id && id.toLowerCase().startsWith(p));
   } catch {
     return [];
   }
