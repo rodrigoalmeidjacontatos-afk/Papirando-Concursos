@@ -1169,9 +1169,9 @@ function Home() {
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(33,150,243,0.06)'; e.currentTarget.style.borderColor = 'rgba(33,150,243,0.1)'; }}
                   >
                     {/* Mini capa */}
-                    <div style={{ width: '72px', height: '44px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#000', flexShrink: 0 }}>
-                      {item.preparatorio.capa
-                        ? <img src={item.preparatorio.capa} alt="capa" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                    <div style={{ width: '50px', height: '70px', borderRadius: '6px', overflow: 'hidden', backgroundColor: '#111', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.5)', border: '1px solid #2a2a35' }}>
+                      {item.preparatorio.logo
+                        ? <img src={item.preparatorio.logo} alt="capa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a24' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2196F3" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                           </div>
@@ -1226,12 +1226,15 @@ function Home() {
                         paddingBottom: '20px',
                         flexWrap: 'wrap'
                       }}>
-                        {/* Capa miniaturizada */}
-                        <div style={{ width: '100px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {item.preparatorio.capa ? (
-                            <img src={item.preparatorio.capa} alt="Capa" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                        {/* Capa do Preparatório (mesmo formato da PreparatorioPage) */}
+                        <div style={{ width: '80px', height: '110px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#111', flexShrink: 0, boxShadow: '0 4px 16px rgba(0,0,0,0.6)', border: '1px solid #2a2a35' }}>
+                          {item.preparatorio.logo ? (
+                            <img src={item.preparatorio.logo} alt={item.preparatorio.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1a1a2e, #16213e)', flexDirection: 'column', gap: '6px' }}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span style={{ fontSize: '8px', color: '#444', textAlign: 'center', padding: '0 4px' }}>{item.preparatorio.nome?.substring(0,12)}</span>
+                            </div>
                           )}
                         </div>
 
