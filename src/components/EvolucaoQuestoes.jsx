@@ -177,26 +177,40 @@ export default function EvolucaoQuestoes({ userEmail }) {
     );
   };
 
-  // Gráfico de rosca SVG
+  // Gráfico de rosca SVG (maior e melhorado)
   const DonutChart = ({ acertos, erros }) => {
     const total = acertos + erros;
     if (total === 0) return null;
-    const r = 45, cx = 60, cy = 60;
+    const r = 72, cx = 90, cy = 90;
     const circunf = 2 * Math.PI * r;
     const pctAcertos = acertos / total;
+    const pctErros = 1 - pctAcertos;
     const dashAcertos = pctAcertos * circunf;
     const dashErros = circunf - dashAcertos;
+    const taxaAcerto = Math.round(pctAcertos * 100);
+    const corTaxa = taxaAcerto >= 70 ? '#4CAF50' : taxaAcerto >= 50 ? '#FFC107' : '#E53935';
     return (
-      <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#2A2A35" strokeWidth="14" />
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E53935" strokeWidth="14"
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        {/* Sombra de fundo */}
+        <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="20" />
+        {/* Trilha */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a28" strokeWidth="18" />
+        {/* Erros */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E53935" strokeWidth="18"
           strokeDasharray={`${dashErros} ${circunf}`} strokeDashoffset={0}
-          strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`} />
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#4CAF50" strokeWidth="14"
+          strokeLinecap="butt" transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ filter: 'drop-shadow(0 0 6px rgba(229,57,53,0.5))' }} />
+        {/* Acertos */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#4CAF50" strokeWidth="18"
           strokeDasharray={`${dashAcertos} ${circunf}`} strokeDashoffset={-dashErros}
-          strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`} />
-        <text x={cx} y={cy - 6} textAnchor="middle" fontSize="16" fontWeight="bold" fill="#FFF">{Math.round(pctAcertos * 100)}%</text>
-        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" fill="#888">acerto</text>
+          strokeLinecap="butt" transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ filter: 'drop-shadow(0 0 6px rgba(76,175,80,0.5))' }} />
+        {/* Percentual central */}
+        <text x={cx} y={cy - 10} textAnchor="middle" fontSize="26" fontWeight="900" fill={corTaxa}>{taxaAcerto}%</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fontSize="12" fill="#aaa" fontWeight="600">de acerto</text>
+        {/* Acertos e Erros em números */}
+        <text x={cx - 30} y={cy + 36} textAnchor="middle" fontSize="11" fill="#4CAF50" fontWeight="700">{acertos}✓</text>
+        <text x={cx + 30} y={cy + 36} textAnchor="middle" fontSize="11" fill="#E53935" fontWeight="700">{erros}✗</text>
       </svg>
     );
   };
@@ -259,18 +273,18 @@ export default function EvolucaoQuestoes({ userEmail }) {
 
       {/* TÍTULO PLACEHOLDER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <h3 style={{ margin: 0, fontSize: '18px', color: '#FFF', fontWeight: '800', letterSpacing: '0.5px', opacity: 0.4 }}>
+        <h3 style={{ margin: 0, fontSize: '18px', color: '#FFF', fontWeight: '800', letterSpacing: '0.5px', opacity: periodoSelecionado === null ? 0.4 : 1 }}>
           🎯 Desempenho em Questões
         </h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {['Geral', 'Hoje', '7 dias', '30 dias', '90 dias'].map((l, i) => (
-            <span key={i} style={{
-              backgroundColor: i === 0 ? 'rgba(240,173,78,0.15)' : 'transparent',
-              color: i === 0 ? '#F0AD4E55' : '#33333388',
-              border: `1px solid ${i === 0 ? '#F0AD4E33' : '#222'}`,
-              padding: '6px 14px', borderRadius: '999px',
-              fontSize: '12px', fontWeight: 'bold'
-            }}>{l}</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {periodoBtns.map(p => (
+            <button key={p.label} onClick={() => setPeriodoSelecionado(p.value)} style={{
+              backgroundColor: periodoSelecionado === p.value ? '#F0AD4E' : 'transparent',
+              color: periodoSelecionado === p.value ? '#000' : '#888',
+              border: `1px solid ${periodoSelecionado === p.value ? '#F0AD4E' : '#333'}`,
+              padding: '6px 14px', borderRadius: '999px', cursor: 'pointer',
+              fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s'
+            }}>{p.label}</button>
           ))}
         </div>
       </div>
@@ -484,21 +498,28 @@ export default function EvolucaoQuestoes({ userEmail }) {
       {/* GRÁFICO ROSCA + EVOLUÇÃO DIÁRIA */}
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px', alignItems: 'stretch' }}>
         {card(
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', height: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', height: '100%', padding: '8px 0' }}>
             <h4 style={{ margin: 0, fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px' }}>Acertos vs Erros</h4>
             <DonutChart acertos={stats.acertos} erros={stats.erros} />
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <span style={{ fontSize: '12px', color: '#4CAF50' }}>● Acertos ({stats.acertos})</span>
-              <span style={{ fontSize: '12px', color: '#E53935' }}>● Erros ({stats.erros})</span>
+            <div style={{ display: 'flex', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '900', color: '#4CAF50' }}>{stats.acertos}</span>
+                <span style={{ fontSize: '11px', color: '#4CAF5099' }}>● Acertos</span>
+              </div>
+              <div style={{ width: '1px', backgroundColor: '#2a2a35' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '900', color: '#E53935' }}>{stats.erros}</span>
+                <span style={{ fontSize: '11px', color: '#E5393599' }}>● Erros</span>
+              </div>
             </div>
           </div>,
-          { minWidth: '200px' }
+          { minWidth: '240px' }
         )}
         {card(
           <>
             <h4 style={{ margin: '0 0 16px', fontSize: '13px', color: '#AAA', textTransform: 'uppercase', letterSpacing: '1px' }}>Evolução Diária</h4>
             {stats.evolucaoDiaria.length > 1
-              ? <MiniBarChart data={stats.evolucaoDiaria} height={80} />
+              ? <MiniBarChart data={stats.evolucaoDiaria} height={120} />
               : <p style={{ color: '#555', fontSize: '13px' }}>Responda questões em dias diferentes para ver a evolução.</p>
             }
           </>
