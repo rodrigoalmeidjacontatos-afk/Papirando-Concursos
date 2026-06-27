@@ -2,6 +2,25 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import Papa from 'papaparse';
 
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://wqvtimtgvlhhpmmfhhdi.supabase.co';
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxdnRpbXRndmxoaHBtbWZoaGRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTAyMDMsImV4cCI6MjA5Mjc4NjIwM30.nrWy9vI87oqUpkHq6thdzu-ns12RmCC1R9sjxqgcGeY';
+
+// Busca IDs de questões cujo UUID (como texto) começa com o prefixo informado.
+// Usa fetch direto para evitar que o SDK encode "::" como "%3A%3A" na URL.
+async function buscarIdsPorPrefixoUUID(prefixo) {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/questoes?id::text=ilike.${encodeURIComponent(prefixo)}%&select=id&limit=50`;
+    const resp = await fetch(url, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data) ? data.map(r => r.id) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function AdminQuestoes() {
   const [questoes, setQuestoes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -39,26 +58,34 @@ export default function AdminQuestoes() {
         .order('created_at', { ascending: false });
 
       if (buscaFiltro.trim()) {
-        let kw = buscaFiltro.trim();
-        // Se o usuário digitou o ID formatado (ex: PC-076D03), tira o prefixo "PC-" para buscar no UUID original
-        const matchIdFormatado = kw.match(/^PC-([a-zA-Z0-9-]+)/i);
-        const kwId = matchIdFormatado ? matchIdFormatado[1].toLowerCase() : null;
+        const kw = buscaFiltro.trim();
 
-        // Verifica se parece um UUID completo para busca exata
+        // Detecta "PC-XXXXXX" ou sequência puramente hexadecimal (possível prefixo de UUID)
+        const matchPc = kw.match(/^PC-([a-zA-Z0-9-]+)/i);
+        const prefixoUUID = matchPc
+          ? matchPc[1].toLowerCase()
+          : /^[0-9a-fA-F]{4,32}$/.test(kw) ? kw.toLowerCase() : null;
+
+        // UUID completo → busca exata
         const isUUIDCompleto = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kw);
 
         if (isUUIDCompleto) {
-          // Busca exata por UUID completo
           query = query.eq('id', kw);
-        } else if (kwId) {
-          // Digitou "PC-XXXXXX" — usa or() com cast PostgREST para buscar pelos primeiros chars do UUID
-          query = query.or(
-            `id::text.ilike.${kwId}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
-          );
+        } else if (prefixoUUID) {
+          // Faz pré-busca de IDs via fetch direto (evita encoding do ::)
+          const ids = await buscarIdsPorPrefixoUUID(prefixoUUID);
+          if (ids.length > 0) {
+            query = query.in('id', ids);
+          } else {
+            // Fallback: busca nos campos de texto normais
+            query = query.or(
+              `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+            );
+          }
         } else {
-          // Busca parcial: tenta bater no UUID (cast para texto) e nos campos de texto
+          // Busca nos campos de texto (enunciado, banca, numero_questao, etc.)
           query = query.or(
-            `id::text.ilike.%${kw}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+            `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
           );
         }
       }
