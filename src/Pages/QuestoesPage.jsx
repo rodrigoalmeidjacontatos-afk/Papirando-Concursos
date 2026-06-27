@@ -126,16 +126,26 @@ export default function QuestoesPage() {
       // Palavra-chave: busca em enunciado, assunto, disciplina, banca, concurso e ID ao mesmo tempo
       if (palavraChave.trim()) {
         const kw = palavraChave.trim();
-        // Verifica se é uma busca direta por ID (UUID ou número)
-        const isIdExato = /^[0-9a-f-]{8,}$/i.test(kw) || /^\d+$/.test(kw);
-        if (isIdExato) {
-          // Busca exata por ID (compatível com UUID e integer)
+
+        // Se o usuário digitou o ID formatado (ex: PC-076D03), extrai a parte após "PC-"
+        const matchIdFormatado = kw.match(/^PC-([a-zA-Z0-9-]+)/i);
+        const kwId = matchIdFormatado ? matchIdFormatado[1].toLowerCase() : null;
+
+        // Verifica se é um UUID completo
+        const isUUIDCompleto = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kw);
+
+        if (isUUIDCompleto) {
+          // Busca exata por UUID completo
+          query = query.eq('id', kw);
+        } else if (kwId) {
+          // Digitou "PC-XXXXXX" — usa cast PostgREST para buscar pelos primeiros chars do UUID
           query = query.or(
-            `id.eq.${kw},enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+            `id::text.ilike.${kwId}%,enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
           );
         } else {
+          // Busca parcial: tenta bater no UUID (cast para texto) e nos campos de texto
           query = query.or(
-            `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+            `id::text.ilike.%${kw}%,enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
           );
         }
       }

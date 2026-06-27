@@ -40,16 +40,27 @@ export default function AdminQuestoes() {
 
       if (buscaFiltro.trim()) {
         let kw = buscaFiltro.trim();
-        // Se o usuário digitou o ID formatado (ex: PC-A1B2C), tira o prefixo para buscar no UUID original
-        const matchIdFormatado = kw.match(/^PC-?([a-zA-Z0-9\-]+)/i);
-        if (matchIdFormatado) {
-          kw = matchIdFormatado[1];
+        // Se o usuário digitou o ID formatado (ex: PC-076D03), tira o prefixo "PC-" para buscar no UUID original
+        const matchIdFormatado = kw.match(/^PC-([a-zA-Z0-9-]+)/i);
+        const kwId = matchIdFormatado ? matchIdFormatado[1].toLowerCase() : null;
+
+        // Verifica se parece um UUID completo para busca exata
+        const isUUIDCompleto = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kw);
+
+        if (isUUIDCompleto) {
+          // Busca exata por UUID completo
+          query = query.eq('id', kw);
+        } else if (kwId) {
+          // Digitou "PC-XXXXXX" — usa or() com cast PostgREST para buscar pelos primeiros chars do UUID
+          query = query.or(
+            `id::text.ilike.${kwId}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+          );
+        } else {
+          // Busca parcial: tenta bater no UUID (cast para texto) e nos campos de texto
+          query = query.or(
+            `id::text.ilike.%${kw}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+          );
         }
-        
-        // Busca por ID parcial (UUID) ou qualquer campo de texto
-        query = query.or(
-          `id.ilike.%${kw}%,enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%`
-        );
       }
 
       const { data, count, error } = await query.range(de, ate);
