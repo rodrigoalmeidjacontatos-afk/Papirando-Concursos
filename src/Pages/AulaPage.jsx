@@ -790,6 +790,13 @@ function AulaPage() {
         events: {
           onReady: (event) => {
             setPlayerReady(true);
+
+            // Desliga legendas via API do YouTube (mais confiável que só parâmetros URL)
+            try {
+              event.target.unloadModule('cc');
+              event.target.unloadModule('captions');
+            } catch (e) {}
+
             const videoDur = event.target.getDuration();
             setDuracao(videoDur);
             if (videoDur > 0) duracaoRef.current = videoDur;
@@ -2123,6 +2130,8 @@ function AulaPage() {
         iframe { width: 100% !important; height: 100% !important; position: absolute !important; top: 0 !important; left: 0 !important; }
         .ytp-gradient-top, .ytp-gradient-bottom, .ytp-chrome-top, .ytp-chrome-bottom, .ytp-title, .ytp-watermark, .ytp-youtube-button, .ytp-share-button { display: none !important; pointer-events: none !important; }
         .ytp-pause-overlay { display: none !important; } /* Esconde sugestões ao pausar */
+        /* Esconde legendas/closed captions do YouTube */
+        .ytp-caption-window-container, .ytp-caption-segment, .captions-text, .ytp-subtitles-button, .caption-window { display: none !important; visibility: hidden !important; opacity: 0 !important; }
 
         /* Estilos do Redesign da Barra Lateral */
         .selector-card {
