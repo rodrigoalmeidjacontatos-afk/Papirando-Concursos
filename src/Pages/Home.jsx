@@ -307,14 +307,16 @@ function Home() {
 
         // 2. Buscar atualizado em segundo plano
         try {
-          const resCat = await withTimeout(supabase.from('categorias').select('*'), 5000);
-          categoriasSupabase = resCat.data || [];
+          const resCat = await withTimeout(supabase.from('categorias').select('*'), 15000);
+          if (resCat && resCat.error) console.error('Erro RLS/Supabase Categorias:', resCat.error);
+          categoriasSupabase = resCat?.data || [];
           if (categoriasSupabase.length > 0) sessionStorage.setItem('papirando_cats', JSON.stringify(categoriasSupabase));
         } catch (e) { console.warn('Timeout categorias', e); }
 
         try {
-          const resCar = await withTimeout(supabase.from('carreiras').select('*'), 5000);
-          carreirasSupabase = resCar.data || [];
+          const resCar = await withTimeout(supabase.from('carreiras').select('*'), 15000);
+          if (resCar && resCar.error) console.error('Erro RLS/Supabase Carreiras:', resCar.error);
+          carreirasSupabase = resCar?.data || [];
           if (carreirasSupabase.length > 0) sessionStorage.setItem('papirando_cars', JSON.stringify(carreirasSupabase));
         } catch (e) { console.warn('Timeout carreiras', e); }
 
