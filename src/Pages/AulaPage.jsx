@@ -483,17 +483,29 @@ function AulaPage() {
           // Se a aula atual tiver progresso salvo e ainda não foi resumida
           const progressoAtual = data.find(p => String(p.aula_id) === String(aulaId));
           if (!hasResumedRef.current && progressoAtual) {
-            const seekTime = progressoAtual.tempo_assistido || 0;
-            if (seekTime > 0) {
-              setTempoAtual(seekTime);
-              if (player && playerReady) {
-                player.seekTo(seekTime, true);
-                hasResumedRef.current = true;
-              } else {
-                seekTimePendenteRef.current = seekTime;
-              }
+            // Se a aula já está concluída, começa do início (evita disparar ENDED automaticamente
+            // ao retomar no final do vídeo, o que causaria um loop infinito de navegação)
+            if (progressoAtual.concluida) {
+              hasResumedRef.current = true;
             } else {
-               hasResumedRef.current = true;
+              const seekTime = progressoAtual.tempo_assistido || 0;
+              if (seekTime > 0) {
+                // Limita o seek a no máximo 90% da duração conhecida para nunca aterrissar
+                // exatamente no final do vídeo e disparar o evento ENDED prematuramente
+                const duracaoConhecida = Number(aulaPlaying?.duracao) || 0;
+                const seekTimeSafe = duracaoConhecida > 0
+                  ? Math.min(seekTime, duracaoConhecida * 0.89)
+                  : seekTime;
+                setTempoAtual(seekTimeSafe);
+                if (player && playerReady) {
+                  player.seekTo(seekTimeSafe, true);
+                  hasResumedRef.current = true;
+                } else {
+                  seekTimePendenteRef.current = seekTimeSafe;
+                }
+              } else {
+                hasResumedRef.current = true;
+              }
             }
           }
         }
@@ -795,8 +807,13 @@ function AulaPage() {
             }
 
             if (seekTimePendenteRef.current > 0) {
-              event.target.seekTo(seekTimePendenteRef.current, true);
-              setTempoAtual(seekTimePendenteRef.current);
+              // Garante que nunca fazemos seek para além de 89% da duração real do vídeo,
+              // evitando que o evento ENDED seja disparado logo ao carregar (loop infinito)
+              const seekSafe = videoDur > 0
+                ? Math.min(seekTimePendenteRef.current, videoDur * 0.89)
+                : seekTimePendenteRef.current;
+              event.target.seekTo(seekSafe, true);
+              setTempoAtual(seekSafe);
               hasResumedRef.current = true;
               seekTimePendenteRef.current = 0;
             }
@@ -824,14 +841,24 @@ function AulaPage() {
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
                 stopProgressTracking();
-                // Aguarda o save terminar ANTES de navegar, para garantir que o banco
-                // já tem concluida=true quando a Home carregar
+                // Salva o progresso e navega para a próxima aula.
+                // Usa Promise.race com timeout de 5s para garantir que a navegação
+                // SEMPRE acontece, mesmo se o Supabase travar após uma pausa longa
+                // (rede inativa → request fica pendurado indefinidamente → .finally nunca dispara).
+                const navegarSeguindo = (() => {
+                  let navegou = false;
+                  return () => {
+                    if (!navegou) {
+                      navegou = true;
+                      if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+                    }
+                  };
+                })();
                 const salvar = marcarAulaComoAssistidaRef.current
                   ? marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e))
                   : Promise.resolve();
-                salvar.finally(() => {
-                  if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
-                });
+                const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+                Promise.race([salvar, timeout]).finally(navegarSeguindo);
               }
             }
           }
@@ -917,13 +944,22 @@ function AulaPage() {
       }
 
       if (payload?.event === 'onStateChange' && payload.info === 0) { // 0 = ENDED
-        // Aguarda o save terminar ANTES de navegar (mesma lógica do player desktop)
+        // Mesma lógica do player desktop: Promise.race com timeout de 5s
+        // para garantir navegação mesmo se o Supabase travar após pausa longa.
+        const navegarSeguindo = (() => {
+          let navegou = false;
+          return () => {
+            if (!navegou) {
+              navegou = true;
+              if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+            }
+          };
+        })();
         const salvar = marcarAulaComoAssistidaRef.current
           ? marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(e => console.error(e))
           : Promise.resolve();
-        salvar.finally(() => {
-          if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
-        });
+        const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+        Promise.race([salvar, timeout]).finally(navegarSeguindo);
       }
     };
 
