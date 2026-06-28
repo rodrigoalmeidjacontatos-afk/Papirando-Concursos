@@ -827,6 +827,12 @@ function AulaPage() {
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
+              // Reforço: desliga as legendas também quando o vídeo começa a tocar (carregamento tardio do módulo)
+              try {
+                event.target.unloadModule('cc');
+                event.target.unloadModule('captions');
+              } catch (e) {}
+
               setIsPlaying(true);
               const currentDur = event.target.getDuration();
               if (currentDur > 0 && duracaoRef.current === 0) {
