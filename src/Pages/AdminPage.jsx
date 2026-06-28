@@ -1195,8 +1195,13 @@ function AdminPage() {
       if (!isPrepVinculado(carreiraId, prepId)) {
         inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId });
       }
-      // Insert all in chunks or single request
-      await supabase.from('vinculos').upsert(inserts);
+      
+      // Divide os inserts em blocos de 500 para não estourar o limite de payload do Supabase (PostgREST)
+      const CHUNK = 500;
+      for (let i = 0; i < inserts.length; i += CHUNK) {
+        const chunk = inserts.slice(i, i + CHUNK);
+        await supabase.from('vinculos').upsert(chunk);
+      }
     }
     alert('✅ Todos os módulos e aulas selecionados!');
   };
