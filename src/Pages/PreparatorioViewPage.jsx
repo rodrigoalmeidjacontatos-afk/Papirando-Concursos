@@ -129,7 +129,7 @@ function PreparatorioViewPage() {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Primeiro garante a sessão e o perfil (via getUser, mais seguro que getSession)
+        // 1. Primeiro garante a sessão e o perfil
         const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
         if (authError) console.error("[Auth] Erro ao obter usuário:", authError);
 
@@ -140,6 +140,21 @@ function PreparatorioViewPage() {
           setPlanoUsuario('basico');
         }
 
+        // Helper para contornar limite de 1000 rows do Supabase
+        const fetchAll = async (table, query = '*') => {
+          let allRows = [];
+          let from = 0;
+          let done = false;
+          while (!done) {
+            const { data, error } = await supabase.from(table).select(query).range(from, from + 999);
+            if (error) throw error;
+            allRows = allRows.concat(data || []);
+            if (!data || data.length < 1000) done = true;
+            else from += 1000;
+          }
+          return allRows;
+        };
+
         // 2. Depois carrega os dados da página
         const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
         if (mounted) setPreparatorio(prepData);
@@ -147,8 +162,7 @@ function PreparatorioViewPage() {
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
         if (mounted) setDisciplinas(discData || []);
 
-        // Busca os vínculos PRIMEIRO para saber exatamente quais módulos e aulas carregar.
-        // Isso evita buscar todas as aulas do sistema (que ultrapassa o limite de 1000 rows do Supabase).
+        // Busca os vínculos PRIMEIRO para saber exatamente quais módulos e aulas carregar (otimização moderna).
         const { data: vData } = await supabase.from('vinculos').select('*').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId);
 
         let aulasFinal = [];
@@ -157,27 +171,20 @@ function PreparatorioViewPage() {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
             const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            // Busca apenas os módulos deste curso (filtrado por ID) — sem limite de 1000
+            // Busca apenas os módulos deste curso
             let modulosFiltrados = [];
             if (modulosPermitidos.length > 0) {
-              const { data: modFiltrado } = await supabase
-                .from('modulos')
-                .select('*')
-                .in('id', modulosPermitidos);
+              const { data: modFiltrado } = await supabase.from('modulos').select('*').in('id', modulosPermitidos);
               modulosFiltrados = modFiltrado || [];
             }
 
-            // Busca apenas as aulas vinculadas a este curso em chunks de 500 (evita limite de URL e de rows)
+            // Busca apenas as aulas vinculadas a este curso em chunks de 500
             let aulasCarregadas = [];
             if (aulasPermitidasIds.length > 0) {
               const CHUNK = 500;
               for (let i = 0; i < aulasPermitidasIds.length; i += CHUNK) {
                 const chunk = aulasPermitidasIds.slice(i, i + CHUNK);
-                const { data: chunkData } = await supabase
-                  .from('aulas')
-                  .select('*')
-                  .in('id', chunk)
-                  .order('ordem', { ascending: true });
+                const { data: chunkData } = await supabase.from('aulas').select('*').in('id', chunk).order('ordem', { ascending: true });
                 aulasCarregadas = aulasCarregadas.concat(chunkData || []);
               }
             }
@@ -186,11 +193,13 @@ function PreparatorioViewPage() {
             setModulos(modulosFiltrados);
             setAulas(aulasFinal);
           } else {
-            // Sem vínculos definidos: fallback — carrega módulos do preparatório
-            const { data: modData } = await supabase.from('modulos').select('*');
-            aulasFinal = [];
-            setModulos(modData || []);
-            setAulas([]);
+            // Fallback legado: carrega TODOS os módulos e TODAS as aulas do sistema (paginado para evitar limite de 1000)
+            const modData = await fetchAll('modulos');
+            const aulaData = await fetchAll('aulas');
+            
+            aulasFinal = aulaData.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+            setModulos(modData);
+            setAulas(aulasFinal);
           }
         }
 
