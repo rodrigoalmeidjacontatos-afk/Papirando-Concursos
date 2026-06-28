@@ -147,24 +147,50 @@ function PreparatorioViewPage() {
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
         if (mounted) setDisciplinas(discData || []);
 
-        const { data: modData } = await supabase.from('modulos').select('*');
-        const { data: aulaData } = await supabase.from('aulas').select('*').order('ordem', { ascending: true });
-
+        // Busca os vínculos PRIMEIRO para saber exatamente quais módulos e aulas carregar.
+        // Isso evita buscar todas as aulas do sistema (que ultrapassa o limite de 1000 rows do Supabase).
         const { data: vData } = await supabase.from('vinculos').select('*').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId);
 
         let aulasFinal = [];
         if (mounted) {
           if (vData && vData.length > 0) {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
-            const aulasPermitidas = vData.filter(v => v.aula_id).map(v => v.aula_id);
-            const modulosFiltrados = modulosPermitidos.length > 0 ? (modData || []).filter(m => modulosPermitidos.includes(m.id)) : (modData || []);
-            aulasFinal = aulasPermitidas.length > 0 ? (aulaData || []).filter(a => aulasPermitidas.includes(a.id)) : (aulaData || []);
+            const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
+
+            // Busca apenas os módulos deste curso (filtrado por ID) — sem limite de 1000
+            let modulosFiltrados = [];
+            if (modulosPermitidos.length > 0) {
+              const { data: modFiltrado } = await supabase
+                .from('modulos')
+                .select('*')
+                .in('id', modulosPermitidos);
+              modulosFiltrados = modFiltrado || [];
+            }
+
+            // Busca apenas as aulas vinculadas a este curso em chunks de 500 (evita limite de URL e de rows)
+            let aulasCarregadas = [];
+            if (aulasPermitidasIds.length > 0) {
+              const CHUNK = 500;
+              for (let i = 0; i < aulasPermitidasIds.length; i += CHUNK) {
+                const chunk = aulasPermitidasIds.slice(i, i + CHUNK);
+                const { data: chunkData } = await supabase
+                  .from('aulas')
+                  .select('*')
+                  .in('id', chunk)
+                  .order('ordem', { ascending: true });
+                aulasCarregadas = aulasCarregadas.concat(chunkData || []);
+              }
+            }
+
+            aulasFinal = aulasCarregadas;
             setModulos(modulosFiltrados);
             setAulas(aulasFinal);
           } else {
-            aulasFinal = aulaData || [];
+            // Sem vínculos definidos: fallback — carrega módulos do preparatório
+            const { data: modData } = await supabase.from('modulos').select('*');
+            aulasFinal = [];
             setModulos(modData || []);
-            setAulas(aulasFinal);
+            setAulas([]);
           }
         }
 
