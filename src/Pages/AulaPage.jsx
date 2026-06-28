@@ -876,7 +876,9 @@ function AulaPage() {
           disablekb: 1,
           fs: 0,
           iv_load_policy: 3,
-          cc_load_policy: 0,
+          cc_load_policy: 0,  // 0 = desabilita legendas automáticas
+          cc_lang_pref: 'none', // evita legenda automática por idioma do sistema
+          hl: 'pt',
           autoplay: 1, // Ativa o autoplay quando recriamos o player ao mudar de aula
           playsinline: 1,
           origin: window.location.origin
@@ -1381,7 +1383,7 @@ function AulaPage() {
                 <iframe
                   ref={iosIframeRef}
                   key={videoId}
-                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                  src={`https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&showinfo=0&cc_load_policy=0&cc_lang_pref=none&hl=pt&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
