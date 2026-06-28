@@ -171,14 +171,16 @@ function PreparatorioViewPage() {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
             const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            // Busca apenas os módulos deste curso
+            // Busca os módulos: se há IDs permitidos, filtra. Se não, traz todos.
             let modulosFiltrados = [];
             if (modulosPermitidos.length > 0) {
               const { data: modFiltrado } = await supabase.from('modulos').select('*').in('id', modulosPermitidos);
               modulosFiltrados = modFiltrado || [];
+            } else {
+              modulosFiltrados = await fetchAll('modulos');
             }
 
-            // Busca apenas as aulas vinculadas a este curso em chunks de 500
+            // Busca as aulas: se há IDs permitidos, filtra em chunks. Se não, traz todas.
             let aulasCarregadas = [];
             if (aulasPermitidasIds.length > 0) {
               const CHUNK = 500;
@@ -187,6 +189,9 @@ function PreparatorioViewPage() {
                 const { data: chunkData } = await supabase.from('aulas').select('*').in('id', chunk).order('ordem', { ascending: true });
                 aulasCarregadas = aulasCarregadas.concat(chunkData || []);
               }
+            } else {
+              aulasCarregadas = await fetchAll('aulas');
+              aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
             }
 
             aulasFinal = aulasCarregadas;
