@@ -162,10 +162,20 @@ function PreparatorioViewPage() {
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
         if (mounted) setDisciplinas(discData || []);
 
-        // Busca os vínculos PRIMEIRO para saber exatamente quais módulos e aulas carregar (otimização moderna).
-        const { data: vData } = await supabase.from('vinculos').select('*').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId);
-
-        let aulasFinal = [];
+        // Busca os vínculos PRIMEIRO (com paginação para evitar limite de 1000 rows se houver "Selecionar Tudo")
+        let vData = [];
+        let vFrom = 0;
+        let vDone = false;
+        while (!vDone) {
+          const { data } = await supabase.from('vinculos')
+            .select('*')
+            .eq('carreira_id', carreiraId)
+            .eq('preparatorio_id', preparatorioId)
+            .range(vFrom, vFrom + 999);
+          vData = vData.concat(data || []);
+          if (!data || data.length < 1000) vDone = true;
+          else vFrom += 1000;
+        }
         if (mounted) {
           if (vData && vData.length > 0) {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
