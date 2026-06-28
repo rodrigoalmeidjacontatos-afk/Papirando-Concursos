@@ -1175,22 +1175,75 @@ function AulaPage() {
         return;
       }
 
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handleBackward();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleForward();
-      } else if (e.key === ' ' || e.code === 'Space') {
-        e.preventDefault();
-        togglePlayPause();
-      } else if (e.key === 'Escape') {
-        if (isFullscreen) {
-          sairTelaCheia();
-        }
-        if (iosFullscreen) {
-          setIosFullscreen(false);
-        }
+      // Atalhos idênticos ao YouTube
+      switch (e.key) {
+        case 'ArrowLeft': // ← volta 5 segundos
+          e.preventDefault();
+          if (player && typeof player.getCurrentTime === 'function') {
+            const t = Math.max(0, player.getCurrentTime() - 5);
+            player.seekTo(t, true);
+            setTempoAtual(t);
+          }
+          break;
+        case 'ArrowRight': // → avança 5 segundos
+          e.preventDefault();
+          if (player && typeof player.getCurrentTime === 'function') {
+            const t = Math.min(duracao, player.getCurrentTime() + 5);
+            player.seekTo(t, true);
+            setTempoAtual(t);
+          }
+          break;
+        case 'j': // J → volta 10 segundos
+        case 'J':
+          e.preventDefault();
+          handleBackward();
+          break;
+        case 'l': // L → avança 10 segundos
+        case 'L':
+          e.preventDefault();
+          handleForward();
+          break;
+        case 'k': // K → play/pause
+        case 'K':
+        case ' ':  // Espaço → play/pause
+          e.preventDefault();
+          togglePlayPause();
+          break;
+        case 'm': // M → mudo
+        case 'M':
+          e.preventDefault();
+          handleMute();
+          break;
+        case 'ArrowUp': // ↑ volume +10%
+          e.preventDefault();
+          if (player && typeof player.getVolume === 'function') {
+            const vol = Math.min(100, player.getVolume() + 10);
+            player.setVolume(vol);
+            setVolume(vol);
+            if (vol > 0) setMuted(false);
+          }
+          break;
+        case 'ArrowDown': // ↓ volume -10%
+          e.preventDefault();
+          if (player && typeof player.getVolume === 'function') {
+            const vol = Math.max(0, player.getVolume() - 10);
+            player.setVolume(vol);
+            setVolume(vol);
+            if (vol === 0) setMuted(true);
+          }
+          break;
+        case 'f': // F → tela cheia / sair tela cheia
+        case 'F':
+          e.preventDefault();
+          if (isFullscreen) sairTelaCheia();
+          else entrarTelaCheia();
+          break;
+        case 'Escape':
+          if (isFullscreen) sairTelaCheia();
+          if (iosFullscreen) setIosFullscreen(false);
+          break;
+        default:
+          break;
       }
     };
 
