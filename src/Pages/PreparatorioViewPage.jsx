@@ -171,29 +171,23 @@ function PreparatorioViewPage() {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
             const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            // Busca os módulos: se há IDs permitidos, filtra. Se não, traz todos.
-            let modulosFiltrados = [];
+            // Para garantir que não haja erros de URL longa (HTTP 414) ao passar centenas de IDs,
+            // e para contornar o limite de 1000 rows do Supabase, buscamos tudo paginado e filtramos localmente.
+            // Esta é a mesma lógica robusta que o sistema antigo usava, mas agora com paginação.
+            const modData = await fetchAll('modulos');
+            const aulaData = await fetchAll('aulas');
+
+            let modulosFiltrados = modData;
             if (modulosPermitidos.length > 0) {
-              const { data: modFiltrado } = await supabase.from('modulos').select('*').in('id', modulosPermitidos);
-              modulosFiltrados = modFiltrado || [];
-            } else {
-              modulosFiltrados = await fetchAll('modulos');
+              modulosFiltrados = modData.filter(m => modulosPermitidos.includes(m.id));
             }
 
-            // Busca as aulas: se há IDs permitidos, filtra em chunks. Se não, traz todas.
-            let aulasCarregadas = [];
+            let aulasCarregadas = aulaData;
             if (aulasPermitidasIds.length > 0) {
-              const CHUNK = 500;
-              for (let i = 0; i < aulasPermitidasIds.length; i += CHUNK) {
-                const chunk = aulasPermitidasIds.slice(i, i + CHUNK);
-                const { data: chunkData } = await supabase.from('aulas').select('*').in('id', chunk).order('ordem', { ascending: true });
-                aulasCarregadas = aulasCarregadas.concat(chunkData || []);
-              }
-            } else {
-              aulasCarregadas = await fetchAll('aulas');
-              aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+              aulasCarregadas = aulaData.filter(a => aulasPermitidasIds.includes(a.id));
             }
 
+            aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
             aulasFinal = aulasCarregadas;
             setModulos(modulosFiltrados);
             setAulas(aulasFinal);
