@@ -176,6 +176,8 @@ function PreparatorioViewPage() {
           if (!data || data.length < 1000) vDone = true;
           else vFrom += 1000;
         }
+
+        let aulasFinal = [];
         if (mounted) {
           if (vData && vData.length > 0) {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
