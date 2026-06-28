@@ -362,24 +362,33 @@ function AdminPage() {
       const startTime = Date.now();
       
       try {
-        const [
-          { data: cat }, 
-          { data: carr }, 
-          { data: prep }, 
-          { data: disc }, 
-          { data: mods }, 
-          { data: aulasData },
-          { data: vData },
-          { data: docsData }
-        ] = await Promise.all([
-          supabase.from('categorias').select('*'),
-          supabase.from('carreiras').select('*'),
-          supabase.from('preparatorios').select('*'),
-          supabase.from('disciplinas').select('*'),
-          supabase.from('modulos').select('*'),
-          supabase.from('aulas').select('*'),
-          supabase.from('vinculos').select('*'),
-          supabase.from('documentos').select('*').order('created_at', { ascending: false })
+        // Função auxiliar: busca TODAS as linhas de uma tabela contornando o limite de 1000 rows
+        const fetchAll = async (table, query = '*', orderBy = null) => {
+          const PAGE = 1000;
+          let allRows = [];
+          let from = 0;
+          let done = false;
+          while (!done) {
+            let req = supabase.from(table).select(query).range(from, from + PAGE - 1);
+            if (orderBy) req = req.order(orderBy, { ascending: true });
+            const { data, error } = await req;
+            if (error) throw new Error(`${table}: ${error.message}`);
+            allRows = allRows.concat(data || []);
+            if (!data || data.length < PAGE) done = true;
+            else from += PAGE;
+          }
+          return allRows;
+        };
+
+        const [cat, carr, prep, disc, mods, aulasData, vData, docsData] = await Promise.all([
+          fetchAll('categorias'),
+          fetchAll('carreiras'),
+          fetchAll('preparatorios'),
+          fetchAll('disciplinas'),
+          fetchAll('modulos'),
+          fetchAll('aulas'),           // ← paginado: carrega TODAS as aulas, sem limite de 1000
+          fetchAll('vinculos'),
+          supabase.from('documentos').select('*').order('created_at', { ascending: false }).then(r => r.data || [])
         ]);
 
         setCategorias(cat || []);
