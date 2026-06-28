@@ -169,22 +169,26 @@ function PreparatorioViewPage() {
         if (mounted) {
           if (vData && vData.length > 0) {
             const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
+            const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
             const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            // Para garantir que não haja erros de URL longa (HTTP 414) ao passar centenas de IDs,
-            // e para contornar o limite de 1000 rows do Supabase, buscamos tudo paginado e filtramos localmente.
-            // Esta é a mesma lógica robusta que o sistema antigo usava, mas agora com paginação.
+            // Para garantir que não haja erros de URL longa (HTTP 414), buscamos tudo paginado e filtramos localmente.
             const modData = await fetchAll('modulos');
             const aulaData = await fetchAll('aulas');
 
             let modulosFiltrados = modData;
-            if (modulosPermitidos.length > 0) {
-              modulosFiltrados = modData.filter(m => modulosPermitidos.includes(m.id));
-            }
-
             let aulasCarregadas = aulaData;
-            if (aulasPermitidasIds.length > 0) {
-              aulasCarregadas = aulaData.filter(a => aulasPermitidasIds.includes(a.id));
+
+            // Se há Vínculos modernos definidos (módulo ou aula específicos), aplicamos o filtro.
+            // Se não, o curso é legado e todas as aulas e módulos são exibidos livremente.
+            if (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0) {
+              modulosFiltrados = modData.filter(m => modulosPermitidos.includes(m.id));
+              
+              // Uma aula é permitida se o seu módulo inteiro foi vinculado, OU se ela mesma foi vinculada individualmente.
+              aulasCarregadas = aulaData.filter(a => 
+                modulosCompletos.includes(a.modulo_id || a.moduloId) || 
+                aulasPermitidasIds.includes(a.id)
+              );
             }
 
             aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
