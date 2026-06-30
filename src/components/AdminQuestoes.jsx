@@ -528,10 +528,35 @@ export default function AdminQuestoes() {
         )}
 
         {total > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '20px' }}>
-            <button disabled={pagina === 1} onClick={() => setPagina(p => p - 1)} style={{ padding: '6px 14px', cursor: pagina === 1 ? 'not-allowed' : 'pointer', backgroundColor: pagina === 1 ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>← Anterior</button>
-            <span style={{ color: '#888' }}>Página {pagina} de {totalPaginas}</span>
-            <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)} style={{ padding: '6px 14px', cursor: pagina >= totalPaginas ? 'not-allowed' : 'pointer', backgroundColor: pagina >= totalPaginas ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>Próxima →</button>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+            <button disabled={pagina === 1} onClick={() => setPagina(p => p - 1)} style={{ padding: '6px 14px', cursor: pagina === 1 ? 'not-allowed' : 'pointer', backgroundColor: pagina === 1 ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>&#171; Anterior</button>
+            
+            {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPaginas || (p >= pagina - 2 && p <= pagina + 2))
+              .reduce((acc, p, i, arr) => {
+                if (i > 0 && p - arr[i - 1] > 1) {
+                  acc.push(<span key={`ellipsis-${p}`} style={{ color: '#888', padding: '0 4px' }}>...</span>);
+                }
+                acc.push(
+                  <button 
+                    key={p} 
+                    onClick={() => setPagina(p)} 
+                    style={{ 
+                      padding: '6px 12px', 
+                      cursor: 'pointer', 
+                      backgroundColor: pagina === p ? '#4CAF50' : '#333', 
+                      color: '#FFF', 
+                      border: 'none', 
+                      borderRadius: '4px',
+                      fontWeight: pagina === p ? 'bold' : 'normal'
+                    }}>
+                    {p}
+                  </button>
+                );
+                return acc;
+              }, [])}
+            
+            <button disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)} style={{ padding: '6px 14px', cursor: pagina >= totalPaginas ? 'not-allowed' : 'pointer', backgroundColor: pagina >= totalPaginas ? '#333' : '#2196F3', color: '#FFF', border: 'none', borderRadius: '4px' }}>Próxima &#187;</button>
           </div>
         )}
       </div>
