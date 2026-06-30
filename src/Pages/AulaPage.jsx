@@ -856,6 +856,9 @@ function AulaPage() {
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
+              // Garante que o sistema sabe que o vídeo já rodou (libera fallbacks)
+              hasResumedRef.current = true;
+              
               // Reforço: desliga as legendas também quando o vídeo começa a tocar (carregamento tardio do módulo)
               try {
                 event.target.unloadModule('cc');
@@ -864,7 +867,7 @@ function AulaPage() {
               // Se o player der reload na stream (ex: após pausa longa com token expirado),
               // ele recomeça do 0 sem disparar ENDED. Detectamos isso e forçamos o seek.
               const currentT = event.target.getCurrentTime();
-              if (currentT < 2 && tempoAtualRef.current > 10 && hasResumedRef.current) {
+              if (currentT < 2 && tempoAtualRef.current > 10) {
                 console.warn("[AulaPage] YouTube reloaded stream unexpectedly. Seeking back to", tempoAtualRef.current);
                 event.target.seekTo(tempoAtualRef.current, true);
               }
@@ -882,20 +885,19 @@ function AulaPage() {
               }
               startProgressTracking(event.target);
             } else {
-              if (event.data === window.YT.PlayerState.PAUSED) {
-                setIsPlaying(false);
+              if (event.data === window.YT.PlayerState.PAUSED || event.data === -1 || event.data === window.YT.PlayerState.BUFFERING) {
+                if (event.data === window.YT.PlayerState.PAUSED) setIsPlaying(false);
                 const pausedTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
-                if (salvarProgressoRef.current && pausedTime > 0) {
+                if (event.data === window.YT.PlayerState.PAUSED && salvarProgressoRef.current && pausedTime > 0) {
                   salvarProgressoRef.current(pausedTime, true);
                 }
-                stopProgressTracking();
+                if (event.data === window.YT.PlayerState.PAUSED) stopProgressTracking();
                 
-                // FALLBACK CRÍTICO: após uma pausa longa (30+ min), o YouTube pode NÃO
-                // disparar o evento ENDED quando o vídeo termina. Em vez disso, ele entra
-                // em PAUSED perto do final. Detectamos isso e navegamos automaticamente.
+                // FALLBACK CRÍTICO: às vezes o YouTube não dispara ENDED, e entra em PAUSED,
+                // UNSTARTED (-1) ou BUFFERING (3) no final do vídeo. Detectamos isso e navegamos.
                 const durFallback = duracaoRef.current || 0;
-                if (durFallback > 0 && pausedTime >= durFallback * 0.97 && !hasEndedRef.current && hasResumedRef.current) {
-                  console.log('[AulaPage] Vídeo pausou em', Math.round(pausedTime), 's de', Math.round(durFallback), 's (>=97%). Agendando navegação...');
+                if (durFallback > 0 && pausedTime >= durFallback * 0.98 && !hasEndedRef.current && hasResumedRef.current) {
+                  console.log('[AulaPage] Vídeo parou no fim (>=98%). Agendando navegação automática...');
                   if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current);
                   videoEndTimeoutRef.current = setTimeout(() => {
                     if (!hasEndedRef.current) {
