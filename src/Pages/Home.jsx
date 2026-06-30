@@ -127,18 +127,18 @@ function Home() {
 
     const init = async () => {
       try {
-        const { data: { session }, error } = await withTimeout(supabase.auth.getSession(), 5000);
+        const { data: { user }, error } = await withTimeout(supabase.auth.getUser(), 5000);
         if (error) {
           console.error("[Auth] Erro ao recuperar sessão inicial:", error);
-          return;
+          // Não retorna aqui, pois pode ser apenas que não haja sessão.
         }
         
-        if (session?.user) {
-          console.log("[Auth] Sessão inicial detectada:", session.user.email);
-          setUser(session.user);
-          await carregarPerfil(session.user);
+        if (user) {
+          console.log("[Auth] Usuário inicial detectado:", user.email);
+          setUser(user);
+          await carregarPerfil(user);
         } else {
-          console.log("[Auth] Nenhuma sessão inicial encontrada.");
+          console.log("[Auth] Nenhum usuário inicial encontrado.");
         }
       } catch (err) {
         console.error("[Auth] Falha crítica no init:", err);
