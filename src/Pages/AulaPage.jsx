@@ -788,12 +788,6 @@ function AulaPage() {
       return;
     }
 
-    if (playerInstanceRef.current) {
-      try { playerInstanceRef.current.destroy(); } catch (e) {}
-      playerInstanceRef.current = null;
-      setPlayerReady(false);
-    }
-
     setTempoAtual(0);
     setDuracao(0);
     duracaoRef.current = 0;
@@ -802,6 +796,24 @@ function AulaPage() {
     if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
     seekTimePendenteRef.current = 0;
     stopProgressTracking();
+
+    // OPTIMIZATION: Reaproveita o iframe existente no Desktop para transição instantânea!
+    // Evita a temida "tela preta de 8 segundos" causada pela recriação do iframe.
+    if (!isIOS && playerInstanceRef.current && typeof playerInstanceRef.current.loadVideoById === 'function') {
+      try {
+        console.log("[AulaPage] Reaproveitando iframe para transição rápida do vídeo:", videoId);
+        playerInstanceRef.current.loadVideoById({ videoId, startSeconds: 0 });
+        return; // Retorna cedo para não destruir o player!
+      } catch (e) {
+        console.warn("[AulaPage] Erro ao tentar reaproveitar player, recriando do zero...", e);
+      }
+    }
+
+    if (playerInstanceRef.current) {
+      try { playerInstanceRef.current.destroy(); } catch (e) {}
+      playerInstanceRef.current = null;
+      setPlayerReady(false);
+    }
 
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -903,8 +915,10 @@ function AulaPage() {
                 // FALLBACK CRÍTICO: às vezes o YouTube não dispara ENDED, e entra em PAUSED,
                 // UNSTARTED (-1) ou BUFFERING (3) no final do vídeo. Detectamos isso e navegamos.
                 const durFallback = duracaoRef.current || 0;
-                if (durFallback > 0 && pausedTime >= durFallback * 0.98 && !hasEndedRef.current && hasResumedRef.current) {
-                  console.log('[AulaPage] Vídeo parou no fim (>=98%). Agendando navegação automática...');
+                // BUGFIX: Ao invés de usar porcentagem (98% = 54 seg. adiantado num video de 45m), 
+                // usa um limite fixo absoluto de 2 segundos até o fim.
+                if (durFallback > 0 && (durFallback - pausedTime) <= 2 && !hasEndedRef.current && hasResumedRef.current) {
+                  console.log('[AulaPage] Vídeo parou no fim (<=2s). Agendando navegação automática...');
                   if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current);
                   videoEndTimeoutRef.current = setTimeout(() => {
                     if (!hasEndedRef.current) {
