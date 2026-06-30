@@ -43,6 +43,7 @@ export default function AdminQuestoes() {
   const [idCopiado, setIdCopiado] = useState(null);
   const [imagemAux, setImagemAux] = useState('');
   const fileInputRef = useRef(null);
+  const fileInputAtualizarRef = useRef(null);
 
   const fetchQuestoes = useCallback(async (pg = pagina, buscaFiltro = buscaAtiva) => {
     setLoading(true);
@@ -234,6 +235,64 @@ export default function AdminQuestoes() {
     });
   };
 
+  const importarAtualizacoesCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async function(results) {
+        const rows = results.data;
+        if (rows.length === 0) return alert('O arquivo CSV está vazio.');
+
+        const confirmacao = window.confirm(`Atenção: O sistema vai buscar as ${rows.length} questões no banco (pelo enunciado exato) e atualizar o campo Subassunto delas. Confirma?`);
+        if (!confirmacao) return;
+
+        setLoading(true);
+        try {
+          let atualizadas = 0;
+          let naoEncontradas = 0;
+          
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const enunciado = row.enunciado?.trim();
+            const subassunto = row.subassunto?.trim();
+            
+            if (!enunciado || !subassunto) continue;
+            
+            // Busca a questão pelo enunciado exato
+            const { data: qData } = await supabase
+              .from('questoes')
+              .select('id')
+              .eq('enunciado', enunciado)
+              .limit(1);
+              
+            if (qData && qData.length > 0) {
+              const { error: uError } = await supabase
+                .from('questoes')
+                .update({ subassunto: subassunto })
+                .eq('id', qData[0].id);
+                
+              if (!uError) atualizadas++;
+            } else {
+              naoEncontradas++;
+            }
+          }
+          
+          alert(`Atualização concluída!\n\nAtualizadas: ${atualizadas}\nNão encontradas (ou sem enunciado/subassunto): ${naoEncontradas}`);
+          fetchQuestoes(1, buscaAtiva);
+        } catch (err) {
+          console.error('Erro ao atualizar via CSV:', err);
+          alert('Erro na atualização em lote.');
+        } finally {
+          setLoading(false);
+          if (fileInputAtualizarRef.current) fileInputAtualizarRef.current.value = '';
+        }
+      }
+    });
+  };
+
   const baixarModeloCSV = () => {
     const colunas = [
       'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
@@ -269,9 +328,20 @@ export default function AdminQuestoes() {
             style={{ display: 'none' }} 
             id="csvUpload" 
           />
-          <label htmlFor="csvUpload" style={{ backgroundColor: '#FF9800', color: '#FFF', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-            Importar CSV
-          </label>
+          <button onClick={() => document.getElementById('csvUpload').click()} style={{ backgroundColor: '#2196F3', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Importar Novas (CSV)
+          </button>
+          <input 
+            type="file" 
+            accept=".csv" 
+            ref={fileInputAtualizarRef} 
+            onChange={importarAtualizacoesCSV} 
+            style={{ display: 'none' }} 
+            id="csvAtualizar" 
+          />
+          <button onClick={() => document.getElementById('csvAtualizar').click()} style={{ backgroundColor: '#FF9800', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Atualizar Subassuntos (CSV)
+          </button>
         </div>
       </div>
 
