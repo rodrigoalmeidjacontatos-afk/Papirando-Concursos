@@ -8,6 +8,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   const [loading, setLoading] = useState(false);
   const [mostrarComentario, setMostrarComentario] = useState(false);
   const [favorita, setFavorita] = useState(false);
+  const [expandirTexto, setExpandirTexto] = useState(false);
 
   useEffect(() => {
     // Resetar estado quando mudar de questão (se renderizado no mesmo componente)
@@ -252,6 +253,44 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
 
       {/* CORPO DA QUESTÃO */}
       <div style={{ padding: '20px 20px 0 20px' }}>
+        
+        {/* TEXTO ASSOCIADO */}
+        {questao.texto_associado && (
+          <div style={{ marginBottom: '20px' }}>
+            <button 
+              onClick={() => setExpandirTexto(!expandirTexto)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px', 
+                backgroundColor: 'transparent', color: '#FF9800', 
+                border: '1px solid #FF9800', borderRadius: '20px', 
+                padding: '6px 14px', cursor: 'pointer', fontSize: '14px',
+                fontWeight: '500', transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 152, 0, 0.1)' }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            >
+              Texto associado
+              <svg 
+                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                style={{ transform: expandirTexto ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }}
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            
+            {expandirTexto && (
+              <div style={{
+                marginTop: '12px', padding: '16px', backgroundColor: '#252525', 
+                borderLeft: '4px solid #FF9800', borderRadius: '4px',
+                fontSize: '14px', lineHeight: '1.7', color: '#CCC', whiteSpace: 'pre-wrap'
+              }}>
+                {questao.texto_associado}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ENUNCIADO */}
         <div style={{ fontSize: '15px', lineHeight: '1.75', marginBottom: '20px', color: '#FFF', whiteSpace: 'pre-wrap' }}>
           {enunciadoLimpo}

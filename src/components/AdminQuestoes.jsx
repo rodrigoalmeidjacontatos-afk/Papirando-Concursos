@@ -33,7 +33,7 @@ export default function AdminQuestoes() {
     concurso: '', orgao: '', cargo: '', banca: '', ano: '', 
     estado: '', fase: '', numero_questao: '', disciplina: '', 
     assunto: '', subassunto: '', palavra_chave: '', dificuldade: 'Media', 
-    modalidade: 'Multipla Escolha', enunciado: '', 
+    modalidade: 'Multipla Escolha', texto_associado: '', enunciado: '', 
     alternativa_a: '', alternativa_b: '', alternativa_c: '', 
     alternativa_d: '', alternativa_e: '', gabarito: 'A', 
     comentario: '', referencia_legal: '', link_prova: ''
@@ -142,7 +142,7 @@ export default function AdminQuestoes() {
       setForm({
         concurso: '', orgao: '', cargo: '', banca: '', ano: '', estado: '', fase: '', numero_questao: '',
         disciplina: '', assunto: '', subassunto: '', palavra_chave: '', dificuldade: 'Media', modalidade: 'Multipla Escolha',
-        enunciado: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '',
+        texto_associado: '', enunciado: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '',
         gabarito: 'A', comentario: '', referencia_legal: '', link_prova: ''
       });
       setImagemAux('');
@@ -194,7 +194,7 @@ export default function AdminQuestoes() {
         
         const colunasValidas = [
           'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
-          'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
+          'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'texto_associado', 'enunciado',
           'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
           'gabarito', 'comentario', 'referencia_legal', 'link_prova'
         ];
@@ -296,7 +296,7 @@ export default function AdminQuestoes() {
   const baixarModeloCSV = () => {
     const colunas = [
       'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
-      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
+      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'texto_associado', 'enunciado',
       'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
       'gabarito', 'comentario', 'referencia_legal', 'link_prova'
     ];
@@ -369,6 +369,8 @@ export default function AdminQuestoes() {
           </select>
         </div>
 
+        <textarea placeholder="Texto Associado (Opcional - Ex: Textos de interpretação, charges, poemas...)" value={form.texto_associado} onChange={e=>setForm({...form, texto_associado: e.target.value})} style={{...inputStyle, width: '100%', height: '80px', marginBottom: '8px', resize: 'vertical'}} />
+        
         <textarea placeholder="Enunciado da Questão" value={form.enunciado} onChange={e=>setForm({...form, enunciado: e.target.value})} style={{...inputStyle, width: '100%', height: '100px', marginBottom: '8px', resize: 'vertical'}} />
         
         <input placeholder="URL da Imagem para o Enunciado (Opcional) - Ex: https://site.com/charge.png" value={imagemAux} onChange={e=>setImagemAux(e.target.value)} style={{...inputStyle, width: '100%', marginBottom: '16px'}} />
@@ -415,7 +417,7 @@ export default function AdminQuestoes() {
             {editandoId ? 'Atualizar Questão' : 'Cadastrar Questão'}
           </button>
           {editandoId && (
-            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', gabarito: 'A', dificuldade: 'Media', modalidade: 'Multipla Escolha', concurso: '', orgao: '', cargo: '', ano: '', estado: '', fase: '', numero_questao: '', disciplina: '', assunto: '', subassunto: '', palavra_chave: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '', comentario: '', referencia_legal: '', link_prova: ''})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', texto_associado: '', gabarito: 'A', dificuldade: 'Media', modalidade: 'Multipla Escolha', concurso: '', orgao: '', cargo: '', ano: '', estado: '', fase: '', numero_questao: '', disciplina: '', assunto: '', subassunto: '', palavra_chave: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '', comentario: '', referencia_legal: '', link_prova: ''})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               Cancelar Edição
             </button>
           )}
