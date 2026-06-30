@@ -448,22 +448,33 @@ function AulaPage() {
         video_id: a.video_id || a.videoId
       }));
 
-      if (aulaId === 'primeira_aula') {
-          const { data: realModAulas } = await supabase.from('aulas').select('*').eq('modulo_id', moduloId).order('ordem', { ascending: true }).limit(1);
-          if (realModAulas && realModAulas.length > 0) {
-            const aulaReal = normalizar(realModAulas)[0];
-            setAulaPlaying(aulaReal);
-            navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${aulaReal.id}`, { replace: true });
-          }
-      } else {
-          const { data: aulaSolo } = await supabase.from('aulas').select('*').eq('id', aulaId).single();
-          if (aulaSolo) setAulaPlaying(normalizar([aulaSolo])[0]);
+      try {
+        if (aulaId === 'primeira_aula') {
+            const { data: realModAulas, error } = await supabase.from('aulas').select('*').eq('modulo_id', moduloId).order('ordem', { ascending: true }).limit(1);
+            if (!error && realModAulas && realModAulas.length > 0) {
+              const aulaReal = normalizar(realModAulas)[0];
+              setAulaPlaying(aulaReal);
+              navigate(`/aula/${carreiraId}/${preparatorioId}/${disciplinaId}/${moduloId}/${aulaReal.id}`, { replace: true });
+            }
+        } else {
+            // OPTIMIZATION & BUGFIX: Primeiro procura na lista local. 
+            // Isso evita travamentos (erros 406 de RLS) caso o token expire no momento exato em que a aula acaba.
+            const aulaNaLista = listaAulas.find(a => String(a.id) === String(aulaId));
+            if (aulaNaLista) {
+              setAulaPlaying(aulaNaLista);
+            } else {
+              const { data: aulaSolo, error } = await supabase.from('aulas').select('*').eq('id', aulaId).single();
+              if (!error && aulaSolo) setAulaPlaying(normalizar([aulaSolo])[0]);
+            }
+        }
+      } catch (err) {
+        console.error('[AulaPage] Erro no fetchPlaying:', err);
       }
     };
     if (aulaId && moduloId) {
       fetchPlaying();
     }
-  }, [aulaId, moduloId, disciplinaId, preparatorioId, carreiraId, navigate]);
+  }, [aulaId, moduloId, disciplinaId, preparatorioId, carreiraId, navigate, listaAulas]);
 
   // Sincronizar o estado de browsing quando a URL mudar de verdade (ex: usuário clicou em uma aula)
   useEffect(() => {
