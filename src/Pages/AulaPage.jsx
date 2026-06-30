@@ -888,10 +888,6 @@ function AulaPage() {
               if (event.data === window.YT.PlayerState.PAUSED || event.data === -1 || event.data === window.YT.PlayerState.BUFFERING) {
                 if (event.data === window.YT.PlayerState.PAUSED) setIsPlaying(false);
                 const pausedTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
-                if (event.data === window.YT.PlayerState.PAUSED && salvarProgressoRef.current && pausedTime > 0) {
-                  salvarProgressoRef.current(pausedTime, true);
-                }
-                if (event.data === window.YT.PlayerState.PAUSED) stopProgressTracking();
                 
                 // FALLBACK CRÍTICO: às vezes o YouTube não dispara ENDED, e entra em PAUSED,
                 // UNSTARTED (-1) ou BUFFERING (3) no final do vídeo. Detectamos isso e navegamos.
@@ -901,16 +897,15 @@ function AulaPage() {
                   if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current);
                   videoEndTimeoutRef.current = setTimeout(() => {
                     if (!hasEndedRef.current) {
-                      console.log('[AulaPage] Navegação automática (ENDED não disparou)');
                       hasEndedRef.current = true;
                       try {
                         if (marcarAulaComoAssistidaRef.current) {
                           marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(() => {});
                         }
-                      } catch (e) { console.warn('[AulaPage] Erro ao marcar aula no fallback:', e); }
+                      } catch (e) {}
                       if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
                     }
-                  }, 4000);
+                  }, 500);
                 }
               }
               if (event.data === window.YT.PlayerState.ENDED) {
@@ -920,24 +915,12 @@ function AulaPage() {
                 if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
                 if (hasEndedRef.current) return; // Já navegou via fallback, ignora
                 hasEndedRef.current = true;
-                console.log('[AulaPage] ENDED event disparado. Salvando e navegando...');
-                // Salva o progresso e navega para a próxima aula.
-                // Usa Promise.race com timeout de 5s para garantir que a navegação
-                // SEMPRE acontece, mesmo se o Supabase travar após uma pausa longa.
-                const navegarSeguindo = (() => {
-                  let navegou = false;
-                  return () => {
-                    if (!navegou) {
-                      navegou = true;
-                      if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
-                    }
-                  };
-                })();
-                const salvar = marcarAulaComoAssistidaRef.current
-                  ? marcarAulaComoAssistidaRef.current(event.target).catch(e => console.error(e))
-                  : Promise.resolve();
-                const timeout = new Promise(resolve => setTimeout(resolve, 5000));
-                Promise.race([salvar, timeout]).finally(navegarSeguindo);
+                
+                if (marcarAulaComoAssistidaRef.current) {
+                  marcarAulaComoAssistidaRef.current(event.target).catch(() => {});
+                }
+                
+                if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
               }
             }
           },
@@ -1038,22 +1021,14 @@ function AulaPage() {
       }
 
       if (payload?.event === 'onStateChange' && payload.info === 0) { // 0 = ENDED
-        // Mesma lógica do player desktop: Promise.race com timeout de 5s
-        // para garantir navegação mesmo se o Supabase travar após pausa longa.
-        const navegarSeguindo = (() => {
-          let navegou = false;
-          return () => {
-            if (!navegou) {
-              navegou = true;
-              if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
-            }
-          };
-        })();
-        const salvar = marcarAulaComoAssistidaRef.current
-          ? marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(e => console.error(e))
-          : Promise.resolve();
-        const timeout = new Promise(resolve => setTimeout(resolve, 5000));
-        Promise.race([salvar, timeout]).finally(navegarSeguindo);
+        if (hasEndedRef.current) return;
+        hasEndedRef.current = true;
+        
+        if (marcarAulaComoAssistidaRef.current) {
+          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(() => {});
+        }
+        
+        if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
       }
     };
 
