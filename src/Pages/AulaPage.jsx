@@ -84,6 +84,8 @@ function AulaPage() {
   const velocidadeRef = useRef(1); // Ref para manter velocidade atualizada nos callbacks do player
   const prevVideoIdRef = useRef(null); // Ref para detectar troca de videoId
   const prevAulaIdRef = useRef(null);  // Ref para detectar troca de aulaId
+  const hasEndedRef = useRef(false);   // Evita dupla-navegação quando vídeo termina
+  const videoEndTimeoutRef = useRef(null); // Timer para navegação automática ao fim do vídeo
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -263,9 +265,23 @@ function AulaPage() {
 
     inicializarSessao();
 
+    // KEEPALIVE: renova a sessão Supabase a cada 4 minutos para evitar expiração
+    // do token JWT durante pausas longas (ex: aluno fazendo anotações por 30+ min).
+    // Sem isso, o token expira e TODAS as operações falham silenciosamente
+    // (salvar progresso, buscar próxima aula, etc), causando o bug de navegação.
+    const keepaliveInterval = setInterval(async () => {
+      try {
+        const { error } = await supabase.auth.refreshSession();
+        if (error) console.warn('[Auth] Keepalive refresh error:', error.message);
+      } catch (e) {
+        console.warn('[Auth] Keepalive falhou:', e);
+      }
+    }, 4 * 60 * 1000);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearInterval(keepaliveInterval);
     };
   }, []);
 
@@ -771,6 +787,8 @@ function AulaPage() {
     setDuracao(0);
     duracaoRef.current = 0;
     hasResumedRef.current = false;
+    hasEndedRef.current = false;
+    if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
     seekTimePendenteRef.current = 0;
     stopProgressTracking();
 
@@ -852,6 +870,8 @@ function AulaPage() {
               }
               
               setIsPlaying(true);
+              // Cancela timer de navegação automática se o usuário retomou a reprodução
+              if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
               const currentDur = event.target.getDuration();
               if (currentDur > 0 && duracaoRef.current === 0) {
                 setDuracao(currentDur);
@@ -864,18 +884,44 @@ function AulaPage() {
             } else {
               if (event.data === window.YT.PlayerState.PAUSED) {
                 setIsPlaying(false);
-                if (salvarProgressoRef.current && typeof event.target.getCurrentTime === 'function') {
-                  salvarProgressoRef.current(event.target.getCurrentTime(), true);
+                const pausedTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
+                if (salvarProgressoRef.current && pausedTime > 0) {
+                  salvarProgressoRef.current(pausedTime, true);
                 }
                 stopProgressTracking();
+                
+                // FALLBACK CRÍTICO: após uma pausa longa (30+ min), o YouTube pode NÃO
+                // disparar o evento ENDED quando o vídeo termina. Em vez disso, ele entra
+                // em PAUSED perto do final. Detectamos isso e navegamos automaticamente.
+                const durFallback = duracaoRef.current || 0;
+                if (durFallback > 0 && pausedTime >= durFallback * 0.97 && !hasEndedRef.current && hasResumedRef.current) {
+                  console.log('[AulaPage] Vídeo pausou em', Math.round(pausedTime), 's de', Math.round(durFallback), 's (>=97%). Agendando navegação...');
+                  if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current);
+                  videoEndTimeoutRef.current = setTimeout(() => {
+                    if (!hasEndedRef.current) {
+                      console.log('[AulaPage] Navegação automática (ENDED não disparou)');
+                      hasEndedRef.current = true;
+                      try {
+                        if (marcarAulaComoAssistidaRef.current) {
+                          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(() => {});
+                        }
+                      } catch (e) { console.warn('[AulaPage] Erro ao marcar aula no fallback:', e); }
+                      if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+                    }
+                  }, 4000);
+                }
               }
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
                 stopProgressTracking();
+                // Cancela qualquer timer de fallback pois o ENDED disparou normalmente
+                if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
+                if (hasEndedRef.current) return; // Já navegou via fallback, ignora
+                hasEndedRef.current = true;
+                console.log('[AulaPage] ENDED event disparado. Salvando e navegando...');
                 // Salva o progresso e navega para a próxima aula.
                 // Usa Promise.race com timeout de 5s para garantir que a navegação
-                // SEMPRE acontece, mesmo se o Supabase travar após uma pausa longa
-                // (rede inativa → request fica pendurado indefinidamente → .finally nunca dispara).
+                // SEMPRE acontece, mesmo se o Supabase travar após uma pausa longa.
                 const navegarSeguindo = (() => {
                   let navegou = false;
                   return () => {
@@ -890,6 +936,18 @@ function AulaPage() {
                   : Promise.resolve();
                 const timeout = new Promise(resolve => setTimeout(resolve, 5000));
                 Promise.race([salvar, timeout]).finally(navegarSeguindo);
+              }
+            }
+          },
+          onError: (event) => {
+            console.error('[AulaPage] YouTube player error. Code:', event.data);
+            // Code 5 = HTML5 player error (stream expirado após pausa longa)
+            if (event.data === 5) {
+              const currentVid = videoIdRef.current;
+              if (currentVid) {
+                console.log('[AulaPage] Recriando player após erro HTML5...');
+                setVideoId(null);
+                setTimeout(() => setVideoId(currentVid), 500);
               }
             }
           }
@@ -931,6 +989,7 @@ function AulaPage() {
 
     return () => {
       stopProgressTracking();
+      if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
       if (playerInstanceRef.current) {
         try { playerInstanceRef.current.destroy(); } catch (e) {}
         playerInstanceRef.current = null;
@@ -1116,16 +1175,18 @@ function AulaPage() {
     // busca diretamente do banco para garantir dados corretos
     if (aulasDoModulo.length === 0 || !aulasDoModulo.find(a => String(a.id) === String(aulaId))) {
       try {
-        const { data: aulasDB } = await supabase
+        const dbQuery = supabase
           .from('aulas')
           .select('*')
           .eq('modulo_id', moduloId)
           .order('ordem', { ascending: true });
+        const dbTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+        const { data: aulasDB } = await Promise.race([dbQuery, dbTimeout]);
         if (aulasDB && aulasDB.length > 0) {
           aulasDoModulo = aulasDB.map(a => ({ ...a, moduloId: a.modulo_id, videoId: a.video_id }));
         }
       } catch (e) {
-        console.error('[irParaProximaAula] Erro ao buscar aulas do banco:', e);
+        console.warn('[irParaProximaAula] DB falhou/timeout, usando dados locais:', e.message);
       }
     }
 
@@ -1150,16 +1211,18 @@ function AulaPage() {
     // Se a lista local não pertence ao módulo atual, busca do banco
     if (aulasDoModulo.length === 0 || !aulasDoModulo.find(a => String(a.id) === String(aulaId))) {
       try {
-        const { data: aulasDB } = await supabase
+        const dbQuery = supabase
           .from('aulas')
           .select('*')
           .eq('modulo_id', moduloId)
           .order('ordem', { ascending: true });
+        const dbTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000));
+        const { data: aulasDB } = await Promise.race([dbQuery, dbTimeout]);
         if (aulasDB && aulasDB.length > 0) {
           aulasDoModulo = aulasDB.map(a => ({ ...a, moduloId: a.modulo_id, videoId: a.video_id }));
         }
       } catch (e) {
-        console.error('[irParaAulaAnterior] Erro ao buscar aulas do banco:', e);
+        console.warn('[irParaAulaAnterior] DB falhou/timeout, usando dados locais:', e.message);
       }
     }
 
