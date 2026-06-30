@@ -20,6 +20,8 @@ function AulaPage() {
   const [player, setPlayer] = useState(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [tempoAtual, setTempoAtual] = useState(0);
+  const tempoAtualRef = useRef(0);
+  useEffect(() => { tempoAtualRef.current = tempoAtual; }, [tempoAtual]);
   const [duracao, setDuracao] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [velocidade, setVelocidade] = useState(1);
@@ -92,10 +94,13 @@ function AulaPage() {
 
   // Atualiza o videoId a partir dos dados da aula carregada
   useEffect(() => {
+    if (aulaId && aulaId !== 'primeira_aula' && aulaPlaying && String(aulaPlaying.id) !== String(aulaId)) {
+      return;
+    }
     const id = aulaPlaying?.video_id || aulaPlaying?.videoId || videosPorAula[videoKey];
     const finalId = id || (aulaPlaying ? 'dQw4w9WgXcQ' : null);
     if (finalId) setVideoId(finalId);
-  }, [aulaPlaying, videoKey]);
+  }, [aulaPlaying, videoKey, aulaId]);
 
   const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -750,6 +755,12 @@ function AulaPage() {
   useEffect(() => {
     if (!videoId) return;
 
+    // Evita race condition: se a rota mudou (aulaId atualizado), 
+    // mas o aulaPlaying ainda é da aula anterior, aguarda o state atualizar.
+    if (aulaId && aulaId !== 'primeira_aula' && aulaPlaying && String(aulaPlaying.id) !== String(aulaId)) {
+      return;
+    }
+
     if (playerInstanceRef.current) {
       try { playerInstanceRef.current.destroy(); } catch (e) {}
       playerInstanceRef.current = null;
@@ -832,7 +843,14 @@ function AulaPage() {
                 event.target.unloadModule('cc');
                 event.target.unloadModule('captions');
               } catch (e) {}
-
+              // Se o player der reload na stream (ex: após pausa longa com token expirado),
+              // ele recomeça do 0 sem disparar ENDED. Detectamos isso e forçamos o seek.
+              const currentT = event.target.getCurrentTime();
+              if (currentT < 2 && tempoAtualRef.current > 10 && hasResumedRef.current) {
+                console.warn("[AulaPage] YouTube reloaded stream unexpectedly. Seeking back to", tempoAtualRef.current);
+                event.target.seekTo(tempoAtualRef.current, true);
+              }
+              
               setIsPlaying(true);
               const currentDur = event.target.getDuration();
               if (currentDur > 0 && duracaoRef.current === 0) {
