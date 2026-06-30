@@ -32,7 +32,7 @@ export default function AdminQuestoes() {
   const [form, setForm] = useState({
     concurso: '', orgao: '', cargo: '', banca: '', ano: '', 
     estado: '', fase: '', numero_questao: '', disciplina: '', 
-    assunto: '', palavra_chave: '', dificuldade: 'Media', 
+    assunto: '', subassunto: '', palavra_chave: '', dificuldade: 'Media', 
     modalidade: 'Multipla Escolha', enunciado: '', 
     alternativa_a: '', alternativa_b: '', alternativa_c: '', 
     alternativa_d: '', alternativa_e: '', gabarito: 'A', 
@@ -76,13 +76,13 @@ export default function AdminQuestoes() {
           } else {
             // Fallback: busca nos campos de texto normais
             query = query.or(
-              `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+              `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,subassunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
             );
           }
         } else {
           // Busca nos campos de texto (enunciado, banca, numero_questao, etc.)
           query = query.or(
-            `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
+            `enunciado.ilike.%${kw}%,banca.ilike.%${kw}%,disciplina.ilike.%${kw}%,assunto.ilike.%${kw}%,subassunto.ilike.%${kw}%,orgao.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,numero_questao.ilike.%${kw}%`
           );
         }
       }
@@ -140,7 +140,7 @@ export default function AdminQuestoes() {
       }
       setForm({
         concurso: '', orgao: '', cargo: '', banca: '', ano: '', estado: '', fase: '', numero_questao: '',
-        disciplina: '', assunto: '', palavra_chave: '', dificuldade: 'Media', modalidade: 'Multipla Escolha',
+        disciplina: '', assunto: '', subassunto: '', palavra_chave: '', dificuldade: 'Media', modalidade: 'Multipla Escolha',
         enunciado: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '',
         gabarito: 'A', comentario: '', referencia_legal: '', link_prova: ''
       });
@@ -193,7 +193,7 @@ export default function AdminQuestoes() {
         
         const colunasValidas = [
           'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
-          'disciplina', 'assunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
+          'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
           'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
           'gabarito', 'comentario', 'referencia_legal', 'link_prova'
         ];
@@ -237,7 +237,7 @@ export default function AdminQuestoes() {
   const baixarModeloCSV = () => {
     const colunas = [
       'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
-      'disciplina', 'assunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
+      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'enunciado',
       'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
       'gabarito', 'comentario', 'referencia_legal', 'link_prova'
     ];
@@ -286,6 +286,7 @@ export default function AdminQuestoes() {
           <input placeholder="Ano" value={form.ano} onChange={e=>setForm({...form, ano: e.target.value})} style={inputStyle} type="number" />
           <input placeholder="Disciplina (Ex: Dir. Penal)" value={form.disciplina} onChange={e=>setForm({...form, disciplina: e.target.value})} style={inputStyle} />
           <input placeholder="Assunto" value={form.assunto} onChange={e=>setForm({...form, assunto: e.target.value})} style={inputStyle} />
+          <input placeholder="Subassunto" value={form.subassunto} onChange={e=>setForm({...form, subassunto: e.target.value})} style={inputStyle} />
           
           <select value={form.dificuldade} onChange={e=>setForm({...form, dificuldade: e.target.value})} style={inputStyle}>
             <option value="Fácil">Fácil</option>
@@ -344,7 +345,7 @@ export default function AdminQuestoes() {
             {editandoId ? 'Atualizar Questão' : 'Cadastrar Questão'}
           </button>
           {editandoId && (
-            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', gabarito: 'A', dificuldade: 'Media', modalidade: 'Multipla Escolha', concurso: '', orgao: '', cargo: '', ano: '', estado: '', fase: '', numero_questao: '', disciplina: '', assunto: '', palavra_chave: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '', comentario: '', referencia_legal: '', link_prova: ''})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            <button onClick={() => { setEditandoId(null); setForm({banca: '', enunciado: '', gabarito: 'A', dificuldade: 'Media', modalidade: 'Multipla Escolha', concurso: '', orgao: '', cargo: '', ano: '', estado: '', fase: '', numero_questao: '', disciplina: '', assunto: '', subassunto: '', palavra_chave: '', alternativa_a: '', alternativa_b: '', alternativa_c: '', alternativa_d: '', alternativa_e: '', comentario: '', referencia_legal: '', link_prova: ''})}} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
               Cancelar Edição
             </button>
           )}

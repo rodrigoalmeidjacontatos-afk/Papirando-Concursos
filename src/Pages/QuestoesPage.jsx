@@ -32,6 +32,7 @@ export default function QuestoesPage() {
   const [filtros, setFiltros] = useState({
     disciplina: '',
     assunto: '',
+    subassunto: '',
     banca: '',
     concurso: '',
     cargo: '',
@@ -110,9 +111,33 @@ export default function QuestoesPage() {
   // Se a disciplina for limpa, limpa o assunto também
   useEffect(() => {
     if (!filtros.disciplina && filtros.assunto) {
-      setFiltros(prev => ({ ...prev, assunto: '' }));
+      setFiltros(prev => ({ ...prev, assunto: '', subassunto: '' }));
     }
   }, [filtros.disciplina]);
+
+  // Busca subassuntos baseados no assunto selecionado
+  const [subassuntosDoAssunto, setSubassuntosDoAssunto] = useState([]);
+  useEffect(() => {
+    if (!filtros.assunto) {
+      setSubassuntosDoAssunto([]);
+      setFiltros(prev => ({ ...prev, subassunto: '' }));
+      return;
+    }
+    const fetchSubassuntos = async () => {
+      const { data } = await supabase
+        .from('questoes')
+        .select('subassunto')
+        .eq('assunto', filtros.assunto)
+        .not('subassunto', 'is', null)
+        .not('subassunto', 'eq', '');
+      
+      if (data) {
+        const unique = [...new Set(data.map(d => d.subassunto).filter(Boolean))].sort();
+        setSubassuntosDoAssunto(unique.map(s => ({ value: s, label: s })));
+      }
+    };
+    fetchSubassuntos();
+  }, [filtros.assunto]);
 
   // Carrega Questões
   useEffect(() => {
@@ -132,6 +157,7 @@ export default function QuestoesPage() {
       // Aplica Filtros
       if (filtros.disciplina) query = query.ilike('disciplina', `%${filtros.disciplina}%`);
       if (filtros.assunto) query = query.ilike('assunto', `%${filtros.assunto}%`);
+      if (filtros.subassunto) query = query.ilike('subassunto', `%${filtros.subassunto}%`);
       if (filtros.banca) query = query.ilike('banca', `%${filtros.banca}%`);
       if (filtros.concurso) query = query.ilike('concurso', `%${filtros.concurso}%`);
       if (filtros.cargo) query = query.ilike('cargo', `%${filtros.cargo}%`);
@@ -139,7 +165,7 @@ export default function QuestoesPage() {
       if (filtros.ano) query = query.eq('ano', filtros.ano);
       if (filtros.dificuldade) query = query.eq('dificuldade', filtros.dificuldade);
 
-      // Palavra-chave: busca em enunciado, assunto, disciplina, banca, concurso e ID ao mesmo tempo
+      // Palavra-chave: busca em enunciado, assunto, subassunto, disciplina, banca, concurso e ID ao mesmo tempo
       if (palavraChave.trim()) {
         const kw = palavraChave.trim();
 
@@ -162,12 +188,12 @@ export default function QuestoesPage() {
           } else {
             // Fallback: busca nos campos de texto
             query = query.or(
-              `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+              `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,subassunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
             );
           }
         } else {
           query = query.or(
-            `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
+            `enunciado.ilike.%${kw}%,assunto.ilike.%${kw}%,subassunto.ilike.%${kw}%,disciplina.ilike.%${kw}%,banca.ilike.%${kw}%,concurso.ilike.%${kw}%,cargo.ilike.%${kw}%,palavra_chave.ilike.%${kw}%`
           );
         }
       }
@@ -190,7 +216,7 @@ export default function QuestoesPage() {
   };
 
   const clearFiltros = () => {
-    setFiltros({ disciplina: '', assunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '', ocultarResolvidas: true });
+    setFiltros({ disciplina: '', assunto: '', subassunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '', ocultarResolvidas: true });
     setPalavraChave('');
     setPaginaAtual(1);
   };
@@ -291,8 +317,9 @@ export default function QuestoesPage() {
               </button>
             </div>
             
-            <Select styles={selectStyles} placeholder="Disciplina" isClearable options={opcoesFiltro.disciplinas} value={filtros.disciplina ? {label: filtros.disciplina, value: filtros.disciplina} : null} onChange={(opt) => setFiltros({...filtros, disciplina: opt ? opt.value : '', assunto: ''})} />
-            <Select styles={selectStyles} placeholder={filtros.disciplina ? "Assunto" : "Selecione a Disciplina primeiro"} isDisabled={!filtros.disciplina} isClearable options={assuntosDaDisciplina} value={filtros.assunto ? {label: filtros.assunto, value: filtros.assunto} : null} onChange={(opt) => setFiltros({...filtros, assunto: opt ? opt.value : ''})} />
+            <Select styles={selectStyles} placeholder="Disciplina" isClearable options={opcoesFiltro.disciplinas} value={filtros.disciplina ? {label: filtros.disciplina, value: filtros.disciplina} : null} onChange={(opt) => setFiltros({...filtros, disciplina: opt ? opt.value : '', assunto: '', subassunto: ''})} />
+            <Select styles={selectStyles} placeholder={filtros.disciplina ? "Assunto" : "Selecione a Disciplina primeiro"} isDisabled={!filtros.disciplina} isClearable options={assuntosDaDisciplina} value={filtros.assunto ? {label: filtros.assunto, value: filtros.assunto} : null} onChange={(opt) => setFiltros({...filtros, assunto: opt ? opt.value : '', subassunto: ''})} />
+            <Select styles={selectStyles} placeholder={filtros.assunto ? "Subassunto" : "Selecione o Assunto primeiro"} isDisabled={!filtros.assunto} isClearable options={subassuntosDoAssunto} value={filtros.subassunto ? {label: filtros.subassunto, value: filtros.subassunto} : null} onChange={(opt) => setFiltros({...filtros, subassunto: opt ? opt.value : ''})} />
             <Select styles={selectStyles} placeholder="Banca" isClearable options={opcoesFiltro.bancas} value={filtros.banca ? {label: filtros.banca, value: filtros.banca} : null} onChange={(opt) => setFiltros({...filtros, banca: opt ? opt.value : ''})} />
             <Select styles={selectStyles} placeholder="Órgão / Instituição" isClearable options={opcoesFiltro.orgaos} value={filtros.orgao ? {label: filtros.orgao, value: filtros.orgao} : null} onChange={(opt) => setFiltros({...filtros, orgao: opt ? opt.value : ''})} />
             <Select styles={selectStyles} placeholder="Cargo" isClearable options={opcoesFiltro.cargos} value={filtros.cargo ? {label: filtros.cargo, value: filtros.cargo} : null} onChange={(opt) => setFiltros({...filtros, cargo: opt ? opt.value : ''})} />

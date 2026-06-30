@@ -195,6 +195,14 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
               </span>
             </>
           )}
+          {questao.subassunto && (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#AAA" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <span style={{ fontSize: '13px', color: '#DDD', fontWeight: '500' }}>
+                {questao.subassunto}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Favorito - empurrado para a direita */}
