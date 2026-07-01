@@ -108,8 +108,14 @@ function AulaPage() {
 
   // Mantém os dados atualizados na ref para o momento em que o componente for desmontado ou a aula mudar
   useEffect(() => {
-    unmountSaveRef.current = { tempo: tempoAtual, duracao: duracao, aulaId: aulaId, userId: user?.id };
-  }, [tempoAtual, duracao, aulaId, user]);
+    unmountSaveRef.current = { 
+      tempo: tempoAtual, 
+      duracao: duracao, 
+      aulaId: aulaId, 
+      userId: user?.id,
+      concluida: progressoAulas[aulaId]?.concluida || false
+    };
+  }, [tempoAtual, duracao, aulaId, user, progressoAulas]);
 
   // Salva o progresso no banco de dados automaticamente caso o usuário saia da página ou troque de aula
   useEffect(() => {
@@ -118,20 +124,18 @@ function AulaPage() {
       const state = unmountSaveRef.current;
       if (state.aulaId === currentAulaId && state.tempo > 0 && state.userId && state.duracao > 0) {
         
-        // RECUPERA o status atual de conclusão para NÃO sobrescrever com "false" se já estava "true"
-        setProgressoAulas(prev => {
-          const jaEstavaConcluida = prev[state.aulaId]?.concluida || false;
-          const isConcluida = jaEstavaConcluida || (state.tempo >= state.duracao * 0.9);
-          
-          supabase.from('progresso').upsert({
-            user_id: state.userId,
-            aula_id: state.aulaId,
-            tempo_assistido: Math.floor(state.tempo),
-            concluida: isConcluida,
-            ultimo_acesso: new Date().toISOString()
-          }, { onConflict: 'user_id,aula_id' }).then(() => {});
-
-          return prev;
+        const isConcluida = state.concluida || (state.tempo >= state.duracao * 0.9);
+        
+        supabase.from('progresso').upsert({
+          user_id: state.userId,
+          aula_id: state.aulaId,
+          tempo_assistido: Math.floor(state.tempo),
+          concluida: isConcluida,
+          ultimo_acesso: new Date().toISOString()
+        }, { onConflict: 'user_id,aula_id' }).then(() => {
+          console.log('[AulaPage] Progresso salvo ao sair:', state.aulaId, isConcluida);
+        }).catch(err => {
+          console.error('[AulaPage] Erro ao salvar progresso ao sair:', err);
         });
       }
     };
