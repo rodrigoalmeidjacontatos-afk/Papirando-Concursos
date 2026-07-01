@@ -126,24 +126,24 @@ function Home() {
       }
     };
 
+    // getSession() lê do localStorage instantaneamente (sem rede)
+    // evita o flash de "deslogado" ao navegar de volta para a Home
     const init = async () => {
       try {
-        const { data: { user }, error } = await withTimeout(supabase.auth.getUser(), 5000);
-        if (error) {
-          console.error("[Auth] Erro ao recuperar sessão inicial:", error);
-        }
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (user) {
-          console.log("[Auth] Usuário inicial detectado:", user.email);
-          setUser(user);
-          await carregarPerfil(user);
+        if (session?.user) {
+          console.log("[Auth] Sessão local detectada:", session.user.email);
+          setUser(session.user);
+          setAuthChecked(true); // libera a UI imediatamente, sem flash
+          carregarPerfil(session.user); // carrega perfil em background (sem await)
         } else {
-          console.log("[Auth] Nenhum usuário inicial encontrado.");
+          console.log("[Auth] Sem sessão local.");
+          setAuthChecked(true);
         }
       } catch (err) {
-        console.error("[Auth] Falha crítica no init:", err);
-      } finally {
-        if (mounted) setAuthChecked(true);
+        console.error("[Auth] Falha no init:", err);
+        setAuthChecked(true);
       }
     };
     init();
@@ -151,22 +151,21 @@ function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[Auth] Evento recebido: ${event}`, session?.user?.email || 'sem usuário');
       
-      // Reagimos a qualquer evento que traga um usuário válido
       if (session?.user) {
         setUser(session.user);
+        if (!mounted) return;
         await carregarPerfil(session.user);
       } else if (event === 'SIGNED_OUT') {
-        // Apenas limpamos se o evento for explicitamente de logout
         console.log("[Auth] Logout detectado.");
         setUser(null);
         setUserName('Aluno');
         setPlanoUsuario('basico');
       }
-      // Se for INITIAL_SESSION ou similar com session null, ignoramos para não resetar o que o init() já fez
       if (mounted) setAuthChecked(true);
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
