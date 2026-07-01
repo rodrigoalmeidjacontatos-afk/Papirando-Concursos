@@ -9,6 +9,7 @@ function Home() {
   const navigate = useNavigate();
   const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
   const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [userName, setUserName] = useState('Aluno');
   const [planoUsuario, setPlanoUsuario] = useState('basico'); 
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -130,7 +131,6 @@ function Home() {
         const { data: { user }, error } = await withTimeout(supabase.auth.getUser(), 5000);
         if (error) {
           console.error("[Auth] Erro ao recuperar sessão inicial:", error);
-          // Não retorna aqui, pois pode ser apenas que não haja sessão.
         }
         
         if (user) {
@@ -142,6 +142,8 @@ function Home() {
         }
       } catch (err) {
         console.error("[Auth] Falha crítica no init:", err);
+      } finally {
+        if (mounted) setAuthChecked(true);
       }
     };
     init();
@@ -161,6 +163,7 @@ function Home() {
         setPlanoUsuario('basico');
       }
       // Se for INITIAL_SESSION ou similar com session null, ignoramos para não resetar o que o init() já fez
+      if (mounted) setAuthChecked(true);
     });
 
     return () => {
@@ -567,7 +570,9 @@ function Home() {
             )}
           </nav>
           <div style={styles.userArea} className="user-area">
-            {!user ? (
+            {!authChecked ? (
+              <div style={{width: '120px', height: '38px'}} />
+            ) : !user ? (
               <button 
                 onClick={() => navigate('/login')} 
                 style={{
@@ -852,7 +857,7 @@ function Home() {
               } else if (tipoAcesso === 'medio') {
                 bloqueado = planoUsuario !== 'medio' && planoUsuario !== 'premium';
               } else if (tipoAcesso === 'basico') {
-                bloqueado = !user; // requer estar logado (pelo menos plano básico)
+                bloqueado = authChecked && !user; // requer estar logado (pelo menos plano básico)
               } else {
                 bloqueado = false; // livre (visível para todos)
               }
