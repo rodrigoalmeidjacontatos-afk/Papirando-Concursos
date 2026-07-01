@@ -1206,6 +1206,47 @@ function AdminPage() {
     alert('✅ Todos os módulos e aulas selecionados!');
   };
 
+  const selecionarModuloVinculo = async (carreiraId, prepId, moduloId) => {
+    const carrVinculos = vinculos[carreiraId] || {};
+    const prepVinculos = carrVinculos[prepId] || { modulos: {} };
+    if (!prepVinculos.modulos) prepVinculos.modulos = {};
+
+    const aulasDoMod = getAulasPorModulo(moduloId);
+    const aulasObj = {};
+    const inserts = [];
+
+    aulasDoMod.forEach(aula => {
+      aulasObj[aula.id] = true;
+      if (!isAulaVinculada(carreiraId, prepId, moduloId, aula.id)) {
+        inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: moduloId, aula_id: aula.id });
+      }
+    });
+
+    const novoVinculos = {
+      ...vinculos,
+      [carreiraId]: {
+        ...carrVinculos,
+        [prepId]: {
+          ...prepVinculos,
+          modulos: {
+            ...prepVinculos.modulos,
+            [moduloId]: { aulas: aulasObj }
+          }
+        }
+      }
+    };
+    setVinculos(novoVinculos);
+
+    if (inserts.length > 0) {
+      const CHUNK = 500;
+      for (let i = 0; i < inserts.length; i += CHUNK) {
+        const chunk = inserts.slice(i, i + CHUNK);
+        await supabase.from('vinculos').upsert(chunk);
+      }
+    }
+    alert(`✅ ${aulasDoMod.length} aula(s) do módulo selecionadas!`);
+  };
+
   // Helpers
   const getPreparatorioNome = (id) => preparatorios.find(p => p.id === id)?.nome || '?';
   const getDisciplinaNome = (id) => disciplinas.find(d => d.id === id)?.nome || '?';
@@ -1961,10 +2002,20 @@ function AdminPage() {
                                         
                                         return (
                                           <div key={mod.id} style={styles.vinculoModulo}>
-                                            <label style={styles.checkboxLabel}>
-                                              <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
-                                              <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
-                                            </label>
+                                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px'}}>
+                                              <label style={styles.checkboxLabel}>
+                                                <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
+                                                <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
+                                              </label>
+                                              {modVinc && (
+                                                <button
+                                                  style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
+                                                  onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
+                                                >
+                                                  ☑️ Selecionar Módulo
+                                                </button>
+                                              )}
+                                            </div>
                                             
                                             {modVinc && (
                                               <div style={styles.vinculoAulas}>
