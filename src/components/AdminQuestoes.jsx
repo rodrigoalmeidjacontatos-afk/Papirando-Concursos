@@ -47,26 +47,30 @@ export default function AdminQuestoes() {
 
   const [opcoesDisciplina, setOpcoesDisciplina] = useState([]);
   const [opcoesAssunto, setOpcoesAssunto] = useState([]);
+  const [opcoesBanca, setOpcoesBanca] = useState([]);
 
   useEffect(() => {
     async function fetchOpcoesAutocomplete() {
       try {
         const { data, error } = await supabase
           .from('questoes')
-          .select('disciplina, assunto')
+          .select('disciplina, assunto, banca')
           .limit(10000); // Garante que pega um grande lote de questoes
           
         if (!error && data) {
           const discSet = new Set();
           const assSet = new Set();
+          const bancaSet = new Set();
           
           data.forEach(item => {
             if (item.disciplina) discSet.add(item.disciplina.trim());
             if (item.assunto) assSet.add(item.assunto.trim());
+            if (item.banca) bancaSet.add(item.banca.trim());
           });
           
           setOpcoesDisciplina(Array.from(discSet).sort());
           setOpcoesAssunto(Array.from(assSet).sort());
+          setOpcoesBanca(Array.from(bancaSet).sort());
         }
       } catch (e) {
         console.error('Erro ao buscar opções de autocomplete:', e);
@@ -380,7 +384,10 @@ export default function AdminQuestoes() {
         <h3 style={{ color: '#FFF', marginBottom: '16px' }}>{editandoId ? `Editar Questão — ID: PC-${editandoId.substring(0, 6).toUpperCase()}` : 'Nova Questão'}</h3>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-          <input placeholder="Banca (Ex: Cebraspe)" value={form.banca} onChange={e=>setForm({...form, banca: e.target.value})} style={inputStyle} />
+          <input placeholder="Banca (Ex: Cebraspe)" value={form.banca} onChange={e=>setForm({...form, banca: e.target.value})} style={inputStyle} list="lista-bancas" />
+          <datalist id="lista-bancas">
+            {opcoesBanca.map(b => <option key={b} value={b} />)}
+          </datalist>
           <input placeholder="Órgão (Ex: PF)" value={form.orgao} onChange={e=>setForm({...form, orgao: e.target.value})} style={inputStyle} />
           <input placeholder="Cargo (Ex: Agente)" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})} style={inputStyle} />
           <input placeholder="Ano" value={form.ano} onChange={e=>setForm({...form, ano: e.target.value})} style={inputStyle} type="number" />
