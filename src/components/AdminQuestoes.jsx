@@ -45,6 +45,36 @@ export default function AdminQuestoes() {
   const fileInputRef = useRef(null);
   const fileInputAtualizarRef = useRef(null);
 
+  const [opcoesDisciplina, setOpcoesDisciplina] = useState([]);
+  const [opcoesAssunto, setOpcoesAssunto] = useState([]);
+
+  useEffect(() => {
+    async function fetchOpcoesAutocomplete() {
+      try {
+        const { data, error } = await supabase
+          .from('questoes')
+          .select('disciplina, assunto')
+          .limit(10000); // Garante que pega um grande lote de questoes
+          
+        if (!error && data) {
+          const discSet = new Set();
+          const assSet = new Set();
+          
+          data.forEach(item => {
+            if (item.disciplina) discSet.add(item.disciplina.trim());
+            if (item.assunto) assSet.add(item.assunto.trim());
+          });
+          
+          setOpcoesDisciplina(Array.from(discSet).sort());
+          setOpcoesAssunto(Array.from(assSet).sort());
+        }
+      } catch (e) {
+        console.error('Erro ao buscar opções de autocomplete:', e);
+      }
+    }
+    fetchOpcoesAutocomplete();
+  }, []);
+
   const fetchQuestoes = useCallback(async (pg = pagina, buscaFiltro = buscaAtiva) => {
     setLoading(true);
     try {
@@ -354,8 +384,16 @@ export default function AdminQuestoes() {
           <input placeholder="Órgão (Ex: PF)" value={form.orgao} onChange={e=>setForm({...form, orgao: e.target.value})} style={inputStyle} />
           <input placeholder="Cargo (Ex: Agente)" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})} style={inputStyle} />
           <input placeholder="Ano" value={form.ano} onChange={e=>setForm({...form, ano: e.target.value})} style={inputStyle} type="number" />
-          <input placeholder="Disciplina (Ex: Dir. Penal)" value={form.disciplina} onChange={e=>setForm({...form, disciplina: e.target.value})} style={inputStyle} />
-          <input placeholder="Assunto" value={form.assunto} onChange={e=>setForm({...form, assunto: e.target.value})} style={inputStyle} />
+          <input placeholder="Disciplina (Ex: Dir. Penal)" value={form.disciplina} onChange={e=>setForm({...form, disciplina: e.target.value})} style={inputStyle} list="lista-disciplinas" />
+          <datalist id="lista-disciplinas">
+            {opcoesDisciplina.map(d => <option key={d} value={d} />)}
+          </datalist>
+
+          <input placeholder="Assunto" value={form.assunto} onChange={e=>setForm({...form, assunto: e.target.value})} style={inputStyle} list="lista-assuntos" />
+          <datalist id="lista-assuntos">
+            {opcoesAssunto.map(a => <option key={a} value={a} />)}
+          </datalist>
+
           <input placeholder="Subassunto" value={form.subassunto} onChange={e=>setForm({...form, subassunto: e.target.value})} style={inputStyle} />
           
           <select value={form.dificuldade} onChange={e=>setForm({...form, dificuldade: e.target.value})} style={inputStyle}>
