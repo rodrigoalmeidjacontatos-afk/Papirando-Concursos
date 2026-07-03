@@ -98,7 +98,7 @@ function PreparatorioCursoPage() {
       </main>
 
       <footer style={styles.footer}>
-        <p style={styles.footerText}>© 2026 Papirando Concursos - Todos os direitos reservados</p>
+        <p style={styles.footerText}>© 2026 Papirando Concursos - Menos tempo procurando. Mais tempo estudando.</p>
       </footer>
 
       <style>{`

@@ -1284,7 +1284,7 @@ function Home() {
       </main>
 
       <footer style={styles.footer}>
-        <p>&copy; 2026 Papirando Concursos - Todos os direitos reservados - v1.0.5</p>
+        <p>&copy; 2026 Papirando Concursos - Menos tempo procurando. Mais tempo estudando. - v1.0.5</p>
         <div style={{fontSize: '10px', color: '#444', marginTop: '5px'}}>ID: {user?.id || 'Desconectado'}</div>
         <div style={styles.footerLinks}>
           <span style={styles.footerLink}>Termos de uso</span>
