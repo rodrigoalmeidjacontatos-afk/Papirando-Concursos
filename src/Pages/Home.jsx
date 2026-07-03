@@ -1283,9 +1283,8 @@ function Home() {
         )}
       </main>
 
-      <footer style={styles.footer}>
-        <p>&copy; 2026 Papirando Concursos - Menos tempo procurando. Mais tempo estudando. - v1.0.5</p>
-        <div style={{fontSize: '10px', color: '#444', marginTop: '5px'}}>ID: {user?.id || 'Desconectado'}</div>
+      <footer style={{...styles.footer, textAlign: 'center'}}>
+        <p style={{fontSize: '16px', color: '#888', marginBottom: '15px'}}>&copy; 2026 Papirando Concursos - Menos tempo procurando. Mais tempo estudando.</p>
         <div style={styles.footerLinks}>
           <span style={styles.footerLink}>Termos de uso</span>
           <span style={styles.footerLink}>Privacidade</span>

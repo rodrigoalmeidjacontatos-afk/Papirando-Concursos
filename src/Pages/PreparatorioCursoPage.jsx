@@ -157,7 +157,7 @@ const styles = {
   year: { color: '#46d369' },
   hd: { border: '1px solid #ccc', padding: '0 4px', borderRadius: '2px' },
   footer: { backgroundColor: '#0a0a0a', padding: '40px', textAlign: 'center' },
-  footerText: { color: '#808080', fontSize: '12px' }
+  footerText: { color: '#808080', fontSize: '16px' }
 };
 
 export default PreparatorioCursoPage;
