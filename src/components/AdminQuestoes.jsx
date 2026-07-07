@@ -48,29 +48,37 @@ export default function AdminQuestoes() {
   const [opcoesDisciplina, setOpcoesDisciplina] = useState([]);
   const [opcoesAssunto, setOpcoesAssunto] = useState([]);
   const [opcoesBanca, setOpcoesBanca] = useState([]);
+  const [opcoesOrgao, setOpcoesOrgao] = useState([]);
+  const [opcoesCargo, setOpcoesCargo] = useState([]);
 
   useEffect(() => {
     async function fetchOpcoesAutocomplete() {
       try {
         const { data, error } = await supabase
           .from('questoes')
-          .select('disciplina, assunto, banca')
-          .limit(10000); // Garante que pega um grande lote de questoes
+          .select('disciplina, assunto, banca, orgao, cargo')
+          .limit(10000);
           
         if (!error && data) {
           const discSet = new Set();
           const assSet = new Set();
           const bancaSet = new Set();
+          const orgaoSet = new Set();
+          const cargoSet = new Set();
           
           data.forEach(item => {
             if (item.disciplina) discSet.add(item.disciplina.trim());
             if (item.assunto) assSet.add(item.assunto.trim());
             if (item.banca) bancaSet.add(item.banca.trim());
+            if (item.orgao) orgaoSet.add(item.orgao.trim());
+            if (item.cargo) cargoSet.add(item.cargo.trim());
           });
           
-          setOpcoesDisciplina(Array.from(discSet).sort());
-          setOpcoesAssunto(Array.from(assSet).sort());
-          setOpcoesBanca(Array.from(bancaSet).sort());
+          setOpcoesDisciplina(Array.from(discSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+          setOpcoesAssunto(Array.from(assSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+          setOpcoesBanca(Array.from(bancaSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+          setOpcoesOrgao(Array.from(orgaoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+          setOpcoesCargo(Array.from(cargoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
         }
       } catch (e) {
         console.error('Erro ao buscar opções de autocomplete:', e);
@@ -388,8 +396,14 @@ export default function AdminQuestoes() {
           <datalist id="lista-bancas">
             {opcoesBanca.map(b => <option key={b} value={b} />)}
           </datalist>
-          <input placeholder="Órgão (Ex: PF)" value={form.orgao} onChange={e=>setForm({...form, orgao: e.target.value})} style={inputStyle} />
-          <input placeholder="Cargo (Ex: Agente)" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})} style={inputStyle} />
+          <input placeholder="Órgão (Ex: PF)" value={form.orgao} onChange={e=>setForm({...form, orgao: e.target.value})} style={inputStyle} list="lista-orgaos" />
+          <datalist id="lista-orgaos">
+            {opcoesOrgao.map(o => <option key={o} value={o} />)}
+          </datalist>
+          <input placeholder="Cargo (Ex: Agente)" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})} style={inputStyle} list="lista-cargos" />
+          <datalist id="lista-cargos">
+            {opcoesCargo.map(c => <option key={c} value={c} />)}
+          </datalist>
           <input placeholder="Ano" value={form.ano} onChange={e=>setForm({...form, ano: e.target.value})} style={inputStyle} type="number" />
           <input placeholder="Disciplina (Ex: Dir. Penal)" value={form.disciplina} onChange={e=>setForm({...form, disciplina: e.target.value})} style={inputStyle} list="lista-disciplinas" />
           <datalist id="lista-disciplinas">
