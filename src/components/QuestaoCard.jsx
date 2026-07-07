@@ -280,21 +280,23 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
             </button>
             
             {expandirTexto && (
-              <div style={{
-                marginTop: '12px', padding: '16px', backgroundColor: '#252525', 
-                borderLeft: '4px solid #FF9800', borderRadius: '4px',
-                fontSize: '14px', lineHeight: '1.7', color: '#CCC', whiteSpace: 'pre-wrap'
-              }}>
-                {questao.texto_associado}
-              </div>
+              <div 
+                style={{
+                  marginTop: '12px', padding: '16px', backgroundColor: '#252525', 
+                  borderLeft: '4px solid #FF9800', borderRadius: '4px',
+                  fontSize: '14px', lineHeight: '1.7', color: '#CCC', whiteSpace: 'pre-wrap'
+                }}
+                dangerouslySetInnerHTML={{ __html: questao.texto_associado }}
+              />
             )}
           </div>
         )}
 
         {/* ENUNCIADO */}
-        <div style={{ fontSize: '15px', lineHeight: '1.75', marginBottom: '20px', color: '#FFF', whiteSpace: 'pre-wrap' }}>
-          {enunciadoLimpo}
-        </div>
+        <div 
+          style={{ fontSize: '15px', lineHeight: '1.75', marginBottom: '20px', color: '#FFF', whiteSpace: 'pre-wrap' }}
+          dangerouslySetInnerHTML={{ __html: enunciadoLimpo }}
+        />
         {/* IMAGEM DO ENUNCIADO */}
         {imagemEnunciado && (
           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
@@ -376,7 +378,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
                 <span style={{ fontWeight: 'bold', marginRight: '12px', color: isGabarito ? corAcerto : (isErroUser ? corErro : '#888') }}>
                   {alt.letra})
                 </span>
-                <span style={{ flex: 1, lineHeight: '1.5' }}>{alt.texto}</span>
+                <span style={{ flex: 1, lineHeight: '1.5' }} dangerouslySetInnerHTML={{ __html: alt.texto }} />
                 
                 {status && isGabarito && <span style={{ color: corAcerto, fontWeight: 'bold' }}>✓ Correta</span>}
                 {status && isErroUser && <span style={{ color: corErro, fontWeight: 'bold' }}>✗ Incorreta</span>}
@@ -452,9 +454,16 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
           animation: 'fadeIn 0.3s'
         }}>
           <h4 style={{ margin: '0 0 12px 0', color: corPrimaria }}>Explicação</h4>
-          <div style={{ fontSize: '15px', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#DDD' }}>
-            {questao.comentario || 'Nenhuma explicação disponível para esta questão no momento.'}
-          </div>
+          {questao.comentario ? (
+            <div 
+              style={{ fontSize: '15px', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#DDD' }}
+              dangerouslySetInnerHTML={{ __html: questao.comentario }}
+            />
+          ) : (
+            <div style={{ fontSize: '15px', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#DDD' }}>
+              Nenhuma explicação disponível para esta questão no momento.
+            </div>
+          )}
           {questao.referencia_legal && (
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#333', borderRadius: '6px', fontSize: '14px', color: '#CCC' }}>
               <strong style={{ color: '#FFF' }}>Fundamentação Legal:</strong><br/>
