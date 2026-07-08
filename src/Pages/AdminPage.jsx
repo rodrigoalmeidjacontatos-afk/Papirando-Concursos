@@ -53,6 +53,8 @@ function AdminPage() {
   const [expandedDiscVinculo, setExpandedDiscVinculo] = useState(null);
   const [filtroDisciplinaVinculo, setFiltroDisciplinaVinculo] = useState('');
   const [buscaModuloVinculo, setBuscaModuloVinculo] = useState('');
+  const [expandedModuloAulas, setExpandedModuloAulas] = useState({});
+  const toggleModuloAulasExpand = (modId) => setExpandedModuloAulas(prev => ({ ...prev, [modId]: !prev[modId] }));
   
   // ========== FORMULÁRIOS ==========
   const [novaCategoria, setNovaCategoria] = useState({ nome: '', icone: '', tipo_acesso: 'livre' });
@@ -2092,17 +2094,27 @@ function AdminPage() {
                                                   <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
                                                   <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
                                                 </label>
-                                                {modVinc && (
-                                                  <button
-                                                    style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
-                                                    onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
-                                                  >
-                                                    ☑️ Selecionar Módulo
-                                                  </button>
-                                                )}
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                  {modVinc && (
+                                                    <button
+                                                      style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
+                                                      onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
+                                                    >
+                                                      ☑️ Selecionar Módulo
+                                                    </button>
+                                                  )}
+                                                  {modVinc && (
+                                                    <button
+                                                      style={{...styles.smallButton, backgroundColor: expandedModuloAulas[mod.id] ? '#555' : '#333', fontSize: '11px', padding: '4px 10px'}}
+                                                      onClick={(e) => { e.stopPropagation(); toggleModuloAulasExpand(mod.id); }}
+                                                    >
+                                                      {expandedModuloAulas[mod.id] ? '▼ Minimizar' : '▶ Ver Aulas'}
+                                                    </button>
+                                                  )}
+                                                </div>
                                               </div>
                                               
-                                              {modVinc && (
+                                              {modVinc && expandedModuloAulas[mod.id] && (
                                                 <div style={styles.vinculoAulas}>
                                                   {getAulasPorModulo(mod.id).map(aula => (
                                                     <label key={aula.id} style={styles.checkboxLabelAula}>
