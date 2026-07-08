@@ -1208,6 +1208,49 @@ function AdminPage() {
     alert('✅ Todos os módulos e aulas selecionados!');
   };
 
+  const selecionarDisciplinaVinculo = async (carreiraId, prepId, discId) => {
+    const carrVinculos = vinculos[carreiraId] || {};
+    const prepVinculos = carrVinculos[prepId] || { modulos: {} };
+    if (!prepVinculos.modulos) prepVinculos.modulos = {};
+
+    const modsDaDisc = getModulosPorDisciplina(discId);
+    const novosModulos = { ...prepVinculos.modulos };
+    const inserts = [];
+
+    modsDaDisc.forEach(mod => {
+      const aulasDoMod = getAulasPorModulo(mod.id);
+      const aulasObj = {};
+      aulasDoMod.forEach(aula => {
+        aulasObj[aula.id] = true;
+        if (!isAulaVinculada(carreiraId, prepId, mod.id, aula.id)) {
+          inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: mod.id, aula_id: aula.id });
+        }
+      });
+      novosModulos[mod.id] = { aulas: aulasObj };
+      if (!isModuloVinculado(carreiraId, prepId, mod.id)) {
+        inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: mod.id });
+      }
+    });
+
+    const novoVinculos = {
+      ...vinculos,
+      [carreiraId]: {
+        ...carrVinculos,
+        [prepId]: { ...prepVinculos, modulos: novosModulos }
+      }
+    };
+    setVinculos(novoVinculos);
+
+    if (inserts.length > 0) {
+      const CHUNK = 500;
+      for (let i = 0; i < inserts.length; i += CHUNK) {
+        await supabase.from('vinculos').upsert(inserts.slice(i, i + CHUNK));
+      }
+    }
+    const disc = disciplinas.find(d => d.id === discId);
+    alert(`✅ Disciplina "${disc?.nome || ''}" selecionada! (${modsDaDisc.length} módulo(s))`);
+  };
+
   const selecionarModuloVinculo = async (carreiraId, prepId, moduloId) => {
     const carrVinculos = vinculos[carreiraId] || {};
     const prepVinculos = carrVinculos[prepId] || { modulos: {} };
@@ -2026,7 +2069,15 @@ function AdminPage() {
                                   <div key={disc.id} style={styles.vinculoDisciplina}>
                                     <div style={styles.vinculoDisciplinaHeader} onClick={() => setExpandedDiscVinculo(isDiscExp ? null : disc.id)}>
                                       <span>{disc.icone} {disc.nome}</span>
-                                      <span>{isDiscExp ? '▼' : '▶'}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <button
+                                          style={{ ...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px', padding: '4px 12px' }}
+                                          onClick={e => { e.stopPropagation(); selecionarDisciplinaVinculo(selectedCarreira, prep.id, disc.id); }}
+                                        >
+                                          ☑️ Selecionar Disciplina
+                                        </button>
+                                        <span>{isDiscExp ? '▼' : '▶'}</span>
+                                      </div>
                                     </div>
                                     
                                     {isDiscExp && (
