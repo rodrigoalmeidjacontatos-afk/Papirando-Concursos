@@ -66,10 +66,13 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
 
   const gabLower = (questao.gabarito || '').toLowerCase().trim();
   
-  // Detecta de forma mais robusta se é Certo/Errado
+  // Detecta se é Certo/Errado — IMPORTANTE: não confundir gabarito 'C' ou 'E'
+  // de múltipla escolha com Certo/Errado. As letras isoladas 'c' e 'e' só indicam
+  // Certo/Errado quando a modalidade NÃO é Múltipla Escolha.
+  const isMultiplaEscolha = questao.modalidade === 'Multipla Escolha';
   const isCertoErrado = questao.modalidade === 'Certo/Errado'
     || gabLower === 'certo' || gabLower === 'errado'
-    || gabLower === 'c' || gabLower === 'e'
+    || (!isMultiplaEscolha && (gabLower === 'c' || gabLower === 'e'))
     || (questao.alternativa_a && questao.alternativa_a.toLowerCase().includes('certo') && questao.alternativa_b && questao.alternativa_b.toLowerCase().includes('errado'));
 
   // Normaliza o gabarito: 'Certo' ou 'C' → 'A', 'Errado' ou 'E' → 'B'
