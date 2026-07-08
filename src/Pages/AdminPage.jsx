@@ -51,6 +51,8 @@ function AdminPage() {
   const [selectedCarreira, setSelectedCarreira] = useState('');
   const [expandedPrepVinculo, setExpandedPrepVinculo] = useState(null);
   const [expandedDiscVinculo, setExpandedDiscVinculo] = useState(null);
+  const [filtroDisciplinaVinculo, setFiltroDisciplinaVinculo] = useState('');
+  const [buscaModuloVinculo, setBuscaModuloVinculo] = useState('');
   
   // ========== FORMULÁRIOS ==========
   const [novaCategoria, setNovaCategoria] = useState({ nome: '', icone: '', tipo_acesso: 'livre' });
@@ -1984,52 +1986,84 @@ function AdminPage() {
 
                         {vinculado && isExpanded && (
                           <div style={styles.vinculoDetails}>
-                            {getDisciplinasPorPrep(prep.id).map(disc => {
-                              const isDiscExp = expandedDiscVinculo === disc.id;
-                              const modulosDaDisc = getModulosPorDisciplina(disc.id);
-                              
-                              return (
-                                <div key={disc.id} style={styles.vinculoDisciplina}>
-                                  <div style={styles.vinculoDisciplinaHeader} onClick={() => setExpandedDiscVinculo(isDiscExp ? null : disc.id)}>
-                                    <span>{disc.icone} {disc.nome}</span>
-                                    <span>{isDiscExp ? '▼' : '▶'}</span>
-                                  </div>
-                                  
-                                  {isDiscExp && (
-                                    <div style={styles.vinculoModulos}>
-                                      {modulosDaDisc.map(mod => {
-                                        const modVinc = isModuloVinculado(selectedCarreira, prep.id, mod.id);
-                                        
-                                        return (
-                                          <div key={mod.id} style={styles.vinculoModulo}>
-                                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px'}}>
-                                              <label style={styles.checkboxLabel}>
-                                                <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
-                                                <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
-                                              </label>
+                            {/* FILTROS */}
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                              <select
+                                value={filtroDisciplinaVinculo}
+                                onChange={e => { setFiltroDisciplinaVinculo(e.target.value); setExpandedDiscVinculo(null); }}
+                                style={{ ...styles.select, flex: 1, minWidth: '180px' }}
+                              >
+                                <option value="">📚 Todas as Disciplinas</option>
+                                {getDisciplinasPorPrep(prep.id).map(d => (
+                                  <option key={d.id} value={d.id}>{d.icone} {d.nome}</option>
+                                ))}
+                              </select>
+                              <input
+                                placeholder="🔍 Buscar módulo..."
+                                value={buscaModuloVinculo}
+                                onChange={e => setBuscaModuloVinculo(e.target.value)}
+                                style={{ ...styles.input, flex: 1, minWidth: '180px', margin: 0 }}
+                              />
+                              {(filtroDisciplinaVinculo || buscaModuloVinculo) && (
+                                <button
+                                  onClick={() => { setFiltroDisciplinaVinculo(''); setBuscaModuloVinculo(''); }}
+                                  style={{ ...styles.smallButton, backgroundColor: '#555', whiteSpace: 'nowrap' }}
+                                >
+                                  ✕ Limpar filtros
+                                </button>
+                              )}
+                            </div>
+
+                            {getDisciplinasPorPrep(prep.id)
+                              .filter(disc => !filtroDisciplinaVinculo || disc.id === filtroDisciplinaVinculo)
+                              .map(disc => {
+                                const isDiscExp = expandedDiscVinculo === disc.id;
+                                const modulosDaDisc = getModulosPorDisciplina(disc.id)
+                                  .filter(mod => !buscaModuloVinculo || mod.nome.toLowerCase().includes(buscaModuloVinculo.toLowerCase()));
+
+                                if (modulosDaDisc.length === 0) return null;
+                                return (
+                                  <div key={disc.id} style={styles.vinculoDisciplina}>
+                                    <div style={styles.vinculoDisciplinaHeader} onClick={() => setExpandedDiscVinculo(isDiscExp ? null : disc.id)}>
+                                      <span>{disc.icone} {disc.nome}</span>
+                                      <span>{isDiscExp ? '▼' : '▶'}</span>
+                                    </div>
+                                    
+                                    {isDiscExp && (
+                                      <div style={styles.vinculoModulos}>
+                                        {modulosDaDisc.map(mod => {
+                                          const modVinc = isModuloVinculado(selectedCarreira, prep.id, mod.id);
+                                          
+                                          return (
+                                            <div key={mod.id} style={styles.vinculoModulo}>
+                                              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px'}}>
+                                                <label style={styles.checkboxLabel}>
+                                                  <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
+                                                  <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
+                                                </label>
+                                                {modVinc && (
+                                                  <button
+                                                    style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
+                                                    onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
+                                                  >
+                                                    ☑️ Selecionar Módulo
+                                                  </button>
+                                                )}
+                                              </div>
+                                              
                                               {modVinc && (
-                                                <button
-                                                  style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
-                                                  onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
-                                                >
-                                                  ☑️ Selecionar Módulo
-                                                </button>
+                                                <div style={styles.vinculoAulas}>
+                                                  {getAulasPorModulo(mod.id).map(aula => (
+                                                    <label key={aula.id} style={styles.checkboxLabelAula}>
+                                                      <input type="checkbox" checked={isAulaVinculada(selectedCarreira, prep.id, mod.id, aula.id)} onChange={() => toggleAulaVinculo(selectedCarreira, prep.id, mod.id, aula.id)} />
+                                                      <span style={{color: '#CCC', fontSize: '13px'}}>{aula.titulo} ({aula.duracao})</span>
+                                                    </label>
+                                                  ))}
+                                                </div>
                                               )}
                                             </div>
-                                            
-                                            {modVinc && (
-                                              <div style={styles.vinculoAulas}>
-                                                {getAulasPorModulo(mod.id).map(aula => (
-                                                  <label key={aula.id} style={styles.checkboxLabelAula}>
-                                                    <input type="checkbox" checked={isAulaVinculada(selectedCarreira, prep.id, mod.id, aula.id)} onChange={() => toggleAulaVinculo(selectedCarreira, prep.id, mod.id, aula.id)} />
-                                                    <span style={{color: '#CCC', fontSize: '13px'}}>{aula.titulo} ({aula.duracao})</span>
-                                                  </label>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
                                         );
-                                      })}
+                                        })}
                                     </div>
                                   )}
                                 </div>
