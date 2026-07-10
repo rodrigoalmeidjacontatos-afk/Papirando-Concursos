@@ -191,12 +191,10 @@ function CarreiraPage() {
             userSelect: isBasico ? 'none' : 'auto',
           }}>
             {preparatorios.map(prep => {
-              const ts = prep.data_atualizacao ? new Date(prep.data_atualizacao).getTime() : '0';
-              const vistoPorMim = localStorage.getItem(`visto_${prep.id}_${ts}`);
               const dentroDoPrazo = prep.data_atualizacao
                 ? (Date.now() - new Date(prep.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
                 : true;
-              const mostrarNovidade = prep.atualizado && dentroDoPrazo && !vistoPorMim;
+              const mostrarNovidade = prep.atualizado && dentroDoPrazo;
 
               return (
               <div
@@ -204,7 +202,6 @@ function CarreiraPage() {
                 style={styles.card}
                 className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
                 onClick={() => {
-                  if (mostrarNovidade) localStorage.setItem(`visto_${prep.id}_${ts}`, '1');
                   navigate(`/preparatorio/${carreiraId}/${prep.id}`);
                 }}
               >

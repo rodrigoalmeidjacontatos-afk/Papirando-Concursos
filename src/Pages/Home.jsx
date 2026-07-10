@@ -57,12 +57,9 @@ function Home() {
         if (!data) return;
         const agora = Date.now();
         const validos = data.filter(p => {
-          const dentro = p.data_atualizacao
+          return p.data_atualizacao
             ? (agora - new Date(p.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
             : true;
-          const ts = p.data_atualizacao ? new Date(p.data_atualizacao).getTime() : '0';
-          const visto = localStorage.getItem(`visto_${p.id}_${ts}`);
-          return dentro && !visto;
         });
         setPrepsAtualizados(validos);
       } catch (e) { /* silencioso */ }
@@ -70,11 +67,6 @@ function Home() {
     buscarAtualizacoes();
   }, []);
 
-  const marcarSinoComoVisto = (prep) => {
-    const ts = prep.data_atualizacao ? new Date(prep.data_atualizacao).getTime() : '0';
-    localStorage.setItem(`visto_${prep.id}_${ts}`, '1');
-    setPrepsAtualizados(prev => prev.filter(p => p.id !== prep.id));
-  };
   // ===============================================
 
   // Criar refs para cada carrossel
@@ -664,9 +656,8 @@ function Home() {
                         prepsAtualizados.map(prep => (
                           <div
                             key={prep.id}
-                            onClick={() => { marcarSinoComoVisto(prep); setSinoAberto(false); navigate(`/carreira`); }}
                             style={{
-                              padding: '12px 16px', cursor: 'pointer',
+                              padding: '12px 16px',
                               borderBottom: '1px solid #2A2A33',
                               display: 'flex', gap: '12px', alignItems: 'flex-start',
                               transition: 'background 0.15s'
@@ -1000,10 +991,6 @@ function Home() {
                             
                             return (
                             <div key={idx} className={`card-hover${estaAtualizado ? ' gold-card' : ''}`} style={styles.card} onClick={() => {
-                              if (estaAtualizado) {
-                                const p = prepsAtualizados.find(x => x.id === curso.id);
-                                if (p) marcarSinoComoVisto(p);
-                              }
                               navigate(`/carreira/${curso.id}`);
                             }}>
                               <div style={{ ...styles.cardImage, position: 'relative' }}>
