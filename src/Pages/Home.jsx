@@ -992,10 +992,19 @@ function Home() {
                       }}>
                         <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft} className="scroll-btn-left">‹</button>
                         <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
-                          {categoria.cursos.map((curso, idx) => (
-                            <div key={idx} className="card-hover" style={styles.card} onClick={() => navigate(`/carreira/${curso.id}`)}>
+                          {categoria.cursos.map((curso, idx) => {
+                            // Verifica se este preparatório está na lista de atualizados do sino
+                            const estaAtualizado = prepsAtualizados.some(p => p.id === curso.id);
+                            
+                            return (
+                            <div key={idx} className={`card-hover${estaAtualizado ? ' gold-card' : ''}`} style={styles.card} onClick={() => {
+                              if (estaAtualizado) {
+                                localStorage.setItem(`sino_visto_${curso.id}`, '1');
+                              }
+                              navigate(`/carreira/${curso.id}`);
+                            }}>
                               <div style={{ ...styles.cardImage, position: 'relative' }}>
-                                {cursosAtualizados.includes(curso.id) && (
+                                {estaAtualizado && (
                                   <span style={{
                                     position: 'absolute',
                                     top: '12px',
@@ -1020,10 +1029,16 @@ function Home() {
                               </div>
                               <div style={styles.cardInfo}>
                                 <h3 style={styles.cardTitle}>{curso.nome}</h3>
+                                {estaAtualizado && (
+                                  <div style={{ fontSize: '11px', color: '#FFD700', marginTop: '4px', fontWeight: '600', textAlign: 'center' }}>
+                                    ✨ Novas aulas adicionadas!
+                                  </div>
+                                )}
                                 <div style={styles.cardDetails}></div>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                           {/* Cards fantasma para quando lista vazia mas bloqueado */}
                           {bloqueado && categoria.cursos.length === 0 && [1,2,3,4].map(i => (
                             <div key={i} style={{...styles.card, minWidth: '200px'}}>
