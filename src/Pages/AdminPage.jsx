@@ -1187,6 +1187,7 @@ function AdminPage() {
         }
       };
       await supabase.from('vinculos').insert([{ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: moduloId, aula_id: aulaId }]);
+      await marcarPrepComoAtualizado(prepId);
     }
     setVinculos(novoVinculos);
   };
@@ -1238,6 +1239,7 @@ function AdminPage() {
         const chunk = inserts.slice(i, i + CHUNK);
         await supabase.from('vinculos').upsert(chunk);
       }
+      await marcarPrepComoAtualizado(prepId);
     }
     alert('✅ Todos os módulos e aulas selecionados!');
   };
@@ -1280,6 +1282,7 @@ function AdminPage() {
       for (let i = 0; i < inserts.length; i += CHUNK) {
         await supabase.from('vinculos').upsert(inserts.slice(i, i + CHUNK));
       }
+      await marcarPrepComoAtualizado(prepId);
     }
     const disc = disciplinas.find(d => d.id === discId);
     alert(`✅ Disciplina "${disc?.nome || ''}" selecionada! (${modsDaDisc.length} módulo(s))`);
@@ -1322,8 +1325,26 @@ function AdminPage() {
         const chunk = inserts.slice(i, i + CHUNK);
         await supabase.from('vinculos').upsert(chunk);
       }
+      await marcarPrepComoAtualizado(prepId);
     }
     alert(`✅ ${aulasDoMod.length} aula(s) do módulo selecionadas!`);
+  };
+
+  const marcarPrepComoAtualizado = async (prepId) => {
+    try {
+      await supabase.from('preparatorios').update({
+        atualizado: true,
+        data_atualizacao: new Date().toISOString()
+      }).eq('id', prepId);
+      
+      setPreparatorios(prev => prev.map(p =>
+        p.id === prepId
+          ? { ...p, atualizado: true, data_atualizacao: new Date().toISOString() }
+          : p
+      ));
+    } catch (e) {
+      console.warn('Não foi possível marcar preparatório como atualizado:', e);
+    }
   };
 
   // Helpers
