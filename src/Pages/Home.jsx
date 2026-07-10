@@ -60,7 +60,8 @@ function Home() {
           const dentro = p.data_atualizacao
             ? (agora - new Date(p.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
             : true;
-          const visto = localStorage.getItem(`sino_visto_${p.id}`);
+          const ts = p.data_atualizacao ? new Date(p.data_atualizacao).getTime() : '0';
+          const visto = localStorage.getItem(`visto_${p.id}_${ts}`);
           return dentro && !visto;
         });
         setPrepsAtualizados(validos);
@@ -69,9 +70,10 @@ function Home() {
     buscarAtualizacoes();
   }, []);
 
-  const marcarSinoComoVisto = (prepId) => {
-    localStorage.setItem(`sino_visto_${prepId}`, '1');
-    setPrepsAtualizados(prev => prev.filter(p => p.id !== prepId));
+  const marcarSinoComoVisto = (prep) => {
+    const ts = prep.data_atualizacao ? new Date(prep.data_atualizacao).getTime() : '0';
+    localStorage.setItem(`visto_${prep.id}_${ts}`, '1');
+    setPrepsAtualizados(prev => prev.filter(p => p.id !== prep.id));
   };
   // ===============================================
 
@@ -662,7 +664,7 @@ function Home() {
                         prepsAtualizados.map(prep => (
                           <div
                             key={prep.id}
-                            onClick={() => { marcarSinoComoVisto(prep.id); setSinoAberto(false); navigate(`/carreira`); }}
+                            onClick={() => { marcarSinoComoVisto(prep); setSinoAberto(false); navigate(`/carreira`); }}
                             style={{
                               padding: '12px 16px', cursor: 'pointer',
                               borderBottom: '1px solid #2A2A33',
@@ -999,7 +1001,8 @@ function Home() {
                             return (
                             <div key={idx} className={`card-hover${estaAtualizado ? ' gold-card' : ''}`} style={styles.card} onClick={() => {
                               if (estaAtualizado) {
-                                localStorage.setItem(`sino_visto_${curso.id}`, '1');
+                                const p = prepsAtualizados.find(x => x.id === curso.id);
+                                if (p) marcarSinoComoVisto(p);
                               }
                               navigate(`/carreira/${curso.id}`);
                             }}>

@@ -191,8 +191,8 @@ function CarreiraPage() {
             userSelect: isBasico ? 'none' : 'auto',
           }}>
             {preparatorios.map(prep => {
-              // Verifica se o badge deve aparecer: atualizado=true + menos de 1 dia + usuária não marcou como visto
-              const vistoPorMim = localStorage.getItem(`prep_visto_${prep.id}`);
+              const ts = prep.data_atualizacao ? new Date(prep.data_atualizacao).getTime() : '0';
+              const vistoPorMim = localStorage.getItem(`visto_${prep.id}_${ts}`);
               const dentroDoPrazo = prep.data_atualizacao
                 ? (Date.now() - new Date(prep.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
                 : true;
@@ -204,7 +204,7 @@ function CarreiraPage() {
                 style={styles.card}
                 className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
                 onClick={() => {
-                  if (mostrarNovidade) localStorage.setItem(`prep_visto_${prep.id}`, '1');
+                  if (mostrarNovidade) localStorage.setItem(`visto_${prep.id}_${ts}`, '1');
                   navigate(`/preparatorio/${carreiraId}/${prep.id}`);
                 }}
               >
@@ -381,14 +381,14 @@ const styles = {
   card: { 
     backgroundColor: 'rgba(20,20,22,0.6)', 
     borderRadius: '16px', 
-    overflow: 'hidden',
     transition: 'all 0.25s', 
     border: '1px solid #1c1c1f', 
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    position: 'relative'
   },
   cardIcon: { fontSize: '48px' },
   cardImage: { 
