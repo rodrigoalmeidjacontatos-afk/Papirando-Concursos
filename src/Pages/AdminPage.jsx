@@ -749,15 +749,24 @@ function AdminPage() {
       id: editandoPreparatorio.id,
       nome: editandoPreparatorio.nome,
       logo: editandoPreparatorio.logo,
-      cor: editandoPreparatorio.cor
+      cor: editandoPreparatorio.cor,
+      atualizado: editandoPreparatorio.atualizado ?? false,
+      descricao_atualizacao: editandoPreparatorio.descricao_atualizacao || 'Novas aulas adicionadas',
+      data_atualizacao: editandoPreparatorio.data_atualizacao || null
     };
     const { error } = await supabase.from('preparatorios').upsert([dadosParaSalvar]);
     if (!error) {
-      setPreparatorios(preparatorios.map(p => p.id === editandoPreparatorio.id ? editandoPreparatorio : p));
+      setPreparatorios(preparatorios.map(p => p.id === editandoPreparatorio.id ? { ...p, ...dadosParaSalvar } : p));
       setEditandoPreparatorio(null);
     } else {
       alert('Erro ao editar preparatório');
     }
+  };
+
+  const removerBadgePrep = async (prepId) => {
+    await supabase.from('preparatorios').update({ atualizado: false, data_atualizacao: null }).eq('id', prepId);
+    setPreparatorios(prev => prev.map(p => p.id === prepId ? { ...p, atualizado: false, data_atualizacao: null } : p));
+    setEditandoPreparatorio(prev => prev ? { ...prev, atualizado: false, data_atualizacao: null } : prev);
   };
 
   const removePreparatorio = async (id) => {
@@ -958,6 +967,29 @@ function AdminPage() {
       const nova = { id, titulo: novaAula.titulo, duracao: novaAula.duracao || null, videoId: extractedVideoId, pdf_url: novaAula.pdf_url || null, moduloId: modId, nivel: nivelFinal, ordem: ordemFinal };
       setAulas(prev => [...prev, nova].sort((a, b) => (a.ordem || 1) - (b.ordem || 1)));
       setNovaAula({ titulo: '', videoId: '', ordem: 1 });
+
+      // === AUTO-DETECTAR PREPARATÓRIO E MARCAR COMO ATUALIZADO ===
+      try {
+        const modulo = modulos.find(m => m.id === modId);
+        const discId = modulo?.disciplinaId || modulo?.disciplina_id;
+        const disciplina = disciplinas.find(d => d.id === discId);
+        const prepId = disciplina?.preparatorioId || disciplina?.preparatorio_id;
+        if (prepId) {
+          await supabase.from('preparatorios').update({
+            atualizado: true,
+            data_atualizacao: new Date().toISOString()
+          }).eq('id', prepId);
+          // Atualiza o estado local também
+          setPreparatorios(prev => prev.map(p =>
+            p.id === prepId
+              ? { ...p, atualizado: true, data_atualizacao: new Date().toISOString() }
+              : p
+          ));
+        }
+      } catch (e) {
+        console.warn('Não foi possível marcar preparatório como atualizado:', e);
+      }
+      // ============================================================
     } else {
       alert('Erro ao adicionar aula: ' + (error.message || JSON.stringify(error)));
     }
@@ -2173,6 +2205,40 @@ function AdminPage() {
                     <label style={{color: '#AAA', fontSize: '12px', display: 'block', marginBottom: '6px'}}>Cor do Card</label>
                     <input style={{...styles.input, height: '44px', padding: '4px', cursor: 'pointer'}} type="color" value={editandoPreparatorio.cor || '#1a237e'} onChange={e => setEditandoPreparatorio({...editandoPreparatorio, cor: e.target.value})} />
                   </div>
+
+                  {/* === CONTROLE DE BADGE DE ATUALIZAÇÃO === */}
+                  <div style={{ borderTop: '1px solid #333', paddingTop: '14px' }}>
+                    <label style={{ color: '#FFD700', fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>🔔 Badge de Atualização</label>
+                    {editandoPreparatorio.atualizado ? (
+                      <div style={{ backgroundColor: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px' }}>
+                        <div style={{ color: '#FFD700', fontSize: '12px', marginBottom: '6px' }}>✅ Badge ativo — alunas estão sendo notificadas</div>
+                        {editandoPreparatorio.data_atualizacao && (
+                          <div style={{ color: '#888', fontSize: '11px' }}>Desde: {new Date(editandoPreparatorio.data_atualizacao).toLocaleString('pt-BR')}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>Nenhum badge ativo no momento.</div>
+                    )}
+                    <div>
+                      <label style={{ color: '#AAA', fontSize: '12px', display: 'block', marginBottom: '4px' }}>Descrição da atualização</label>
+                      <input
+                        style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '13px' }}
+                        placeholder="Ex: Novas aulas de Interpretação de Texto"
+                        value={editandoPreparatorio.descricao_atualizacao || ''}
+                        onChange={e => setEditandoPreparatorio({ ...editandoPreparatorio, descricao_atualizacao: e.target.value })}
+                      />
+                    </div>
+                    {editandoPreparatorio.atualizado && (
+                      <button
+                        style={{ ...styles.deleteButton, width: '100%', marginTop: '8px', fontSize: '12px', padding: '8px' }}
+                        onClick={() => removerBadgePrep(editandoPreparatorio.id)}
+                      >
+                        🗑️ Remover Badge (notificação já vista)
+                      </button>
+                    )}
+                  </div>
+                  {/* ======================================= */}
+
                   <div style={{display: 'flex', gap: '10px', marginTop: '4px'}}>
                     <button style={{...styles.addButton, flex: 1, padding: '12px'}} onClick={saveEditPreparatorio}>✅ Salvar</button>
                     <button style={{...styles.deleteButton, flex: 1, padding: '12px'}} onClick={cancelEditPreparatorio}>❌ Cancelar</button>

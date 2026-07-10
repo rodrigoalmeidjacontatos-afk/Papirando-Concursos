@@ -124,6 +124,9 @@ function CarreiraPage() {
           box-shadow: 0 15px 35px rgba(229, 9, 20, 0.16) !important;
           border-color: rgba(229, 9, 20, 0.35) !important;
         }
+        .hover-card-preparatorio.gold-card:hover {
+          box-shadow: 0 15px 40px rgba(255, 215, 0, 0.35) !important;
+        }
         .prep-cta-button {
           transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s !important;
         }
@@ -131,6 +134,15 @@ function CarreiraPage() {
           background-color: #f40612 !important;
           transform: scale(1.03);
           box-shadow: 0 4px 15px rgba(229, 9, 20, 0.45) !important;
+        }
+        @keyframes goldPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(255,215,0,0.7), 0 0 16px 4px rgba(255,215,0,0.3); border-color: #FFD700; }
+          50%  { box-shadow: 0 0 0 8px rgba(255,215,0,0), 0 0 28px 8px rgba(255,215,0,0.15); border-color: #FFC200; }
+          100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.7), 0 0 16px 4px rgba(255,215,0,0.3); border-color: #FFD700; }
+        }
+        .gold-card {
+          animation: goldPulse 2s ease-in-out infinite !important;
+          border: 2px solid #FFD700 !important;
         }
       `}</style>
 
@@ -178,13 +190,37 @@ function CarreiraPage() {
             pointerEvents: isBasico ? 'none' : 'auto',
             userSelect: isBasico ? 'none' : 'auto',
           }}>
-            {preparatorios.map(prep => (
+            {preparatorios.map(prep => {
+              // Verifica se o badge deve aparecer: atualizado=true + menos de 1 dia + usuária não marcou como visto
+              const vistoPorMim = localStorage.getItem(`prep_visto_${prep.id}`);
+              const dentroDoPrazo = prep.data_atualizacao
+                ? (Date.now() - new Date(prep.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
+                : true;
+              const mostrarNovidade = prep.atualizado && dentroDoPrazo && !vistoPorMim;
+
+              return (
               <div
                 key={prep.id}
                 style={styles.card}
-                className="hover-card-preparatorio"
-                onClick={() => navigate(`/preparatorio/${carreiraId}/${prep.id}`)}
+                className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
+                onClick={() => {
+                  if (mostrarNovidade) localStorage.setItem(`prep_visto_${prep.id}`, '1');
+                  navigate(`/preparatorio/${carreiraId}/${prep.id}`);
+                }}
               >
+                {/* Badge NOVO */}
+                {mostrarNovidade && (
+                  <div style={{
+                    position: 'absolute', top: '10px', right: '10px', zIndex: 10,
+                    backgroundColor: '#FFD700', color: '#000',
+                    fontSize: '10px', fontWeight: 'bold', padding: '3px 8px',
+                    borderRadius: '20px', letterSpacing: '0.5px',
+                    boxShadow: '0 2px 8px rgba(255,215,0,0.6)'
+                  }}>
+                    🆕 NOVO
+                  </div>
+                )}
+
                 <div style={styles.cardImage}>
                   {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
                   <div style={{
@@ -205,12 +241,18 @@ function CarreiraPage() {
 
                 <div style={styles.cardInfo}>
                   <h3 style={styles.cardTitle}>{prep.nome}</h3>
+                  {mostrarNovidade && (
+                    <div style={{ fontSize: '11px', color: '#FFD700', marginBottom: '6px', fontWeight: '600' }}>
+                      ✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas!'}
+                    </div>
+                  )}
                   <button style={styles.cardButton} className="prep-cta-button">
                     Acessar Curso →
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {/* Cards fantasma para básico (quando lista vazia) */}
             {isBasico && preparatorios.length === 0 && [1,2,3].map(i => (
