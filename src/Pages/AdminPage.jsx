@@ -2238,7 +2238,15 @@ function AdminPage() {
                         )}
                       </div>
                     ) : (
-                      <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>Nenhum badge ativo no momento.</div>
+                      <div style={{ marginBottom: '10px' }}>
+                        <div style={{ color: '#666', fontSize: '12px', marginBottom: '8px' }}>Nenhum badge ativo no momento.</div>
+                        <button 
+                          style={{...styles.addButton, width: '100%', padding: '6px', fontSize: '12px', backgroundColor: 'transparent', border: '1px solid #FFD700', color: '#FFD700'}}
+                          onClick={() => setEditandoPreparatorio({...editandoPreparatorio, atualizado: true, data_atualizacao: new Date().toISOString()})}
+                        >
+                          ✨ Ativar Badge Manualmente
+                        </button>
+                      </div>
                     )}
                     <div>
                       <label style={{ color: '#AAA', fontSize: '12px', display: 'block', marginBottom: '4px' }}>Descrição da atualização</label>
