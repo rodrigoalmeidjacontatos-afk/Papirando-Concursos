@@ -104,7 +104,7 @@ function AulaPage() {
     if (finalId) setVideoId(finalId);
   }, [aulaPlaying, videoKey, aulaId]);
 
-  const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const velocidades = [0.5, 0.67, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
   // Mantém os dados atualizados na ref para o momento em que o componente for desmontado ou a aula mudar
   useEffect(() => {
@@ -1864,8 +1864,12 @@ function AulaPage() {
                                 onClick={(e) => { e.stopPropagation(); mudarVelocidade(v); setShowSpeedMenu(false); }}
                                 style={{
                                   ...styles.speedMenuItem,
-                                  backgroundColor: velocidade === v ? 'rgba(33, 150, 243, 0.2)' : 'transparent',
-                                  color: velocidade === v ? '#2196F3' : '#FFF',
+                                  backgroundColor: velocidade === v
+                                    ? (v === 0.67 ? 'rgba(229, 9, 20, 0.2)' : 'rgba(33, 150, 243, 0.2)')
+                                    : 'transparent',
+                                  color: v === 0.67
+                                    ? (velocidade === v ? '#ff4d4d' : '#E50914')
+                                    : (velocidade === v ? '#2196F3' : '#FFF'),
                                   fontWeight: velocidade === v ? 'bold' : 'normal',
                                 }}
                                 onMouseEnter={(e) => {
