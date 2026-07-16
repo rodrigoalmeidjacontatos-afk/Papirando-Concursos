@@ -2854,7 +2854,8 @@ function AdminPage() {
                       ? 'rgba(21, 101, 192, 0.12)' : '#222',
                     borderRadius: '10px',
                     border: `1px solid ${isGlobal ? '#1565C0' : '#333'}`,
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    flexShrink: 0
                   }}>
                     {/* Cabeçalho do preparatório */}
                     <div style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderBottom: '1px solid #333'}}>
