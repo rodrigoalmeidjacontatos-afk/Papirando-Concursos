@@ -30,6 +30,7 @@ function AdminPage() {
   
   // ========== DADOS DE USUÁRIOS (NOVO) ==========
   const [usuarios, setUsuarios] = useState([]);
+  const [buscaUsuario, setBuscaUsuario] = useState('');
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(false);
   const [novosUsuariosBadge, setNovosUsuariosBadge] = useState(0);
   
@@ -2475,9 +2476,31 @@ function AdminPage() {
             </div>
           )}
 
-          {activeMenu === 'usuarios' && (
+          {activeMenu === 'usuarios' && (() => {
+            const usuariosFiltrados = usuarios.filter(u => 
+              (u.email || '').toLowerCase().includes(buscaUsuario.toLowerCase())
+            );
+            return (
             <div>
-              <h2 style={{color: '#fff', marginBottom: 20}}>Gerenciar Usuários</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
+                <h2 style={{color: '#fff', margin: 0}}>Gerenciar Usuários</h2>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar por email..."
+                  value={buscaUsuario}
+                  onChange={(e) => setBuscaUsuario(e.target.value)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #333',
+                    backgroundColor: '#111',
+                    color: '#FFF',
+                    width: '300px',
+                    outline: 'none',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
               {carregandoUsuarios ? (
                 <div style={{color: '#AAA'}}>Carregando usuários...</div>
               ) : (
@@ -2493,7 +2516,13 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {usuarios.map(u => (
+                      {usuariosFiltrados.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{padding: '20px', textAlign: 'center', color: '#888'}}>
+                            Nenhum usuário encontrado.
+                          </td>
+                        </tr>
+                      ) : usuariosFiltrados.map(u => (
                         <tr key={u.id} style={{borderBottom: '1px solid #333', transition: 'background 0.2s'}}>
                           <td style={{padding: '20px 12px'}}>
                             <div style={{display: 'flex', flexDirection: 'column'}}>
@@ -2603,7 +2632,7 @@ function AdminPage() {
                 </div>
               )}
             </div>
-          )}
+          )})}
 
           {activeMenu === 'metricas' && (
             <div>
