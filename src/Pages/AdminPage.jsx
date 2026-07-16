@@ -2844,13 +2844,9 @@ function AdminPage() {
                 const globalKey = `*:${prep.id}`;
                 const isGlobal = liberados.includes(globalKey);
 
-                // Carreiras que têm este preparatório vinculado
-                const carreirasDoPrep = carreiras.filter(car => {
-                  // verifica se há vínculo desta carreira com este prep
-                  // vinculos é um objeto {carreiraId: {prepId: {...}}}
-                  const vCarreira = vinculos[car.id];
-                  return vCarreira && vCarreira[prep.id] !== undefined;
-                });
+                // Mostra TODAS as carreiras (o admin escolhe onde liberar)
+                // Não filtramos por vínculo pois isso causava lista vazia em bd legado
+                const carreirasDoPrep = carreiras;
 
                 return (
                   <div key={prep.id} style={{
