@@ -309,20 +309,45 @@ function AdminPage() {
   };
 
   const abrirGerenciarAcesso = (usuario) => {
+    let liberados = usuario.preparatorios_liberados || [];
+    if (typeof liberados === 'string') {
+      try { liberados = JSON.parse(liberados); } catch (e) { liberados = []; }
+    }
+    if (!Array.isArray(liberados)) liberados = [];
     setUsuarioEditandoAcesso({
       ...usuario,
-      preparatorios_liberados: usuario.preparatorios_liberados || []
+      preparatorios_liberados: liberados
     });
   };
 
-  const toggleAcessoPrep = (prepId) => {
+  // key = "carreiraId:prepId" ou "*:prepId" (global)
+  const toggleAcessoCombo = (key) => {
     setUsuarioEditandoAcesso(prev => {
       const atual = prev.preparatorios_liberados || [];
-      const jatem = atual.includes(prepId);
+      const jatem = atual.includes(key);
       return {
         ...prev,
-        preparatorios_liberados: jatem ? atual.filter(id => id !== prepId) : [...atual, prepId]
+        preparatorios_liberados: jatem ? atual.filter(k => k !== key) : [...atual, key]
       };
+    });
+  };
+
+  // Libera o preparatório em TODAS as carreiras (global: *:prepId)
+  // e remove quaisquer combos específicos daquele preparatório
+  const toggleAcessoGlobal = (prepId) => {
+    const globalKey = `*:${prepId}`;
+    setUsuarioEditandoAcesso(prev => {
+      const atual = prev.preparatorios_liberados || [];
+      const jaTemGlobal = atual.includes(globalKey);
+      // Remove todas as entradas deste prep (específicas e global)
+      const semEstePrep = atual.filter(k => !k.endsWith(`:${prepId}`));
+      if (jaTemGlobal) {
+        // Desmarca global
+        return { ...prev, preparatorios_liberados: semEstePrep };
+      } else {
+        // Marca global (remove específicos e adiciona *)
+        return { ...prev, preparatorios_liberados: [...semEstePrep, globalKey] };
+      }
     });
   };
 
@@ -2793,45 +2818,110 @@ function AdminPage() {
               <p style={{color: '#AAA', margin: '6px 0 0', fontSize: '13px'}}>{usuarioEditandoAcesso.email}</p>
             </div>
 
+            {/* Barra de status */}
             <div style={{
               backgroundColor: '#222', borderRadius: '8px', padding: '12px 16px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <span style={{color: '#CCC', fontSize: '13px'}}>
                 {(usuarioEditandoAcesso.preparatorios_liberados?.length || 0) === 0
-                  ? '✅ Acesso livre a todos os cursos'
-                  : `${usuarioEditandoAcesso.preparatorios_liberados.length} curso(s) liberado(s)`
+                  ? '🔓 Nenhum acesso liberado'
+                  : `${usuarioEditandoAcesso.preparatorios_liberados.length} acesso(s) liberado(s)`
                 }
               </span>
               <button
                 style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px'}}
                 onClick={() => setUsuarioEditandoAcesso(prev => ({...prev, preparatorios_liberados: []}))}
               >
-                Liberar Todos
+                Limpar Tudo
               </button>
             </div>
 
-            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px'}}>
+            {/* Lista agrupada por preparatório */}
+            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px'}}>
               {preparatorios.map(prep => {
-                const liberado = (usuarioEditandoAcesso.preparatorios_liberados || []).includes(prep.id);
+                const liberados = usuarioEditandoAcesso.preparatorios_liberados || [];
+                const globalKey = `*:${prep.id}`;
+                const isGlobal = liberados.includes(globalKey);
+
+                // Carreiras que têm este preparatório vinculado
+                const carreirasDoPrep = carreiras.filter(car => {
+                  // verifica se há vínculo desta carreira com este prep
+                  // vinculos é um objeto {carreiraId: {prepId: {...}}}
+                  const vCarreira = vinculos[car.id];
+                  return vCarreira && vCarreira[prep.id] !== undefined;
+                });
+
                 return (
-                  <label key={prep.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '12px 16px', borderRadius: '8px', cursor: 'pointer',
-                    backgroundColor: liberado ? 'rgba(21, 101, 192, 0.2)' : '#222',
-                    border: `1px solid ${liberado ? '#1565C0' : '#333'}`,
-                    transition: 'all 0.2s'
+                  <div key={prep.id} style={{
+                    backgroundColor: (isGlobal || carreirasDoPrep.some(c => liberados.includes(`${c.id}:${prep.id}`)))
+                      ? 'rgba(21, 101, 192, 0.12)' : '#222',
+                    borderRadius: '10px',
+                    border: `1px solid ${isGlobal ? '#1565C0' : '#333'}`,
+                    overflow: 'hidden'
                   }}>
-                    <input
-                      type="checkbox"
-                      checked={liberado}
-                      onChange={() => toggleAcessoPrep(prep.id)}
-                      style={{width: '16px', height: '16px', accentColor: '#1565C0'}}
-                    />
-                    {renderIcon(prep.logo)}
-                    <span style={{color: '#FFF', fontWeight: '500', flex: 1}}>{prep.nome}</span>
-                    {liberado && <span style={{color: '#1565C0', fontSize: '12px', fontWeight: 'bold'}}>✓ Liberado</span>}
-                  </label>
+                    {/* Cabeçalho do preparatório */}
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderBottom: '1px solid #333'}}>
+                      {renderIcon(prep.logo)}
+                      <span style={{color: '#FFF', fontWeight: 'bold', flex: 1, fontSize: '14px'}}>{prep.nome}</span>
+                    </div>
+
+                    {/* Sub-opções */}
+                    <div style={{padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+
+                      {/* Opção: Todas as Carreiras (global) */}
+                      <label style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
+                        backgroundColor: isGlobal ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isGlobal ? '#4CAF50' : '#444'}`,
+                        transition: 'all 0.2s'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isGlobal}
+                          onChange={() => toggleAcessoGlobal(prep.id)}
+                          style={{width: '15px', height: '15px', accentColor: '#4CAF50'}}
+                        />
+                        <span style={{fontSize: '14px'}}>🌐</span>
+                        <span style={{color: isGlobal ? '#4CAF50' : '#CCC', fontWeight: isGlobal ? 'bold' : 'normal', fontSize: '13px', flex: 1}}>
+                          Todas as Carreiras
+                        </span>
+                        {isGlobal && <span style={{color: '#4CAF50', fontSize: '11px', fontWeight: 'bold'}}>✓ GLOBAL</span>}
+                      </label>
+
+                      {/* Carreiras específicas (só mostra se não for global) */}
+                      {!isGlobal && carreirasDoPrep.map(car => {
+                        const comboKey = `${car.id}:${prep.id}`;
+                        const ativo = liberados.includes(comboKey);
+                        return (
+                          <label key={car.id} style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            padding: '7px 12px', borderRadius: '7px', cursor: 'pointer',
+                            backgroundColor: ativo ? 'rgba(21,101,192,0.18)' : 'transparent',
+                            border: `1px solid ${ativo ? '#1565C0' : '#3a3a3a'}`,
+                            transition: 'all 0.2s'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={ativo}
+                              onChange={() => toggleAcessoCombo(comboKey)}
+                              style={{width: '14px', height: '14px', accentColor: '#1565C0'}}
+                            />
+                            <span style={{fontSize: '13px'}}>{car.icone || '📌'}</span>
+                            <span style={{color: ativo ? '#90CAF9' : '#AAA', fontSize: '13px', flex: 1}}>{car.nome}</span>
+                            {ativo && <span style={{color: '#1565C0', fontSize: '10px', fontWeight: 'bold'}}>✓ OK</span>}
+                          </label>
+                        );
+                      })}
+
+                      {!isGlobal && carreirasDoPrep.length === 0 && (
+                        <p style={{color: '#666', fontSize: '11px', margin: 0, padding: '4px 0'}}>
+                          Nenhuma carreira vinculada a este preparatório ainda.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>

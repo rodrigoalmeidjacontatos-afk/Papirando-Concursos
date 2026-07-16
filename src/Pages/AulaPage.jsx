@@ -1429,7 +1429,10 @@ function AulaPage() {
   const isBloqueada = 
     (nivelAula === 'premium' && planoUsuario !== 'premium') ||
     (nivelAula === 'medio' && planoUsuario === 'basico') ||
-    (planoUsuario === 'medio' && !preparatoriosLiberados.includes(preparatorioId));
+    (planoUsuario === 'medio' && 
+      !preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) &&
+      !preparatoriosLiberados.includes(`*:${preparatorioId}`)
+    );
 
   if (isBloqueada && !isAdmin) {
     return (

@@ -460,7 +460,10 @@ function PreparatorioViewPage() {
 
   const temAcessoBloqueadoAoCurso = !isAdmin && (
     planoUsuario === 'basico' ||
-    (planoUsuario === 'medio' && !preparatoriosLiberados.includes(preparatorioId))
+    (planoUsuario === 'medio' && 
+      !preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) &&
+      !preparatoriosLiberados.includes(`*:${preparatorioId}`)
+    )
   );
 
   return (

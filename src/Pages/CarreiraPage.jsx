@@ -83,10 +83,10 @@ function CarreiraPage() {
         setPlanoUsuario(planoNormalizado);
 
         // ====================================================
-        // LÓGICA DE ACESSO INDIVIDUAL POR CURSO
+        // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
         // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
-        // Mostra todos os preps mas bloqueia individualmente
-        // quem não tem o prep em preparatorios_liberados
+        // Chave: "carreiraId:prepId" = acesso nessa carreira apenas
+        //        "*:prepId"          = acesso em qualquer carreira
         // ====================================================
         if ((tipoAcesso === 'restrito' || planoNormalizado === 'medio') && !isOwner && planoNormalizado !== 'premium') {
           let liberados = profile?.preparatorios_liberados || [];
@@ -96,8 +96,13 @@ function CarreiraPage() {
           }
           if (!Array.isArray(liberados)) liberados = [];
 
+          // Um prep está liberado se houver "carreiraId:prepId" ou "*:prepId" na lista
+          const liberadosNesseContexto = prepsFiltrados
+            .filter(p => liberados.includes(`${carreiraId}:${p.id}`) || liberados.includes(`*:${p.id}`))
+            .map(p => p.id);
+
           setPreparatorios(prepsFiltrados);
-          setPrepsComAcesso(liberados);
+          setPrepsComAcesso(liberadosNesseContexto);
           setCarregando(false);
           return;
         }
