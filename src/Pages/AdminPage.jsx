@@ -2632,6 +2632,7 @@ function AdminPage() {
                 </div>
               )}
             </div>
+            );
           })()}
 
           {activeMenu === 'metricas' && (
