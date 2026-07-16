@@ -22,6 +22,7 @@ function PreparatorioViewPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [dataExpiracao, setDataExpiracao] = useState(null);
   const [progressoAulas, setProgressoAulas] = useState({});
+  const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
 
   const isRecente = (createdAtString) => {
     if (!createdAtString) return false;
@@ -55,7 +56,7 @@ function PreparatorioViewPage() {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
           const { data: profile, error } = await supabase
             .from('profiles')
-            .select('plano, plano_anterior, display_name, data_expiracao')
+            .select('plano, plano_anterior, display_name, data_expiracao, preparatorios_liberados')
             .eq('id', userObj.id)
             .single();
             
@@ -101,6 +102,13 @@ function PreparatorioViewPage() {
           setPlanoUsuario(planoNormalizado);
           setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
           setDataExpiracao(profile.data_expiracao);
+          
+          let liberados = profile.preparatorios_liberados || [];
+          if (typeof liberados === 'string') {
+            try { liberados = JSON.parse(liberados); } catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
+          }
+          if (!Array.isArray(liberados)) liberados = [];
+          setPreparatoriosLiberados(liberados);
         } else if (mounted) {
           setPlanoUsuario('basico');
           setDataExpiracao(null);
@@ -450,6 +458,11 @@ function PreparatorioViewPage() {
   // Imagem de fundo fixa (soldado SWAT - Pinterest)
   const bgImage = '/images/bg-swat.jpg';
 
+  const temAcessoBloqueadoAoCurso = !isAdmin && (
+    planoUsuario === 'basico' ||
+    (planoUsuario === 'medio' && !preparatoriosLiberados.includes(preparatorioId))
+  );
+
   return (
     <div style={styles.container}>
       {/* Fundo cinematográfico */}
@@ -511,8 +524,8 @@ function PreparatorioViewPage() {
       </header>
 
       <main style={{...styles.main, position: 'relative', zIndex: 10}}>
-        {/* Overlay de bloqueio apenas se for explicitamente básico e não admin */}
-        {planoUsuario === 'basico' && !isAdmin && (
+        {/* Overlay de bloqueio */}
+        {temAcessoBloqueadoAoCurso && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
             zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',

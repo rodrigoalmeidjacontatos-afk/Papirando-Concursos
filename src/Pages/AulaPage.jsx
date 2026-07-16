@@ -41,6 +41,7 @@ function AulaPage() {
   const [temAcesso, setTemAcesso] = useState(true);
   const [carregandoAcesso, setCarregandoAcesso] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
   const [userName, setUserName] = useState('Aluno');
   
   // Novos Estados para a Barra Lateral
@@ -168,7 +169,11 @@ function AulaPage() {
 
       try {
         console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase.from('profiles').select('display_name, plano, plano_anterior, data_expiracao').eq('id', userObj.id).single();
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('display_name, plano, plano_anterior, data_expiracao, preparatorios_liberados')
+          .eq('id', userObj.id)
+          .single();
         
         if (error) {
           console.error("[Auth] Erro ao buscar profile:", error);
@@ -219,6 +224,14 @@ function AulaPage() {
 
           console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
           setPlanoUsuario(planoNormalizado);
+          
+          let liberados = profile.preparatorios_liberados || [];
+          if (typeof liberados === 'string') {
+            try { liberados = JSON.parse(liberados); } catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
+          }
+          if (!Array.isArray(liberados)) liberados = [];
+          setPreparatoriosLiberados(liberados);
+          
           setCarregandoAcesso(false);
         }
       } catch (e) {
@@ -1415,7 +1428,8 @@ function AulaPage() {
   const nivelAula = aulaPlaying?.nivel || 'basico'; // Pega o nível da aula (basico, medio, premium)
   const isBloqueada = 
     (nivelAula === 'premium' && planoUsuario !== 'premium') ||
-    (nivelAula === 'medio' && planoUsuario === 'basico');
+    (nivelAula === 'medio' && planoUsuario === 'basico') ||
+    (planoUsuario === 'medio' && !preparatoriosLiberados.includes(preparatorioId));
 
   if (isBloqueada && !isAdmin) {
     return (

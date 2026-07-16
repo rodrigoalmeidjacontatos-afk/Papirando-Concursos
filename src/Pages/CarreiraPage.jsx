@@ -10,6 +10,8 @@ function CarreiraPage() {
   const [preparatorios, setPreparatorios] = useState([]);
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
+  // Para categoria 'restrito': lista de IDs de preps que o usuário tem acesso (null = sem restrição individual)
+  const [prepsComAcesso, setPrepsComAcesso] = useState(null);
 
   useEffect(() => {
     async function carregarDados() {
@@ -18,6 +20,16 @@ function CarreiraPage() {
       const encontrada = (carreirasData || []).find(s => s.id === carreiraId);
       setCarreira(encontrada);
 
+      // 1b. Buscar tipo_acesso da categoria desta carreira
+      let tipoAcesso = 'livre';
+      if (encontrada) {
+        const catId = encontrada.categoriaId || encontrada.categoria_id;
+        if (catId) {
+          const { data: catData } = await supabase.from('categorias').select('tipo_acesso').eq('id', catId).single();
+          tipoAcesso = catData?.tipo_acesso || 'livre';
+        }
+      }
+
       // 2. Buscar preparatórios
       const { data: prepsData } = await supabase.from('preparatorios').select('*');
 
@@ -25,12 +37,10 @@ function CarreiraPage() {
       const { data: vData } = await supabase.from('vinculos').select('*');
       const storedVinculos = {};
       if (vData) {
-        // Primeiro processa o registro legado (data) se existir
         const legado = vData.find(row => row.data);
         if (legado && legado.data) {
           Object.assign(storedVinculos, legado.data);
         }
-        // Depois processa as linhas individuais, garantindo que não sejam sobrescritas pelo legado
         vData.forEach(row => {
           if (!row.data && row.carreira_id && row.preparatorio_id) {
             if (!storedVinculos[row.carreira_id]) storedVinculos[row.carreira_id] = {};
@@ -46,7 +56,7 @@ function CarreiraPage() {
       const prepIds = Object.keys(carreiraVinculos);
       let prepsFiltrados = (prepsData || []).filter(p => prepIds.includes(p.id));
 
-      // 5. Verificar plano do usuário
+      // 5. Verificar plano e acesso do usuário
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -56,12 +66,11 @@ function CarreiraPage() {
           .single();
 
         const dataExp = profile?.data_expiracao;
-        // Normalização robusta com trim()
         let planoNormalizado = String(profile?.plano || 'basico')
           .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        console.log(`[CarreiraPage] User: ${user.email} | Plano Banco: "${profile?.plano}" | Normalizado: "${planoNormalizado}"`);
-        
+
+        console.log(`[CarreiraPage] User: ${user.email} | Plano: "${planoNormalizado}" | TipoAcesso: "${tipoAcesso}"`);
+
         if (dataExp && new Date(dataExp) < new Date()) {
           planoNormalizado = profile?.plano_anterior || 'basico';
           supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', user.id);
@@ -73,20 +82,36 @@ function CarreiraPage() {
 
         setPlanoUsuario(planoNormalizado);
 
+        // ====================================================
+        // LÓGICA DE ACESSO INDIVIDUAL POR CURSO
+        // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
+        // Mostra todos os preps mas bloqueia individualmente
+        // quem não tem o prep em preparatorios_liberados
+        // ====================================================
+        if ((tipoAcesso === 'restrito' || planoNormalizado === 'medio') && !isOwner && planoNormalizado !== 'premium') {
+          let liberados = profile?.preparatorios_liberados || [];
+          if (typeof liberados === 'string') {
+            try { liberados = JSON.parse(liberados); }
+            catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
+          }
+          if (!Array.isArray(liberados)) liberados = [];
+
+          setPreparatorios(prepsFiltrados);
+          setPrepsComAcesso(liberados);
+          setCarregando(false);
+          return;
+        }
+
+        // Lógica original de plano (para categorias não restritas e planos básico/premium)
         if (planoNormalizado === 'basico') {
           setPreparatorios(prepsFiltrados);
         } else if (planoNormalizado === 'medio') {
           let liberados = profile?.preparatorios_liberados || [];
           if (typeof liberados === 'string') {
-            try {
-              liberados = JSON.parse(liberados);
-            } catch (e) {
-              liberados = liberados.split(',').map(s => s.trim());
-            }
+            try { liberados = JSON.parse(liberados); }
+            catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
           }
-          if (!Array.isArray(liberados)) {
-            liberados = [];
-          }
+          if (!Array.isArray(liberados)) liberados = [];
 
           if (liberados.length > 0) {
             setPreparatorios(prepsFiltrados.filter(p => liberados.includes(p.id)));
@@ -97,8 +122,14 @@ function CarreiraPage() {
           setPreparatorios(prepsFiltrados);
         }
       } else {
+        // Usuário não logado
         setPlanoUsuario('basico');
-        setPreparatorios(prepsFiltrados);
+        if (tipoAcesso === 'restrito') {
+          setPreparatorios(prepsFiltrados);
+          setPrepsComAcesso([]);
+        } else {
+          setPreparatorios(prepsFiltrados);
+        }
       }
 
       setCarregando(false);
@@ -111,10 +142,11 @@ function CarreiraPage() {
   if (!carreira) return <LoadingScreen />;
 
   const isBasico = planoUsuario === 'basico';
+  // Modo restrito: prepsComAcesso é array (mesmo vazio) → cada prep tem acesso individual
+  const isModoRestrito = prepsComAcesso !== null;
 
   return (
     <div style={styles.container}>
-      {/* Estilos globais injetados para aprimorar visualmente */}
       <style>{`
         .hover-card-preparatorio {
           transition: transform 0.25s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.25s ease, border-color 0.25s ease !important;
@@ -146,7 +178,6 @@ function CarreiraPage() {
         }
       `}</style>
 
-      {/* Brilho de Fundo Neon */}
       <div style={styles.ambientGlow} />
 
       <header style={styles.header}>
@@ -175,114 +206,217 @@ function CarreiraPage() {
         {/* TÍTULO DA SEÇÃO */}
         <div style={styles.sectionHeader}>
           <span style={styles.sectionBadge}>📚 PLATAFORMAS DISPONÍVEIS</span>
-          {isBasico && (
+          {isBasico && !isModoRestrito && (
             <span style={styles.premiumBadge}>🔒 CONTEÚDO RESTRITO</span>
+          )}
+          {isModoRestrito && (
+            <span style={{
+              fontSize: '11px', fontWeight: 'bold', color: '#4ade80',
+              backgroundColor: 'rgba(74,222,128,0.1)',
+              border: '1px solid rgba(74,222,128,0.3)',
+              padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
+            }}>📋 EDITAL ABERTO</span>
           )}
         </div>
 
-        {/* ÁREA COM BLUR PARA BÁSICO */}
-        <div style={{ position: 'relative', zIndex: 3 }}>
-
-          {/* GRID DE CARDS — sempre renderiza, mas com blur forte para básico */}
-          <div style={{
-            ...styles.grid,
-            filter: isBasico ? 'blur(18px) brightness(0.15) saturate(0.3)' : 'none',
-            pointerEvents: isBasico ? 'none' : 'auto',
-            userSelect: isBasico ? 'none' : 'auto',
-          }}>
+        {/* ===== MODO RESTRITO: cadeado individual por prep ===== */}
+        {isModoRestrito ? (
+          <div style={styles.grid}>
             {preparatorios.map(prep => {
+              const temAcesso = prepsComAcesso.includes(prep.id);
               const dentroDoPrazo = prep.data_atualizacao
                 ? (Date.now() - new Date(prep.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
                 : true;
-              const mostrarNovidade = prep.atualizado && dentroDoPrazo;
+              const mostrarNovidade = prep.atualizado && dentroDoPrazo && temAcesso;
 
               return (
-              <div
-                key={prep.id}
-                style={styles.card}
-                className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
-                onClick={() => {
-                  navigate(`/preparatorio/${carreiraId}/${prep.id}`);
-                }}
-              >
-                {/* Badge NOVO */}
-                {mostrarNovidade && (
-                  <div style={{
-                    position: 'absolute', top: '10px', right: '10px', zIndex: 10,
-                    backgroundColor: '#FFD700', color: '#000',
-                    fontSize: '10px', fontWeight: 'bold', padding: '3px 8px',
-                    borderRadius: '20px', letterSpacing: '0.5px',
-                    boxShadow: '0 2px 8px rgba(255,215,0,0.6)'
-                  }}>
-                    🆕 NOVO
-                  </div>
-                )}
+                <div
+                  key={prep.id}
+                  style={{
+                    ...styles.card,
+                    cursor: temAcesso ? 'pointer' : 'default',
+                    opacity: temAcesso ? 1 : 0.85,
+                    border: temAcesso ? '1px solid #1c1c1f' : '1px solid rgba(229,9,20,0.2)',
+                  }}
+                  className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
+                  onClick={() => { if (temAcesso) navigate(`/preparatorio/${carreiraId}/${prep.id}`); }}
+                >
+                  {mostrarNovidade && (
+                    <div style={{
+                      position: 'absolute', top: '10px', right: '10px', zIndex: 10,
+                      backgroundColor: '#FFD700', color: '#000',
+                      fontSize: '10px', fontWeight: 'bold', padding: '3px 8px',
+                      borderRadius: '20px', letterSpacing: '0.5px',
+                      boxShadow: '0 2px 8px rgba(255,215,0,0.6)'
+                    }}>
+                      🆕 NOVO
+                    </div>
+                  )}
 
-                <div style={styles.cardImage}>
-                  {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
-                  <div style={{
-                    position: prep.capa ? 'absolute' : 'static',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: prep.capa ? 'rgba(0,0,0,0.45)' : '#0d0d0f',
-                    zIndex: 2,
-                    padding: '20px'
-                  }}>
-                    {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
-                      <img src={prep.logo} alt={prep.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                  <div style={styles.cardImage}>
+                    {prep.capa && (
+                      <img
+                        src={prep.capa}
+                        alt="background"
+                        style={{ ...styles.cardImageImg, filter: temAcesso ? 'none' : 'brightness(0.35) saturate(0.3)' }}
+                      />
+                    )}
+                    <div style={{
+                      position: prep.capa ? 'absolute' : 'static',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: prep.capa ? 'rgba(0,0,0,0.45)' : '#0d0d0f',
+                      zIndex: 2,
+                      padding: '20px',
+                      filter: temAcesso ? 'none' : 'brightness(0.4) saturate(0.2)',
+                    }}>
+                      {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
+                        <img src={prep.logo} alt={prep.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                      ) : (
+                        <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                      )}
+                    </div>
+
+                    {/* Cadeado sobre a imagem para preps sem acesso */}
+                    {!temAcesso && (
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 5,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                      }}>
+                        <div style={{ fontSize: '36px', filter: 'drop-shadow(0 0 12px rgba(229,9,20,0.7))' }}>🔒</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={styles.cardInfo}>
+                    <h3 style={{ ...styles.cardTitle, color: temAcesso ? '#FFF' : '#888' }}>{prep.nome}</h3>
+                    {mostrarNovidade && (
+                      <div style={{ fontSize: '11px', color: '#FFD700', marginBottom: '6px', fontWeight: '600' }}>
+                        ✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas!'}
+                      </div>
+                    )}
+                    {temAcesso ? (
+                      <button style={styles.cardButton} className="prep-cta-button">
+                        Acessar Curso →
+                      </button>
                     ) : (
-                      <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                      <div style={{
+                        padding: '10px', borderRadius: '8px', textAlign: 'center',
+                        backgroundColor: 'rgba(229,9,20,0.08)',
+                        border: '1px solid rgba(229,9,20,0.2)',
+                        color: '#E50914', fontSize: '12px', fontWeight: 'bold',
+                        letterSpacing: '0.5px'
+                      }}>
+                        🔒 Acesso não liberado
+                      </div>
                     )}
                   </div>
                 </div>
+              );
+            })}
+            {preparatorios.length === 0 && (
+              <p style={styles.empty}>Nenhum preparatório disponível nesta carreira ainda.</p>
+            )}
+          </div>
 
-                <div style={styles.cardInfo}>
-                  <h3 style={styles.cardTitle}>{prep.nome}</h3>
-                  {mostrarNovidade && (
-                    <div style={{ fontSize: '11px', color: '#FFD700', marginBottom: '6px', fontWeight: '600' }}>
-                      ✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas!'}
+        ) : (
+          /* ===== MODO NORMAL / BÁSICO: blur global ===== */
+          <div style={{ position: 'relative', zIndex: 3 }}>
+            <div style={{
+              ...styles.grid,
+              filter: isBasico ? 'blur(18px) brightness(0.15) saturate(0.3)' : 'none',
+              pointerEvents: isBasico ? 'none' : 'auto',
+              userSelect: isBasico ? 'none' : 'auto',
+            }}>
+              {preparatorios.map(prep => {
+                const dentroDoPrazo = prep.data_atualizacao
+                  ? (Date.now() - new Date(prep.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
+                  : true;
+                const mostrarNovidade = prep.atualizado && dentroDoPrazo;
+
+                return (
+                  <div
+                    key={prep.id}
+                    style={styles.card}
+                    className={`hover-card-preparatorio${mostrarNovidade ? ' gold-card' : ''}`}
+                    onClick={() => navigate(`/preparatorio/${carreiraId}/${prep.id}`)}
+                  >
+                    {mostrarNovidade && (
+                      <div style={{
+                        position: 'absolute', top: '10px', right: '10px', zIndex: 10,
+                        backgroundColor: '#FFD700', color: '#000',
+                        fontSize: '10px', fontWeight: 'bold', padding: '3px 8px',
+                        borderRadius: '20px', letterSpacing: '0.5px',
+                        boxShadow: '0 2px 8px rgba(255,215,0,0.6)'
+                      }}>
+                        🆕 NOVO
+                      </div>
+                    )}
+
+                    <div style={styles.cardImage}>
+                      {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
+                      <div style={{
+                        position: prep.capa ? 'absolute' : 'static',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: prep.capa ? 'rgba(0,0,0,0.45)' : '#0d0d0f',
+                        zIndex: 2,
+                        padding: '20px'
+                      }}>
+                        {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
+                          <img src={prep.logo} alt={prep.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                        ) : (
+                          <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <button style={styles.cardButton} className="prep-cta-button">
-                    Acessar Curso →
+
+                    <div style={styles.cardInfo}>
+                      <h3 style={styles.cardTitle}>{prep.nome}</h3>
+                      {mostrarNovidade && (
+                        <div style={{ fontSize: '11px', color: '#FFD700', marginBottom: '6px', fontWeight: '600' }}>
+                          ✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas!'}
+                        </div>
+                      )}
+                      <button style={styles.cardButton} className="prep-cta-button">
+                        Acessar Curso →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isBasico && preparatorios.length === 0 && [1, 2, 3].map(i => (
+                <div key={i} style={styles.card}>
+                  <div style={{ ...styles.cardImage, backgroundColor: '#222' }} />
+                  <h3 style={{ ...styles.cardTitle, backgroundColor: '#333', borderRadius: 4, color: 'transparent' }}>Preparatório</h3>
+                </div>
+              ))}
+            </div>
+
+            {/* OVERLAY DE CADEADO GLOBAL — só para básico */}
+            {isBasico && (
+              <div style={styles.lockOverlay}>
+                <div style={styles.lockBox}>
+                  <div style={{ fontSize: '56px', marginBottom: '16px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
+                  <div style={styles.premiumLabel}>🔒 ÁREA DE ASSINANTES</div>
+                  <h3 style={{ color: '#FFF', margin: '14px 0 10px', fontSize: '22px', fontWeight: 'bold' }}>Acesso Exclusivo</h3>
+                  <p style={{ color: '#AAA', margin: '0 0 24px', fontSize: '13px', textAlign: 'center', lineHeight: '1.7', maxWidth: '320px' }}>
+                    Esta área é restrita a assinantes com acesso habilitado ao curso.<br />
+                    Fale com nosso suporte para liberar sua conta!
+                  </p>
+                  <button style={styles.upgradeBtn} onClick={() => navigate(-1)}>
+                    ← Voltar ao Início
                   </button>
                 </div>
               </div>
-              );
-            })}
-
-            {/* Cards fantasma para básico (quando lista vazia) */}
-            {isBasico && preparatorios.length === 0 && [1,2,3].map(i => (
-              <div key={i} style={styles.card}>
-                <div style={{...styles.cardImage, backgroundColor: '#222'}} />
-                <h3 style={{...styles.cardTitle, backgroundColor: '#333', borderRadius: 4, color: 'transparent'}}>Preparatório</h3>
-              </div>
-            ))}
+            )}
           </div>
+        )}
 
-          {/* OVERLAY DE CADEADO — só para básico */}
-          {isBasico && (
-            <div style={styles.lockOverlay}>
-              <div style={styles.lockBox}>
-                <div style={{ fontSize: '56px', marginBottom: '16px', filter: 'drop-shadow(0 0 16px rgba(229,9,20,0.5))' }}>🔒</div>
-                <div style={styles.premiumLabel}>🔒 ÁREA DE ASSINANTES</div>
-                <h3 style={{ color: '#FFF', margin: '14px 0 10px', fontSize: '22px', fontWeight: 'bold' }}>Acesso Exclusivo</h3>
-                <p style={{ color: '#AAA', margin: '0 0 24px', fontSize: '13px', textAlign: 'center', lineHeight: '1.7', maxWidth: '320px' }}>
-                  Esta área é restrita a assinantes com acesso habilitado ao curso.<br />
-                  Fale com nosso suporte para liberar sua conta!
-                </p>
-                <button
-                  style={styles.upgradeBtn}
-                  onClick={() => navigate(-1)}
-                >
-                  ← Voltar ao Início
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {preparatorios.length === 0 && !isBasico && (
+        {preparatorios.length === 0 && !isBasico && !isModoRestrito && (
           <p style={styles.empty}>Nenhum preparatório disponível para sua conta nesta carreira.</p>
         )}
       </main>
@@ -301,21 +435,21 @@ const styles = {
     pointerEvents: 'none',
     zIndex: 1
   },
-  header: { 
-    backgroundColor: 'rgba(15,15,15,0.96)', 
-    padding: '16px 40px', 
-    borderBottom: '1px solid #1c1c1c', 
-    position: 'relative', 
+  header: {
+    backgroundColor: 'rgba(15,15,15,0.96)',
+    padding: '16px 40px',
+    borderBottom: '1px solid #1c1c1c',
+    position: 'relative',
     zIndex: 10,
     backdropFilter: 'blur(10px)'
   },
   headerContent: { maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  backButton: { 
-    padding: '8px 20px', 
-    backgroundColor: 'rgba(255,255,255,0.04)', 
-    border: '1px solid rgba(255,255,255,0.08)', 
-    color: '#FFF', 
-    borderRadius: '20px', 
+  backButton: {
+    padding: '8px 20px',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#FFF',
+    borderRadius: '20px',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 'bold',
@@ -323,8 +457,7 @@ const styles = {
   },
   careerBadge: { display: 'flex', alignItems: 'center', gap: '8px' },
   title: { color: '#FFF', fontSize: '20px', fontWeight: 'bold', margin: 0 },
-  
-  // Hero Banner Glassmorphic
+
   heroBanner: {
     position: 'relative',
     backgroundColor: '#0F0F12',
@@ -350,7 +483,6 @@ const styles = {
 
   main: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', position: 'relative', zIndex: 2 },
 
-  // Seção de preparatórios
   sectionHeader: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px',
     marginBottom: '30px', paddingBottom: '16px',
@@ -368,18 +500,17 @@ const styles = {
     letterSpacing: '1px'
   },
 
-  // Grid
-  grid: { 
-    display: 'grid', 
-    gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 320px))', 
-    gap: '30px', 
-    justifyContent: 'center' 
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 320px))',
+    gap: '30px',
+    justifyContent: 'center'
   },
-  card: { 
-    backgroundColor: 'rgba(20,20,22,0.6)', 
-    borderRadius: '16px', 
-    transition: 'all 0.25s', 
-    border: '1px solid #1c1c1f', 
+  card: {
+    backgroundColor: 'rgba(20,20,22,0.6)',
+    borderRadius: '16px',
+    transition: 'all 0.25s',
+    border: '1px solid #1c1c1f',
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
@@ -388,13 +519,13 @@ const styles = {
     position: 'relative'
   },
   cardIcon: { fontSize: '48px' },
-  cardImage: { 
-    height: '160px', 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#070708', 
-    overflow: 'hidden', 
+  cardImage: {
+    height: '160px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#070708',
+    overflow: 'hidden',
     position: 'relative',
     borderBottom: '1px solid rgba(255,255,255,0.05)'
   },
@@ -408,12 +539,12 @@ const styles = {
     backgroundColor: '#111'
   },
   cardTitle: { color: '#FFF', fontSize: '18px', fontWeight: 'bold', margin: 0, textAlign: 'center' },
-  cardButton: { 
-    padding: '12px', 
-    backgroundColor: '#E50914', 
-    border: 'none', 
-    color: '#FFF', 
-    borderRadius: '8px', 
+  cardButton: {
+    padding: '12px',
+    backgroundColor: '#E50914',
+    border: 'none',
+    color: '#FFF',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: 'bold',
@@ -422,7 +553,6 @@ const styles = {
     boxShadow: '0 4px 12px rgba(229,9,20,0.2)'
   },
 
-  // Overlay de bloqueio
   lockOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
