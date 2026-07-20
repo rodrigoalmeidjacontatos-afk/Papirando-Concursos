@@ -1021,6 +1021,26 @@ function AdminPage() {
     }
   };
 
+  const mudarNivelDeTodasAulas = async (modId, novoNivel) => {
+    if (!window.confirm(`Deseja alterar o nível de TODAS as aulas deste módulo para ${novoNivel.toUpperCase()}?`)) return;
+
+    const aulasDoModulo = getAulasPorModulo(modId);
+    if (aulasDoModulo.length === 0) return alert('Este módulo não possui aulas para alterar.');
+
+    const { error } = await supabase
+      .from('aulas')
+      .update({ nivel: novoNivel })
+      .eq('modulo_id', modId);
+
+    if (error) {
+      alert('Erro ao atualizar aulas: ' + error.message);
+      return;
+    }
+
+    setAulas(prev => prev.map(a => String(a.moduloId || a.modulo_id) === String(modId) ? { ...a, nivel: novoNivel } : a));
+    alert('Aulas atualizadas com sucesso!');
+  };
+
   const updateAula = async () => {
     if (!editandoAula) return;
     const nivelFinal = editandoAula.nivel || 'basico';
@@ -1932,7 +1952,26 @@ function AdminPage() {
                                               <>
                                                 <span style={{...styles.treeName, fontSize: '14px', color: '#FFF'}}>📁 {mod.nome}</span>
                                                 <span style={styles.treeCount}>{aulasDoMod.length} aulas</span>
-                                                <div style={{display: 'flex', gap: '4px'}}>
+                                                <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
+                                                  <select 
+                                                    style={{...styles.inputSmall, width: 'auto', padding: '2px 4px', fontSize: '11px', height: 'auto', cursor: 'pointer', backgroundColor: '#333', color: '#FFF', border: '1px solid #555'}}
+                                                    onChange={(e) => {
+                                                      e.stopPropagation();
+                                                      if (e.target.value) {
+                                                        mudarNivelDeTodasAulas(mod.id, e.target.value);
+                                                        e.target.value = "";
+                                                      }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    title="Mudar nível de todas as aulas"
+                                                    defaultValue=""
+                                                  >
+                                                    <option value="" disabled>Alterar Nível de Todos...</option>
+                                                    <option value="basico">📘 Básico</option>
+                                                    <option value="medio">🥈 Médio</option>
+                                                    <option value="premium">🔒 Premium</option>
+                                                    <option value="admin">🔴 Admin</option>
+                                                  </select>
                                                   <button style={styles.editButtonSmall} onClick={(e) => { e.stopPropagation(); setEditandoModulo(mod); }}>Editar</button>
                                                   <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeModulo(mod.id); }}>Excluir</button>
                                                 </div>
