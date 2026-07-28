@@ -1274,11 +1274,13 @@ function AdminPage() {
     };
     setVinculos(novoVinculos);
     
+    // Sempre garante que o vínculo prep→carreira existe no banco,
+    // independente de haver módulos/aulas a inserir.
+    if (!isPrepVinculado(carreiraId, prepId)) {
+      await supabase.from('vinculos').upsert([{ carreira_id: carreiraId, preparatorio_id: prepId }]);
+    }
+
     if (inserts.length > 0) {
-      if (!isPrepVinculado(carreiraId, prepId)) {
-        inserts.push({ carreira_id: carreiraId, preparatorio_id: prepId });
-      }
-      
       // Divide os inserts em blocos de 500 para não estourar o limite de payload do Supabase (PostgREST)
       const CHUNK = 500;
       for (let i = 0; i < inserts.length; i += CHUNK) {

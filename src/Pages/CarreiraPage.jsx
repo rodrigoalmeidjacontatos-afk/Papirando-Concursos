@@ -507,8 +507,8 @@ const styles = {
 
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 320px))',
-    gap: '30px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gap: '20px',
     justifyContent: 'center'
   },
   card: {
@@ -536,14 +536,14 @@ const styles = {
   },
   cardImageImg: { width: '100%', height: '100%', objectFit: 'cover' },
   cardInfo: {
-    padding: '24px',
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '10px',
     flex: 1,
     backgroundColor: '#111'
   },
-  cardTitle: { color: '#FFF', fontSize: '18px', fontWeight: 'bold', margin: 0, textAlign: 'center' },
+  cardTitle: { color: '#FFF', fontSize: '15px', fontWeight: 'bold', margin: 0, textAlign: 'center' },
   cardButton: {
     padding: '12px',
     backgroundColor: '#E50914',
