@@ -10,9 +10,9 @@ function Home() {
   const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [userName, setUserName] = useState('Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState('basico'); 
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [userName, setUserName] = useState(() => sessionStorage.getItem('papirando_nome') || 'Aluno');
+  const [planoUsuario, setPlanoUsuario] = useState(() => sessionStorage.getItem('papirando_plano') || 'basico'); 
+  const [avatarUrl, setAvatarUrl] = useState(() => sessionStorage.getItem('papirando_avatar') || null);
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
@@ -138,13 +138,22 @@ function Home() {
           if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
+          sessionStorage.setItem('papirando_plano', planoNormalizado);
+          
           setAvatarUrl(profile.avatar_url || null);
-          setUserName(profile.display_name || nomeProvisorio);
-          setNewDisplayName(profile.display_name || nomeProvisorio);
+          if (profile.avatar_url) sessionStorage.setItem('papirando_avatar', profile.avatar_url);
+          
+          const nomeFinal = profile.display_name || nomeProvisorio;
+          setUserName(nomeFinal);
+          sessionStorage.setItem('papirando_nome', nomeFinal);
+          
+          setNewDisplayName(nomeFinal);
         } else if (mounted) {
           const planoFallback = userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico';
           setPlanoUsuario(planoFallback);
+          sessionStorage.setItem('papirando_plano', planoFallback);
           setUserName(nomeProvisorio);
+          sessionStorage.setItem('papirando_nome', nomeProvisorio);
         }
       } catch (e) {
         console.error("[Auth] Erro crítico no carregamento de perfil:", e);
@@ -185,6 +194,10 @@ function Home() {
         setUser(null);
         setUserName('Aluno');
         setPlanoUsuario('basico');
+        setAvatarUrl(null);
+        sessionStorage.removeItem('papirando_plano');
+        sessionStorage.removeItem('papirando_nome');
+        sessionStorage.removeItem('papirando_avatar');
       }
       if (mounted) setAuthChecked(true);
     });
@@ -206,6 +219,9 @@ function Home() {
   }, [user, planoUsuario]);
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('papirando_plano');
+    sessionStorage.removeItem('papirando_nome');
+    sessionStorage.removeItem('papirando_avatar');
     await supabase.auth.signOut();
     navigate('/');
   };
