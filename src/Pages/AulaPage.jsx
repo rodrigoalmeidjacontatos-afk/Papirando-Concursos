@@ -925,8 +925,15 @@ function AulaPage() {
               }
               startProgressTracking(event.target);
             } else {
+              stopProgressTracking();
               if (event.data === window.YT.PlayerState.PAUSED || event.data === -1 || event.data === window.YT.PlayerState.BUFFERING) {
-                if (event.data === window.YT.PlayerState.PAUSED) setIsPlaying(false);
+                if (event.data === window.YT.PlayerState.PAUSED) {
+                  setIsPlaying(false);
+                  const pTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
+                  if (pTime > 0 && salvarProgressoRef.current) {
+                    salvarProgressoRef.current(pTime, true, false);
+                  }
+                }
                 const pausedTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
                 
                 // FALLBACK CRÍTICO: às vezes o YouTube não dispara ENDED, e entra em PAUSED,
