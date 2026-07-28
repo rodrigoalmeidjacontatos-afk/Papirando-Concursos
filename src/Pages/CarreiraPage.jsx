@@ -507,7 +507,7 @@ const styles = {
 
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 240px))',
     gap: '20px',
     justifyContent: 'center'
   },
