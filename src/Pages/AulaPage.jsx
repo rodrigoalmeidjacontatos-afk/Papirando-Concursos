@@ -2233,19 +2233,23 @@ function AulaPage() {
                     <div 
                       key={d.id} 
                       className={`list-item-modern ${d.id === browsingDisciplinaId ? 'active' : ''}`}
-                      onClick={async () => {
-                        // Atualiza a disciplina em navegação e carrega o primeiro tópico dela
+                      onClick={(e) => {
+                        // 1. Muda a view IMEDIATAMENTE (não pode ser bloqueado por async)
                         setBrowsingDisciplinaId(d.id);
-                        const { data: firstM } = await supabase
+                        setSidebarSearchTerm('');
+                        setSidebarView('main');
+                        // 2. Busca o primeiro módulo em background (não bloqueia a UI)
+                        supabase
                           .from('modulos')
                           .select('id')
                           .eq('disciplina_id', d.id)
                           .order('ordem', { ascending: true })
                           .limit(1)
-                          .single();
-                        if (firstM) setBrowsingModuloId(firstM.id);
-                        setSidebarSearchTerm('');
-                        setSidebarView('main'); // Volta ao main para o usuário escolher o tópico
+                          .single()
+                          .then(({ data: firstM }) => {
+                            if (firstM) setBrowsingModuloId(firstM.id);
+                          })
+                          .catch(() => {}); // falha silenciosa - UI já foi atualizada
                       }}
                     >
                       <div style={styles.listItemHeader}>
@@ -2289,7 +2293,7 @@ function AulaPage() {
                       key={m.id} 
                       className={`list-item-modern ${m.id === browsingModuloId ? 'active' : ''}`}
                       onClick={() => {
-                        // Atualiza o tópico em navegação e volta ao main para o usuário escolher a aula
+                        // Muda a view IMEDIATAMENTE, sem async (não pode travar)
                         setBrowsingModuloId(m.id);
                         setSidebarSearchTerm('');
                         setSidebarView('main');
