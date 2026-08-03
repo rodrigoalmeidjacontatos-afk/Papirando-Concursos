@@ -1993,7 +1993,7 @@ function AulaPage() {
               </div>
 
               <div style={styles.selectionCardsContainer}>
-                <div className="selector-card" onClick={() => setSidebarView('disciplinas')}>
+                <div className="selector-card" onClick={() => { setSidebarSearchTerm(''); setSidebarView('disciplinas'); }}>
                   <div style={styles.selectorCardLabel}>DISCIPLINA</div>
                   <div style={styles.selectorCardValue}>
                     <span>{browsingDisciplina?.nome || 'Carregando...'}</span>
@@ -2007,7 +2007,7 @@ function AulaPage() {
                   </div>
                 </div>
 
-                <div className="selector-card" onClick={() => setSidebarView('modulos')}>
+                <div className="selector-card" onClick={() => { setSidebarSearchTerm(''); setSidebarView('modulos'); }}>
                   <div style={styles.selectorCardLabel}>TÓPICO</div>
                   <div style={styles.selectorCardValue}>
                     <span>{browsingModulo?.nome || 'Carregando...'}</span>
@@ -2234,10 +2234,40 @@ function AulaPage() {
                       key={d.id} 
                       className={`list-item-modern ${d.id === browsingDisciplinaId ? 'active' : ''}`}
                       onClick={async () => {
-                        setBrowsingDisciplinaId(d.id);
-                        const { data: firstM } = await supabase.from('modulos').select('id').eq('disciplina_id', d.id).order('id', { ascending: true }).limit(1).single();
-                        if (firstM) setBrowsingModuloId(firstM.id);
-                        setSidebarView('main');
+                        // Buscar o primeiro módulo da disciplina selecionada
+                        const { data: firstM } = await supabase
+                          .from('modulos')
+                          .select('id')
+                          .eq('disciplina_id', d.id)
+                          .order('ordem', { ascending: true })
+                          .limit(1)
+                          .single();
+                        if (firstM) {
+                          // Buscar a primeira aula do módulo encontrado
+                          const { data: firstA } = await supabase
+                            .from('aulas')
+                            .select('id')
+                            .eq('modulo_id', firstM.id)
+                            .order('ordem', { ascending: true })
+                            .limit(1)
+                            .single();
+                          if (firstA) {
+                            setSidebarView('main');
+                            setSidebarSearchTerm('');
+                            navigate(`/aula/${carreiraId}/${preparatorioId}/${d.id}/${firstM.id}/${firstA.id}`);
+                          } else {
+                            // Módulo sem aulas: apenas atualiza browsing state
+                            setBrowsingDisciplinaId(d.id);
+                            setBrowsingModuloId(firstM.id);
+                            setSidebarView('main');
+                            setSidebarSearchTerm('');
+                          }
+                        } else {
+                          // Disciplina sem módulos: apenas atualiza browsing
+                          setBrowsingDisciplinaId(d.id);
+                          setSidebarView('main');
+                          setSidebarSearchTerm('');
+                        }
                       }}
                     >
                       <div style={styles.listItemHeader}>
@@ -2280,9 +2310,25 @@ function AulaPage() {
                     <div 
                       key={m.id} 
                       className={`list-item-modern ${m.id === browsingModuloId ? 'active' : ''}`}
-                      onClick={() => {
-                        setBrowsingModuloId(m.id);
-                        setSidebarView('main');
+                      onClick={async () => {
+                        // Buscar a primeira aula do tópico selecionado e navegar
+                        const { data: firstA } = await supabase
+                          .from('aulas')
+                          .select('id')
+                          .eq('modulo_id', m.id)
+                          .order('ordem', { ascending: true })
+                          .limit(1)
+                          .single();
+                        if (firstA) {
+                          setSidebarView('main');
+                          setSidebarSearchTerm('');
+                          navigate(`/aula/${carreiraId}/${preparatorioId}/${browsingDisciplinaId}/${m.id}/${firstA.id}`);
+                        } else {
+                          // Tópico sem aulas: apenas atualiza browsing state
+                          setBrowsingModuloId(m.id);
+                          setSidebarView('main');
+                          setSidebarSearchTerm('');
+                        }
                       }}
                     >
                       <div style={styles.listItemHeader}>
