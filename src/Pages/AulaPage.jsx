@@ -2234,7 +2234,8 @@ function AulaPage() {
                       key={d.id} 
                       className={`list-item-modern ${d.id === browsingDisciplinaId ? 'active' : ''}`}
                       onClick={async () => {
-                        // Buscar o primeiro módulo da disciplina selecionada
+                        // Atualiza a disciplina em navegação e carrega o primeiro tópico dela
+                        setBrowsingDisciplinaId(d.id);
                         const { data: firstM } = await supabase
                           .from('modulos')
                           .select('id')
@@ -2242,32 +2243,9 @@ function AulaPage() {
                           .order('ordem', { ascending: true })
                           .limit(1)
                           .single();
-                        if (firstM) {
-                          // Buscar a primeira aula do módulo encontrado
-                          const { data: firstA } = await supabase
-                            .from('aulas')
-                            .select('id')
-                            .eq('modulo_id', firstM.id)
-                            .order('ordem', { ascending: true })
-                            .limit(1)
-                            .single();
-                          if (firstA) {
-                            setSidebarView('main');
-                            setSidebarSearchTerm('');
-                            navigate(`/aula/${carreiraId}/${preparatorioId}/${d.id}/${firstM.id}/${firstA.id}`);
-                          } else {
-                            // Módulo sem aulas: apenas atualiza browsing state
-                            setBrowsingDisciplinaId(d.id);
-                            setBrowsingModuloId(firstM.id);
-                            setSidebarView('main');
-                            setSidebarSearchTerm('');
-                          }
-                        } else {
-                          // Disciplina sem módulos: apenas atualiza browsing
-                          setBrowsingDisciplinaId(d.id);
-                          setSidebarView('main');
-                          setSidebarSearchTerm('');
-                        }
+                        if (firstM) setBrowsingModuloId(firstM.id);
+                        setSidebarSearchTerm('');
+                        setSidebarView('main'); // Volta ao main para o usuário escolher o tópico
                       }}
                     >
                       <div style={styles.listItemHeader}>
@@ -2310,25 +2288,11 @@ function AulaPage() {
                     <div 
                       key={m.id} 
                       className={`list-item-modern ${m.id === browsingModuloId ? 'active' : ''}`}
-                      onClick={async () => {
-                        // Buscar a primeira aula do tópico selecionado e navegar
-                        const { data: firstA } = await supabase
-                          .from('aulas')
-                          .select('id')
-                          .eq('modulo_id', m.id)
-                          .order('ordem', { ascending: true })
-                          .limit(1)
-                          .single();
-                        if (firstA) {
-                          setSidebarView('main');
-                          setSidebarSearchTerm('');
-                          navigate(`/aula/${carreiraId}/${preparatorioId}/${browsingDisciplinaId}/${m.id}/${firstA.id}`);
-                        } else {
-                          // Tópico sem aulas: apenas atualiza browsing state
-                          setBrowsingModuloId(m.id);
-                          setSidebarView('main');
-                          setSidebarSearchTerm('');
-                        }
+                      onClick={() => {
+                        // Atualiza o tópico em navegação e volta ao main para o usuário escolher a aula
+                        setBrowsingModuloId(m.id);
+                        setSidebarSearchTerm('');
+                        setSidebarView('main');
                       }}
                     >
                       <div style={styles.listItemHeader}>
