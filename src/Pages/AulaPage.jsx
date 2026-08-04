@@ -69,6 +69,8 @@ function AulaPage() {
   const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
   const [progressoGeral, setProgressoGeral] = useState({ disciplinas: {}, modulos: {} });
   const [docsDoPreparatorio, setDocsDoPreparatorio] = useState([]);
+  const [prepNome, setPrepNome] = useState('');
+  const [prepLogo, setPrepLogo] = useState('');
 
   const timerRef = useRef(null);
   const progressIntervalRef = useRef(null);
@@ -406,7 +408,8 @@ function AulaPage() {
         setListaDisciplinas((todasDisciplinas || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
 
         // Carregar Preparatório e seus Documentos vinculados
-        const { data: prepObj } = await supabase.from('preparatorios').select('nome').eq('id', preparatorioId).single();
+        const { data: prepObj } = await supabase.from('preparatorios').select('nome, logo').eq('id', preparatorioId).single();
+        if (prepObj) { setPrepNome(prepObj.nome || ''); setPrepLogo(prepObj.logo || ''); }
         if (prepObj) {
           const { data: allDocs } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
           if (allDocs) {
@@ -1497,10 +1500,62 @@ function AulaPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-right">
-          <div style={{...styles.headerInfo, marginRight: '20px', textAlign: 'right'}} className="aula-header-title">
-            <h1 style={styles.headerTitle}>{disciplina?.nome || disciplinaId?.replace('_', ' ').toUpperCase()}</h1>
-            <p style={styles.headerSubtitulo}>{preparatorioId?.replace('_', ' ').toUpperCase()}</p>
+
+          {/* Badge premium: logo do preparatório + disciplina atual */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '14px',
+            padding: '8px 18px 8px 10px',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          }}>
+            {/* Logo do preparatório */}
+            {prepLogo && (prepLogo.startsWith('http') || prepLogo.startsWith('data:')) ? (
+              <img
+                src={prepLogo}
+                alt={prepNome}
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '8px',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : prepLogo ? (
+              <span style={{ fontSize: '28px' }}>{prepLogo}</span>
+            ) : null}
+
+            {/* Disciplina + rótulo do preparatório */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{
+                fontSize: '16px',
+                fontWeight: '800',
+                color: '#FFFFFF',
+                letterSpacing: '0.2px',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+              }}>
+                {disciplina?.nome || disciplinaId?.replace('_', ' ').toUpperCase()}
+              </span>
+              <span style={{
+                fontSize: '9px',
+                fontWeight: '600',
+                color: 'rgba(255,255,255,0.45)',
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+              }}>
+                {prepNome || preparatorioId?.replace('_', ' ').toUpperCase()}
+              </span>
+            </div>
           </div>
+
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-buttons">
             <button 
               onClick={() => navigate(`/preparatorio/${carreiraId}/${preparatorioId}`)} 
