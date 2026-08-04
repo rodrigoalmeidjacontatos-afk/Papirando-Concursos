@@ -123,14 +123,22 @@ function AulaPage() {
     const currentAulaId = aulaId;
     return () => {
       const state = unmountSaveRef.current;
-      if (state.aulaId === currentAulaId && state.tempo > 0 && state.userId && state.duracao > 0) {
-        
-        const isConcluida = state.concluida || (state.tempo >= state.duracao * 0.9);
-        
+      // Salva se: (1) é a aula correta, (2) tem userId, e
+      // (3) há tempo assistido com duração conhecida, OU a aula já está marcada como concluída
+      const devesSalvar = state.aulaId === currentAulaId
+        && state.userId
+        && (state.concluida || (state.tempo > 0 && state.duracao > 0));
+
+      if (devesSalvar) {
+        const isConcluida = state.concluida || (state.duracao > 0 && state.tempo >= state.duracao * 0.9);
+        const tempoFinal = state.concluida && state.duracao > 0
+          ? Math.max(state.tempo, state.duracao)
+          : Math.floor(state.tempo);
+
         supabase.from('progresso').upsert({
           user_id: state.userId,
           aula_id: state.aulaId,
-          tempo_assistido: Math.floor(state.tempo),
+          tempo_assistido: Math.floor(tempoFinal),
           concluida: isConcluida,
           ultimo_acesso: new Date().toISOString()
         }, { onConflict: 'user_id,aula_id' }).then(() => {
@@ -724,6 +732,7 @@ function AulaPage() {
       if (unmountSaveRef.current) {
         unmountSaveRef.current.tempo = Math.max(tempo, dur);
         unmountSaveRef.current.duracao = dur;
+        unmountSaveRef.current.concluida = true; // CRÍTICO: marca como concluída antes de qualquer navegação
       }
     }
 
@@ -944,12 +953,12 @@ function AulaPage() {
                 if (durFallback > 0 && (durFallback - pausedTime) <= 2 && !hasEndedRef.current && hasResumedRef.current) {
                   console.log('[AulaPage] Vídeo parou no fim (<=2s). Agendando navegação automática...');
                   if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current);
-                  videoEndTimeoutRef.current = setTimeout(() => {
+                  videoEndTimeoutRef.current = setTimeout(async () => {
                     if (!hasEndedRef.current) {
                       hasEndedRef.current = true;
                       try {
                         if (marcarAulaComoAssistidaRef.current) {
-                          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(() => {});
+                          await marcarAulaComoAssistidaRef.current(playerInstanceRef.current);
                         }
                       } catch (e) {}
                       if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
@@ -964,12 +973,16 @@ function AulaPage() {
                 if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
                 if (hasEndedRef.current) return; // Já navegou via fallback, ignora
                 hasEndedRef.current = true;
-                
-                if (marcarAulaComoAssistidaRef.current) {
-                  marcarAulaComoAssistidaRef.current(event.target).catch(() => {});
-                }
-                
-                if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+
+                // Usa IIFE async para aguardar o save antes de navegar, sem tornar o callback inteiro async
+                (async () => {
+                  try {
+                    if (marcarAulaComoAssistidaRef.current) {
+                      await marcarAulaComoAssistidaRef.current(event.target);
+                    }
+                  } catch (e) {}
+                  if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+                })();
               }
             }
           },
@@ -1073,11 +1086,15 @@ function AulaPage() {
         if (hasEndedRef.current) return;
         hasEndedRef.current = true;
         
-        if (marcarAulaComoAssistidaRef.current) {
-          marcarAulaComoAssistidaRef.current(playerInstanceRef.current).catch(() => {});
-        }
-        
-        if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+        // Usa IIFE async para aguardar o save antes de navegar
+        (async () => {
+          try {
+            if (marcarAulaComoAssistidaRef.current) {
+              await marcarAulaComoAssistidaRef.current(playerInstanceRef.current);
+            }
+          } catch (e) {}
+          if (irParaProximaAulaRef.current) irParaProximaAulaRef.current();
+        })();
       }
     };
 
