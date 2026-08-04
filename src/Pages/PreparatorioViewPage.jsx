@@ -514,15 +514,73 @@ function PreparatorioViewPage() {
           </div>
         </div>
 
-        <div style={{display: 'flex', alignItems: 'center', gap: '24px'}}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-            {renderIcon(preparatorio.logo)}
-            <h1 style={styles.title}>{preparatorio.nome}</h1>
+        {/* Lado direito: logo + nome do preparatório em destaque + botão voltar */}
+        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+
+          {/* Badge do preparatório — estilo premium como na AulaPage */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '14px',
+            padding: '10px 20px 10px 12px',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          }}>
+            {/* Logo do preparatório maior */}
+            {preparatorio.logo && (preparatorio.logo.startsWith('http') || preparatorio.logo.startsWith('data:')) ? (
+              <img
+                src={preparatorio.logo}
+                alt={preparatorio.nome}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '10px',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '10px',
+                backgroundColor: 'rgba(229,9,20,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '26px', border: '2px solid rgba(255,255,255,0.12)',
+              }}>
+                {preparatorio.logo || '🎓'}
+              </div>
+            )}
+
+            {/* Nome e subtítulo */}
+            <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: '800',
+                color: '#FFFFFF',
+                letterSpacing: '0.3px',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+              }}>
+                {preparatorio.nome}
+              </span>
+              <span style={{
+                fontSize: '10px',
+                fontWeight: '600',
+                color: 'rgba(255,255,255,0.45)',
+                letterSpacing: '2.5px',
+                textTransform: 'uppercase',
+              }}>
+                PREPARATÓRIO
+              </span>
+            </div>
           </div>
-          
-          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-            <button onClick={() => navigate(-1)} style={styles.backButton}>← Voltar</button>
-          </div>
+
+          {/* Botão Voltar */}
+          <button onClick={() => navigate(-1)} style={styles.backButton}>← Voltar</button>
         </div>
       </header>
 
