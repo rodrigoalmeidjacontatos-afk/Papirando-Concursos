@@ -704,7 +704,7 @@ function AulaPage() {
     lastSaveTimeRef.current = now;
 
     try {
-      const { error } = await supabase
+      let response = await supabase
         .from('progresso')
         .upsert({
           user_id: user.id,
@@ -716,8 +716,25 @@ function AulaPage() {
           onConflict: 'user_id,aula_id',
         });
 
-      if (error) {
-        console.error('Erro ao salvar progresso no Supabase:', error);
+      // Tenta atualizar a sessão se o token JWT tiver expirado (ex: o usuário pausou por 2 horas)
+      if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
+        console.warn('[AulaPage] Token expirado ao salvar progresso. Atualizando sessão e tentando novamente...');
+        await supabase.auth.refreshSession();
+        response = await supabase
+          .from('progresso')
+          .upsert({
+            user_id: user.id,
+            aula_id: aulaId,
+            tempo_assistido: Math.floor(tempoFinal),
+            concluida: isConcluida,
+            ultimo_acesso: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,aula_id',
+          });
+      }
+
+      if (response.error) {
+        console.error('Erro ao salvar progresso no Supabase:', response.error);
       }
     } catch (e) {
       console.error('Erro ao tentar salvar progresso:', e);
@@ -754,7 +771,11 @@ function AulaPage() {
     }
 
     if (salvarProgressoRef.current) {
-      await salvarProgressoRef.current(Math.max(tempo, dur), true, true);
+      // Usa um timeout de 2 segundos para garantir que a navegação automática 
+      // não fique travada caso o Supabase demore ou fique pendurado na renovação do token
+      const savePromise = salvarProgressoRef.current(Math.max(tempo, dur), true, true);
+      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
+      await Promise.race([savePromise, timeoutPromise]);
     }
   };
 
