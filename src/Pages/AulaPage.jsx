@@ -65,6 +65,7 @@ function AulaPage() {
   const [browsingModulo, setBrowsingModulo] = useState(null);
   const [anotacao, setAnotacao] = useState('');
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
+  const [salvandoManual, setSalvandoManual] = useState(false);
   const [sidebarView, setSidebarView] = useState('main'); // 'main', 'disciplinas', 'modulos'
   const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
   const [progressoGeral, setProgressoGeral] = useState({ disciplinas: {}, modulos: {} });
@@ -783,6 +784,67 @@ function AulaPage() {
   useEffect(() => {
     marcarAulaComoAssistidaRef.current = marcarAulaComoAssistida;
   });
+
+  const toggleMarcarConcluida = async () => {
+    if (!user || !temAcesso || salvandoManual) return;
+    setSalvandoManual(true);
+    
+    const statusAtual = aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
+    const novoStatus = !statusAtual;
+
+    // Atualiza estado local e ref instantaneamente para a UI responder rápido
+    aulaConcluidaRef.current = novoStatus;
+    setProgressoAulas(prev => ({
+      ...prev,
+      [aulaId]: {
+        ...(prev[aulaId] || {}),
+        concluida: novoStatus,
+      }
+    }));
+
+    try {
+      let response = await supabase
+        .from('progresso')
+        .upsert({
+          user_id: user.id,
+          aula_id: aulaId,
+          tempo_assistido: Math.floor(tempoAtual),
+          concluida: novoStatus,
+          ultimo_acesso: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,aula_id',
+        });
+        
+      if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
+        await supabase.auth.refreshSession();
+        response = await supabase
+          .from('progresso')
+          .upsert({
+            user_id: user.id,
+            aula_id: aulaId,
+            tempo_assistido: Math.floor(tempoAtual),
+            concluida: novoStatus,
+            ultimo_acesso: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,aula_id',
+          });
+      }
+
+      if (response.error) {
+        console.error('Erro ao alternar status de conclusão:', response.error);
+        // Reverte em caso de erro fatal
+        aulaConcluidaRef.current = statusAtual;
+        setProgressoAulas(prev => ({
+          ...prev,
+          [aulaId]: { ...(prev[aulaId] || {}), concluida: statusAtual }
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSalvandoManual(false);
+    }
+  };
 
   const salvarPdfUrl = async (novaUrl) => {
     if (planoUsuario !== 'premium') return;
@@ -1637,16 +1699,50 @@ function AulaPage() {
               }}>
                 {disciplina?.nome || ''}
               </p>
-              <h2 style={{
-                margin: 0,
-                fontSize: '18px',
-                fontWeight: '800',
-                color: '#F5F5F5',
-                lineHeight: '1.35',
-                letterSpacing: '0.2px'
-              }}>
-                {aulaPlaying.titulo}
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px' }}>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '18px',
+                  fontWeight: '800',
+                  color: '#F5F5F5',
+                  lineHeight: '1.35',
+                  letterSpacing: '0.2px'
+                }}>
+                  {aulaPlaying.titulo}
+                </h2>
+                <button
+                  onClick={toggleMarcarConcluida}
+                  disabled={salvandoManual}
+                  style={{
+                    backgroundColor: (aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) ? '#28a745' : 'transparent',
+                    color: (aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) ? '#fff' : '#ccc',
+                    border: (aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) ? '1px solid #28a745' : '1px solid #666',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: salvandoManual ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    opacity: salvandoManual ? 0.7 : 1
+                  }}
+                  onMouseOver={(e) => {
+                    if (!(aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) && !salvandoManual) {
+                      e.target.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!(aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) && !salvandoManual) {
+                      e.target.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {(aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida) ? '✓ Concluída' : 'Marcar como concluída'}
+                </button>
+              </div>
             </div>
           )}
 
