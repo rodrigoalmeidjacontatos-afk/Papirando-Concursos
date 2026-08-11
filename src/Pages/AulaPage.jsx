@@ -94,6 +94,9 @@ function AulaPage() {
   // Trava de segurança: nunca regride de true para false durante a vida da aula (reseta só ao trocar de aula)
   // Garante que race conditions entre pause-save e unmount-cleanup nunca sobrescrevam concluida=true com false
   const lastKnownConcluidaRef = useRef(false);
+  // Fila de promessas para garantir que os saves (upserts) executem estritamente em ordem,
+  // evitando que um save de 'pause' antigo sobrescreva um 'ended' mais novo devido a atraso de rede.
+  const saveQueueRef = useRef(Promise.resolve());
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -153,16 +156,21 @@ function AulaPage() {
           ? Math.max(state.tempo, state.duracao)
           : Math.floor(state.tempo);
 
-        supabase.from('progresso').upsert({
-          user_id: state.userId,
-          aula_id: state.aulaId,
-          tempo_assistido: Math.floor(tempoFinal),
-          concluida: isConcluida,
-          ultimo_acesso: new Date().toISOString()
-        }, { onConflict: 'user_id,aula_id' }).then(() => {
-          console.log('[AulaPage] Progresso salvo ao sair:', state.aulaId, isConcluida);
-        }).catch(err => {
-          console.error('[AulaPage] Erro ao salvar progresso ao sair:', err);
+        // Usa a fila de saves para garantir que o unmount save ocorra APÓS
+        // qualquer save pendente de pause ou ended.
+        saveQueueRef.current = saveQueueRef.current.then(async () => {
+          try {
+            await supabase.from('progresso').upsert({
+              user_id: state.userId,
+              aula_id: state.aulaId,
+              tempo_assistido: Math.floor(tempoFinal),
+              concluida: isConcluida,
+              ultimo_acesso: new Date().toISOString()
+            }, { onConflict: 'user_id,aula_id' });
+            console.log('[AulaPage] Progresso salvo ao sair:', state.aulaId, isConcluida);
+          } catch (err) {
+            console.error('[AulaPage] Erro ao salvar progresso ao sair:', err);
+          }
         });
       }
     };
@@ -715,24 +723,10 @@ function AulaPage() {
     }
     lastSaveTimeRef.current = now;
 
-    try {
-      let response = await supabase
-        .from('progresso')
-        .upsert({
-          user_id: user.id,
-          aula_id: aulaId,
-          tempo_assistido: Math.floor(tempoFinal),
-          concluida: isConcluida,
-          ultimo_acesso: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id,aula_id',
-        });
-
-      // Tenta atualizar a sessão se o token JWT tiver expirado (ex: o usuário pausou por 2 horas)
-      if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
-        console.warn('[AulaPage] Token expirado ao salvar progresso. Atualizando sessão e tentando novamente...');
-        await supabase.auth.refreshSession();
-        response = await supabase
+    // Adiciona o save na fila de promises para evitar race conditions (ex: pause logo antes de ended)
+    const currentSavePromise = saveQueueRef.current.then(async () => {
+      try {
+        let response = await supabase
           .from('progresso')
           .upsert({
             user_id: user.id,
@@ -743,14 +737,34 @@ function AulaPage() {
           }, {
             onConflict: 'user_id,aula_id',
           });
-      }
 
-      if (response.error) {
-        console.error('Erro ao salvar progresso no Supabase:', response.error);
+        // Tenta atualizar a sessão se o token JWT tiver expirado
+        if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
+          console.warn('[AulaPage] Token expirado ao salvar progresso. Atualizando sessão e tentando novamente...');
+          await supabase.auth.refreshSession();
+          response = await supabase
+            .from('progresso')
+            .upsert({
+              user_id: user.id,
+              aula_id: aulaId,
+              tempo_assistido: Math.floor(tempoFinal),
+              concluida: isConcluida,
+              ultimo_acesso: new Date().toISOString(),
+            }, {
+              onConflict: 'user_id,aula_id',
+            });
+        }
+
+        if (response.error) {
+          console.error('Erro ao salvar progresso no Supabase:', response.error);
+        }
+      } catch (e) {
+        console.error('Erro ao tentar salvar progresso:', e);
       }
-    } catch (e) {
-      console.error('Erro ao tentar salvar progresso:', e);
-    }
+    });
+
+    saveQueueRef.current = currentSavePromise;
+    return currentSavePromise;
   };
 
   const marcarAulaComoAssistida = async (playerInstance) => {
