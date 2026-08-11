@@ -148,12 +148,14 @@ function AulaPage() {
       // (3) há tempo assistido com duração conhecida, OU a aula já está marcada como concluída
       const devesSalvar = state.aulaId === currentAulaId
         && state.userId
-        && (foiConcluida || (state.tempo > 0 && state.duracao > 0));
+        && (foiConcluida || (state.tempo > 0 && (state.duracao > 0 || duracaoRef.current > 0)));
 
       if (devesSalvar) {
-        const isConcluida = foiConcluida || (state.duracao > 0 && state.tempo >= state.duracao * 0.9);
-        const tempoFinal = isConcluida && state.duracao > 0
-          ? Math.max(state.tempo, state.duracao)
+        // Se a duração no unmount for inválida mas duracaoRef tem valor, usa duracaoRef.
+        const dEfetiva = state.duracao > 0 ? state.duracao : (duracaoRef.current || 0);
+        const isConcluida = foiConcluida || (dEfetiva > 0 && state.tempo >= dEfetiva * 0.9);
+        const tempoFinal = isConcluida && dEfetiva > 0
+          ? Math.max(state.tempo, dEfetiva)
           : Math.floor(state.tempo);
 
         // Usa a fila de saves para garantir que o unmount save ocorra APÓS
@@ -686,7 +688,7 @@ function AulaPage() {
     // Usa a ref para verificar conclusão — evita problema de closure stale com o estado React
     // aulaConcluidaRef nunca regride de true para false, garantindo que saves posteriores
     // (ex: ao pausar após ter concluído) não sobrescrevam concluida=true com false no banco.
-    const jaEstavaConcluida = aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
+    const jaEstavaConcluida = aulaConcluidaRef.current || lastKnownConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
     const isConcluida = jaEstavaConcluida || marcarConcluida
       || (durEfetiva > 0 && tempoFinal >= durEfetiva * 0.9);
     // Propaga imediatamente para as refs se concluída agora
@@ -718,7 +720,11 @@ function AulaPage() {
     });
 
     const now = Date.now();
-    if (!forceSave && now - lastSaveTimeRef.current < 10000) {
+    const durEfetivaParaCheck = Math.max(duracaoRef.current || 0, duracao || 0, Number(aulaPlaying?.duracao) || 0);
+    const atingiuFim = (durEfetivaParaCheck > 0 && tempo >= durEfetivaParaCheck * 0.9);
+    const recemConcluida = atingiuFim && !aulaConcluidaRef.current && !lastKnownConcluidaRef.current && !progressoAulas[aulaId]?.concluida;
+    
+    if (!forceSave && now - lastSaveTimeRef.current < 10000 && !recemConcluida) {
       return;
     }
     lastSaveTimeRef.current = now;
