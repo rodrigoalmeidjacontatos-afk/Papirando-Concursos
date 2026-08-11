@@ -91,6 +91,9 @@ function AulaPage() {
   const hasEndedRef = useRef(false);   // Evita dupla-navegação quando vídeo termina
   const videoEndTimeoutRef = useRef(null); // Timer para navegação automática ao fim do vídeo
   const aulaConcluidaRef = useRef(false); // Ref para guardar status concluida sem problema de closure
+  // Trava de segurança: nunca regride de true para false durante a vida da aula (reseta só ao trocar de aula)
+  // Garante que race conditions entre pause-save e unmount-cleanup nunca sobrescrevam concluida=true com false
+  const lastKnownConcluidaRef = useRef(false);
   
   const [aulaPlaying, setAulaPlaying] = useState(null); // Dados da aula que está SENDO ASSISTIDA
   const videoKey = `${preparatorioId}_${disciplinaId}_${aulaId}`;
@@ -114,15 +117,17 @@ function AulaPage() {
   // Mantém os dados atualizados na ref para o momento em que o componente for desmontado ou a aula mudar
   useEffect(() => {
     // Propaga concluida=true para aulaConcluidaRef imediatamente (nunca regride para false)
-    if (progressoAulas[aulaId]?.concluida) {
+    if (progressoAulas[aulaId]?.concluida || aulaConcluidaRef.current) {
       aulaConcluidaRef.current = true;
+      lastKnownConcluidaRef.current = true; // Trava: nunca regride de true durante a vida da aula
     }
     unmountSaveRef.current = { 
       tempo: tempoAtual, 
       duracao: duracao, 
       aulaId: aulaId, 
       userId: user?.id,
-      concluida: aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false
+      // Usa lastKnownConcluidaRef como backup definitivo — imune a race conditions de render
+      concluida: lastKnownConcluidaRef.current || aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false
     };
   }, [tempoAtual, duracao, aulaId, user, progressoAulas]);
 
@@ -131,9 +136,10 @@ function AulaPage() {
     const currentAulaId = aulaId;
     return () => {
       const state = unmountSaveRef.current;
-      // Lê aulaConcluidaRef diretamente como fallback caso unmountSaveRef não tenha sido
-      // atualizado ainda (saída rápida antes do React re-renderizar após conclusão)
-      const foiConcluida = state.concluida || aulaConcluidaRef.current;
+      // Lê lastKnownConcluidaRef e aulaConcluidaRef como fallbacks definitivos.
+      // lastKnownConcluidaRef é a fonte mais confiável: nunca regride de true para false
+      // durante a vida da aula, sendo imune a race conditions de render e cleanup.
+      const foiConcluida = lastKnownConcluidaRef.current || state.concluida || aulaConcluidaRef.current;
 
       // Salva se: (1) é a aula correta, (2) tem userId, e
       // (3) há tempo assistido com duração conhecida, OU a aula já está marcada como concluída
@@ -675,8 +681,13 @@ function AulaPage() {
     const jaEstavaConcluida = aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
     const isConcluida = jaEstavaConcluida || marcarConcluida
       || (durEfetiva > 0 && tempoFinal >= durEfetiva * 0.9);
-    // Propaga imediatamente para a ref se concluída agora
-    if (isConcluida) aulaConcluidaRef.current = true;
+    // Propaga imediatamente para as refs se concluída agora
+    if (isConcluida) {
+      aulaConcluidaRef.current = true;
+      lastKnownConcluidaRef.current = true; // Trava definitiva — o save de pause não vai reverter isso
+      // Sincroniza unmountSaveRef imediatamente para proteger contra cleanup rápido
+      if (unmountSaveRef.current) unmountSaveRef.current.concluida = true;
+    }
 
     // Atualiza o progresso em tempo real no estado local
     setProgressoAulas(prev => {
@@ -762,8 +773,10 @@ function AulaPage() {
       setDuracao(dur);
       setTempoAtual(Math.max(tempo, dur));
       
-      // Sincroniza a ref de desmontagem imediatamente para evitar condição de corrida
+      // Sincroniza as refs de desmontagem imediatamente para evitar condição de corrida
       // onde o unmount roda antes do state atualizar e salva concluida=false por engano
+      aulaConcluidaRef.current = true;
+      lastKnownConcluidaRef.current = true; // CRÍTICO: trava definitiva antes de qualquer navegação
       if (unmountSaveRef.current) {
         unmountSaveRef.current.tempo = Math.max(tempo, dur);
         unmountSaveRef.current.duracao = dur;
@@ -792,8 +805,9 @@ function AulaPage() {
     const statusAtual = aulaConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
     const novoStatus = !statusAtual;
 
-    // Atualiza estado local e ref instantaneamente para a UI responder rápido
+    // Atualiza estado local e refs instantaneamente para a UI responder rápido
     aulaConcluidaRef.current = novoStatus;
+    lastKnownConcluidaRef.current = novoStatus; // Segue o toggle (pode voltar a false se desmarcar)
     setProgressoAulas(prev => ({
       ...prev,
       [aulaId]: {
@@ -834,6 +848,7 @@ function AulaPage() {
         console.error('Erro ao alternar status de conclusão:', response.error);
         // Reverte em caso de erro fatal
         aulaConcluidaRef.current = statusAtual;
+        lastKnownConcluidaRef.current = statusAtual;
         setProgressoAulas(prev => ({
           ...prev,
           [aulaId]: { ...(prev[aulaId] || {}), concluida: statusAtual }
@@ -920,6 +935,7 @@ function AulaPage() {
     hasResumedRef.current = false;
     hasEndedRef.current = false;
     aulaConcluidaRef.current = false; // Reseta o flag de conclusão ao trocar de aula
+    lastKnownConcluidaRef.current = false; // Reseta a trava de segurança ao trocar de aula
     if (videoEndTimeoutRef.current) { clearTimeout(videoEndTimeoutRef.current); videoEndTimeoutRef.current = null; }
     seekTimePendenteRef.current = 0;
     stopProgressTracking();
