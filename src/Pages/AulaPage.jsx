@@ -554,10 +554,13 @@ function AulaPage() {
             const novoMap = { ...prev };
             data.forEach(p => {
               const atual = prev[p.aula_id];
+              // Usa aulaConcluidaRef como fallback se esta é a aula atual
+              // (protege contra race condition onde o banco ainda não reflete o save mais recente)
+              const refConcluida = String(p.aula_id) === String(aulaId) && (aulaConcluidaRef.current || lastKnownConcluidaRef.current);
               novoMap[p.aula_id] = {
                 ...p,
                 // Preserva o concluida=true local, pois o banco pode estar desatualizado (race condition do upsert otimista)
-                concluida: (atual && atual.concluida) ? true : p.concluida,
+                concluida: refConcluida || (atual && atual.concluida) ? true : p.concluida,
                 // Preserva o maior tempo assistido
                 tempo_assistido: Math.max(atual?.tempo_assistido || 0, p.tempo_assistido || 0)
               };
@@ -805,11 +808,24 @@ function AulaPage() {
     }
 
     if (salvarProgressoRef.current) {
-      // Usa um timeout de 2 segundos para garantir que a navegação automática 
-      // não fique travada caso o Supabase demore ou fique pendurado na renovação do token
-      const savePromise = salvarProgressoRef.current(Math.max(tempo, dur), true, true);
-      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
-      await Promise.race([savePromise, timeoutPromise]);
+      // Save DIRETO (bypass da fila) para garantir que concluida=true chega ao banco
+      // antes de qualquer navegação — imune à race condition da fila de saves
+      try {
+        await Promise.race([
+          supabase.from('progresso').upsert({
+            user_id: user?.id || unmountSaveRef.current?.userId,
+            aula_id: aulaId,
+            tempo_assistido: Math.floor(Math.max(tempo, dur)),
+            concluida: true,
+            ultimo_acesso: new Date().toISOString()
+          }, { onConflict: 'user_id,aula_id' }),
+          new Promise(resolve => setTimeout(resolve, 5000))
+        ]);
+      } catch (e) {
+        console.error('[AulaPage] Erro no save direto de marcarAulaComoAssistida:', e);
+      }
+      // Também enfileira na fila normal como redundância
+      salvarProgressoRef.current(Math.max(tempo, dur), true, true);
     }
   };
 
@@ -1077,7 +1093,11 @@ function AulaPage() {
                   setIsPlaying(false);
                   const pTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
                   if (pTime > 0 && salvarProgressoRef.current) {
-                    salvarProgressoRef.current(pTime, true, false);
+                    // Se o vídeo pausou muito perto do fim (<=2s), marca como concluída
+                    // para evitar race condition com o ENDED que vem logo em seguida
+                    const durCheck = duracaoRef.current || 0;
+                    const pertoDoFim = durCheck > 0 && (durCheck - pTime) <= 2;
+                    salvarProgressoRef.current(pTime, true, pertoDoFim);
                   }
                 }
                 const pausedTime = typeof event.target.getCurrentTime === 'function' ? event.target.getCurrentTime() : 0;
