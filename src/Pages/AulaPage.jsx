@@ -330,23 +330,9 @@ function AulaPage() {
 
     inicializarSessao();
 
-    // KEEPALIVE: renova a sessão Supabase a cada 4 minutos para evitar expiração
-    // do token JWT durante pausas longas (ex: aluno fazendo anotações por 30+ min).
-    // Sem isso, o token expira e TODAS as operações falham silenciosamente
-    // (salvar progresso, buscar próxima aula, etc), causando o bug de navegação.
-    const keepaliveInterval = setInterval(async () => {
-      try {
-        const { error } = await supabase.auth.refreshSession();
-        if (error) console.warn('[Auth] Keepalive refresh error:', error.message);
-      } catch (e) {
-        console.warn('[Auth] Keepalive falhou:', e);
-      }
-    }, 4 * 60 * 1000);
-
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      clearInterval(keepaliveInterval);
     };
   }, []);
 
