@@ -162,13 +162,25 @@ function AulaPage() {
         // qualquer save pendente de pause ou ended.
         saveQueueRef.current = saveQueueRef.current.then(async () => {
           try {
-            await supabase.from('progresso').upsert({
+            let response = await supabase.from('progresso').upsert({
               user_id: state.userId,
               aula_id: state.aulaId,
               tempo_assistido: Math.floor(tempoFinal),
               concluida: isConcluida,
               ultimo_acesso: new Date().toISOString()
             }, { onConflict: 'user_id,aula_id' });
+            
+            if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
+              console.warn('[AulaPage] Token expirado ao sair. Atualizando sessão...');
+              await supabase.auth.refreshSession();
+              await supabase.from('progresso').upsert({
+                user_id: state.userId,
+                aula_id: state.aulaId,
+                tempo_assistido: Math.floor(tempoFinal),
+                concluida: isConcluida,
+                ultimo_acesso: new Date().toISOString()
+              }, { onConflict: 'user_id,aula_id' });
+            }
             console.log('[AulaPage] Progresso salvo ao sair:', state.aulaId, isConcluida);
           } catch (err) {
             console.error('[AulaPage] Erro ao salvar progresso ao sair:', err);
@@ -811,14 +823,30 @@ function AulaPage() {
       // Save DIRETO (bypass da fila) para garantir que concluida=true chega ao banco
       // antes de qualquer navegação — imune à race condition da fila de saves
       try {
-        await Promise.race([
-          supabase.from('progresso').upsert({
+        const directSavePromise = async () => {
+          let response = await supabase.from('progresso').upsert({
             user_id: user?.id || unmountSaveRef.current?.userId,
             aula_id: aulaId,
             tempo_assistido: Math.floor(Math.max(tempo, dur)),
             concluida: true,
             ultimo_acesso: new Date().toISOString()
-          }, { onConflict: 'user_id,aula_id' }),
+          }, { onConflict: 'user_id,aula_id' });
+
+          if (response.error && (String(response.error.message).toLowerCase().includes('jwt') || String(response.error.code) === '401')) {
+            console.warn('[AulaPage] Token expirado no save direto. Atualizando...');
+            await supabase.auth.refreshSession();
+            await supabase.from('progresso').upsert({
+              user_id: user?.id || unmountSaveRef.current?.userId,
+              aula_id: aulaId,
+              tempo_assistido: Math.floor(Math.max(tempo, dur)),
+              concluida: true,
+              ultimo_acesso: new Date().toISOString()
+            }, { onConflict: 'user_id,aula_id' });
+          }
+        };
+
+        await Promise.race([
+          directSavePromise(),
           new Promise(resolve => setTimeout(resolve, 5000))
         ]);
       } catch (e) {
