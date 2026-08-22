@@ -558,7 +558,8 @@ function AulaPage() {
               novoMap[p.aula_id] = {
                 ...p,
                 // Preserva o concluida=true local, pois o banco pode estar desatualizado (race condition do upsert otimista)
-                concluida: refConcluida || (atual && atual.concluida) ? true : p.concluida,
+                // BUGFIX: parênteses explícitos para garantir precedência correta do operador ternário
+                concluida: (refConcluida || (atual && atual.concluida)) ? true : p.concluida,
                 // Preserva o maior tempo assistido
                 tempo_assistido: Math.max(atual?.tempo_assistido || 0, p.tempo_assistido || 0)
               };
@@ -584,12 +585,7 @@ function AulaPage() {
                   ? Math.min(seekTime, duracaoConhecida * 0.89)
                   : seekTime;
                 setTempoAtual(seekTimeSafe);
-                if (player && playerReady) {
-                  player.seekTo(seekTimeSafe, true);
-                  hasResumedRef.current = true;
-                } else {
-                  seekTimePendenteRef.current = seekTimeSafe;
-                }
+                seekTimePendenteRef.current = seekTimeSafe; // Sempre guarda para o player aplicar quando ficar pronto
               } else {
                 hasResumedRef.current = true;
               }
@@ -602,7 +598,23 @@ function AulaPage() {
     };
     
     carregarProgressoModulo();
-  }, [user, listaAulas, aulaId, playerReady]);
+  // BUGFIX: playerReady removido das dependências para evitar que a query ao banco
+  // seja repetida toda vez que o player fica pronto — o que sobrescrevia concluida=true
+  // com o valor desatualizado do banco (race condition).
+  // O seek quando o player fica pronto agora é tratado no efeito abaixo.
+  }, [user, listaAulas, aulaId]);
+
+  // Efeito separado: aplica o seek pendente quando o player ficar pronto,
+  // sem disparar nova query ao banco de dados.
+  useEffect(() => {
+    if (!playerReady || !player || hasResumedRef.current) return;
+    const pendente = seekTimePendenteRef.current;
+    if (pendente > 0) {
+      player.seekTo(pendente, true);
+      seekTimePendenteRef.current = 0;
+      hasResumedRef.current = true;
+    }
+  }, [playerReady, player]);
 
   // Carregar progresso geral de todas as disciplinas e módulos do preparatório
   useEffect(() => {
