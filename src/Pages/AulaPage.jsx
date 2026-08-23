@@ -964,7 +964,8 @@ function AulaPage() {
           const tempo = currentPlayer.getCurrentTime();
           setTempoAtual(tempo);
           const dur = duracaoRef.current || duracao;
-          if (dur > 0 && tempo >= dur * 0.9) {
+          // Marca como assistida após 20 segundos (estilo GranCursos), independente da duração total
+          if (tempo >= 20) {
             if (salvarProgressoRef.current) {
               salvarProgressoRef.current(tempo, false, true);
             }
