@@ -701,9 +701,11 @@ function AulaPage() {
     // Usa a ref para verificar conclusão — evita problema de closure stale com o estado React
     // aulaConcluidaRef nunca regride de true para false, garantindo que saves posteriores
     // (ex: ao pausar após ter concluído) não sobrescrevam concluida=true com false no banco.
+    // IMPORTANTE: a conclusão é controlada APENAS pelo parâmetro marcarConcluida (passado após
+    // 20s de reprodução pelo tracking, ou ao fim do vídeo). Nenhuma heurística de % aqui,
+    // para evitar falso "concluída" em aulas abertas por longo tempo sem assistir.
     const jaEstavaConcluida = aulaConcluidaRef.current || lastKnownConcluidaRef.current || progressoAulas[aulaId]?.concluida || false;
-    const isConcluida = jaEstavaConcluida || marcarConcluida
-      || (durEfetiva > 0 && tempoFinal >= durEfetiva * 0.9);
+    const isConcluida = jaEstavaConcluida || marcarConcluida;
     // Propaga imediatamente para as refs se concluída agora
     if (isConcluida) {
       aulaConcluidaRef.current = true;
@@ -733,9 +735,8 @@ function AulaPage() {
     });
 
     const now = Date.now();
-    const durEfetivaParaCheck = Math.max(duracaoRef.current || 0, duracao || 0, Number(aulaPlaying?.duracao) || 0);
-    const atingiuFim = (durEfetivaParaCheck > 0 && tempo >= durEfetivaParaCheck * 0.9);
-    const recemConcluida = atingiuFim && !aulaConcluidaRef.current && !lastKnownConcluidaRef.current && !progressoAulas[aulaId]?.concluida;
+    // Bypass do throttle de 10s quando a aula está sendo marcada como concluída pela primeira vez
+    const recemConcluida = marcarConcluida && !aulaConcluidaRef.current && !lastKnownConcluidaRef.current && !progressoAulas[aulaId]?.concluida;
     
     if (!forceSave && now - lastSaveTimeRef.current < 10000 && !recemConcluida) {
       return;
