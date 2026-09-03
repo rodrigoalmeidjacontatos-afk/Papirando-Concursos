@@ -65,6 +65,7 @@ function AdminPage() {
   const [novaDisciplina, setNovaDisciplina] = useState({ nome: '', icone: '', preparatorioId: '' });
   const [novoModulo, setNovoModulo] = useState({ nome: '', disciplinaId: '' });
   const [novaAula, setNovaAula] = useState({ titulo: '', videoId: '', ordem: 1 });
+  const [fetchingYoutube, setFetchingYoutube] = useState(false);
   const [nivelNovaAula, setNivelNovaAula] = useState('basico');
   const [editandoAula, setEditandoAula] = useState(null);
   const [dragAulaId, setDragAulaId] = useState(null);
@@ -1022,6 +1023,99 @@ function AdminPage() {
     }
   };
 
+
+  // ========== AUTO-FETCH YOUTUBE: Busca título e duração pelo ID ==========
+  const buscarDadosYoutube = async () => {
+    let videoId = novaAula.videoId.trim();
+    if (!videoId) return alert('Cole o ID do YouTube primeiro.');
+
+    // Extrai ID caso o usuário tenha colado o link completo
+    if (videoId.includes('youtube.com') || videoId.includes('youtu.be')) {
+      const match = videoId.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^"&?\/\s]{11})/);
+      if (match && match[1]) {
+        videoId = match[1];
+        setNovaAula(prev => ({ ...prev, videoId }));
+      } else {
+        return alert('Link inválido. Cole o ID do vídeo ou o link padrão do YouTube.');
+      }
+    }
+
+    setFetchingYoutube(true);
+    let titulo = '';
+    let duracao = '';
+
+    try {
+      // 1. Busca o TÍTULO via oEmbed (gratuito, sem chave de API)
+      const oembedRes = await fetch(
+        `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+      );
+      if (oembedRes.ok) {
+        const oembedData = await oembedRes.json();
+        titulo = oembedData.title || '';
+      }
+    } catch (_) { /* silencioso — campo ficará editável */ }
+
+    try {
+      // 2. Busca a DURAÇÃO via YouTube IFrame API (gratuito, sem chave de API)
+      duracao = await new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(''), 8000); // desiste após 8s
+
+        // Cria iframe oculto
+        const container = document.createElement('div');
+        container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+        document.body.appendChild(container);
+
+        const iframe = document.createElement('iframe');
+        iframe.id = `yt-fetch-${videoId}`;
+        iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+        iframe.allow = 'autoplay';
+        container.appendChild(iframe);
+
+        const onMessage = (event) => {
+          try {
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            if (data?.event === 'infoDelivery' && data?.info?.duration) {
+              const secs = Math.round(data.info.duration);
+              const mm = Math.floor(secs / 60).toString().padStart(2, '0');
+              const ss = (secs % 60).toString().padStart(2, '0');
+              clearTimeout(timeout);
+              window.removeEventListener('message', onMessage);
+              document.body.removeChild(container);
+              resolve(`${mm}:${ss}`);
+            }
+          } catch (_) {}
+        };
+
+        window.addEventListener('message', onMessage);
+
+        // Solicita informações ao iframe assim que carregar
+        iframe.onload = () => {
+          setTimeout(() => {
+            iframe.contentWindow?.postMessage(
+              JSON.stringify({ event: 'listening', id: 1 }), '*'
+            );
+            iframe.contentWindow?.postMessage(
+              JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onReady'] }), '*'
+            );
+          }, 1000);
+        };
+      });
+    } catch (_) { /* silencioso */ }
+
+    // Preenche apenas os campos que vieram com dados — o resto fica editável
+    setNovaAula(prev => ({
+      ...prev,
+      titulo: titulo || prev.titulo,
+      duracao: duracao || prev.duracao || '',
+    }));
+    setFetchingYoutube(false);
+
+    if (!titulo && !duracao) {
+      alert('Não foi possível buscar os dados automaticamente. Preencha os campos manualmente.');
+    } else if (titulo && !duracao) {
+      alert('Título preenchido! A duração não foi detectada automaticamente — preencha manualmente se quiser.');
+    }
+  };
 
   // ========== CRUD AULAS (SUPABASE) ==========
   const addAula = async (modId) => {
@@ -2054,33 +2148,72 @@ function AdminPage() {
                                           {isModExpanded && (
                                             <div style={styles.treeSubSubChildren}>
                                               <div style={{...styles.addForm, backgroundColor: '#2A2A2A', padding: '12px', borderRadius: '8px'}}>
+
+                                                {/* ── Linha 1: ID YouTube + botão Buscar ── */}
+                                                <div style={{display: 'flex', gap: '6px', alignItems: 'flex-end', gridColumn: '1 / -1'}}>
+                                                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px', flex: 1}}>
+                                                    <label style={{fontSize: '11px', color: '#AAA'}}>ID YouTube</label>
+                                                    <input
+                                                      style={styles.inputSmall}
+                                                      placeholder="Cole o ID ou link do YouTube"
+                                                      value={novaAula.videoId}
+                                                      onChange={e => setNovaAula(prev => ({...prev, videoId: e.target.value}))}
+                                                    />
+                                                  </div>
+                                                  <button
+                                                    style={{
+                                                      ...styles.smallButton,
+                                                      backgroundColor: fetchingYoutube ? '#555' : '#1565C0',
+                                                      minWidth: '90px',
+                                                      alignSelf: 'flex-end',
+                                                      cursor: fetchingYoutube ? 'not-allowed' : 'pointer',
+                                                      whiteSpace: 'nowrap',
+                                                    }}
+                                                    onClick={buscarDadosYoutube}
+                                                    disabled={fetchingYoutube}
+                                                    title="Preenche título e duração automaticamente pelo ID do YouTube"
+                                                  >
+                                                    {fetchingYoutube ? '⏳ Buscando...' : '🔍 Buscar'}
+                                                  </button>
+                                                </div>
+
+                                                {/* ── Linha 2: Título ── */}
                                                 <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                  <label style={{fontSize: '11px', color: '#AAA'}}>Título</label>
+                                                  <label style={{fontSize: '11px', color: '#AAA'}}>
+                                                    Título
+                                                    <span style={{color: '#666', marginLeft: '6px', fontStyle: 'italic'}}>
+                                                      (preenchido automaticamente ou edite aqui)
+                                                    </span>
+                                                  </label>
                                                   <input style={styles.inputSmall} placeholder="Título da Aula" value={novaAula.titulo} onChange={e => setNovaAula(prev => ({...prev, titulo: e.target.value}))} />
                                                 </div>
-                                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                  <label style={{fontSize: '11px', color: '#AAA'}}>ID YouTube</label>
-                                                  <input style={styles.inputSmall} placeholder="ID do YouTube" value={novaAula.videoId} onChange={e => setNovaAula(prev => ({...prev, videoId: e.target.value}))} />
+
+                                                {/* ── Linha 3: Duração + Nível ── */}
+                                                <div style={{display: 'flex', gap: '6px'}}>
+                                                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px', flex: 1}}>
+                                                    <label style={{fontSize: '11px', color: '#AAA'}}>
+                                                      Duração
+                                                      <span style={{color: '#666', marginLeft: '6px', fontStyle: 'italic'}}>(automático ou manual)</span>
+                                                    </label>
+                                                    <input style={styles.inputSmall} placeholder="Ex: 10:00" value={novaAula.duracao || ''} onChange={e => setNovaAula(prev => ({...prev, duracao: e.target.value}))} />
+                                                  </div>
+                                                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px', flex: 1}}>
+                                                    <label style={{fontSize: '11px', color: '#AAA'}}>Nível</label>
+                                                    <select
+                                                      style={{...styles.inputSmall, cursor: 'pointer',
+                                                        backgroundColor: nivelNovaAula === 'premium' ? 'rgba(229,9,20,0.15)' : nivelNovaAula === 'medio' ? 'rgba(33,150,243,0.15)' : 'rgba(76,175,80,0.15)'
+                                                      }}
+                                                      value={nivelNovaAula}
+                                                      onChange={e => setNivelNovaAula(e.target.value)}
+                                                    >
+                                                      <option value="basico">📘 Básico (livre)</option>
+                                                      <option value="medio">🥈 Médio</option>
+                                                      <option value="premium">🔒 Premium</option>
+                                                      <option value="admin">🔴 Admin (Apenas Admins)</option>
+                                                    </select>
+                                                  </div>
                                                 </div>
-                                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                  <label style={{fontSize: '11px', color: '#AAA'}}>Duração</label>
-                                                  <input style={styles.inputSmall} placeholder="Ex: 10:00" value={novaAula.duracao || ''} onChange={e => setNovaAula(prev => ({...prev, duracao: e.target.value}))} />
-                                                </div>
-                                                <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                                  <label style={{fontSize: '11px', color: '#AAA'}}>Nível</label>
-                                                  <select
-                                                    style={{...styles.inputSmall, cursor: 'pointer',
-                                                      backgroundColor: nivelNovaAula === 'premium' ? 'rgba(229,9,20,0.15)' : nivelNovaAula === 'medio' ? 'rgba(33,150,243,0.15)' : 'rgba(76,175,80,0.15)'
-                                                    }}
-                                                    value={nivelNovaAula}
-                                                    onChange={e => setNivelNovaAula(e.target.value)}
-                                                  >
-                                                    <option value="basico">📘 Básico (livre)</option>
-                                                    <option value="medio">🥈 Médio</option>
-                                                    <option value="premium">🔒 Premium</option>
-                                                    <option value="admin">🔴 Admin (Apenas Admins)</option>
-                                                  </select>
-                                                </div>
+
                                                 <button style={{...styles.smallButton, backgroundColor: '#4CAF50', alignSelf: 'flex-end'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
                                               </div>
                                               
