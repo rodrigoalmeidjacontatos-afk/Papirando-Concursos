@@ -1042,71 +1042,72 @@ function AdminPage() {
 
     setFetchingYoutube(true);
 
-    const fetchTitulo = async () => {
-      try {
-        const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-        if (oembedRes.ok) {
-          const oembedData = await oembedRes.json();
-          return oembedData.title || '';
+    // 1. Busca Título via oEmbed (Independente, atualiza a tela na hora)
+    const promiseTitulo = fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.title) {
+          setNovaAula(prev => ({ ...prev, titulo: data.title }));
+          return true;
         }
-      } catch (_) {}
-      return '';
-    };
+        return false;
+      })
+      .catch(() => false);
 
-    const fetchDuracao = async () => {
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve(''), 5000); // reduzido para 5s max
+    // 2. Busca Duração via IFrame Oculto (Melhorado)
+    const promiseDuracao = new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 7000); // 7s de limite
 
-        const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-        document.body.appendChild(container);
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+      document.body.appendChild(container);
 
-        const iframe = document.createElement('iframe');
-        iframe.id = `yt-fetch-${videoId}`;
-        iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
-        iframe.allow = 'autoplay';
-        container.appendChild(iframe);
+      const iframe = document.createElement('iframe');
+      iframe.id = `yt-fetch-${videoId}`;
+      // Adicionado autoplay=1, mute=1 e origin para forçar o carregamento dos metadados
+      iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&origin=${window.location.origin}`;
+      iframe.allow = 'autoplay';
+      container.appendChild(iframe);
 
-        const onMessage = (event) => {
-          try {
-            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-            if (data?.event === 'infoDelivery' && data?.info?.duration) {
-              const secs = Math.round(data.info.duration);
-              const mm = Math.floor(secs / 60).toString().padStart(2, '0');
-              const ss = (secs % 60).toString().padStart(2, '0');
-              clearTimeout(timeout);
-              window.removeEventListener('message', onMessage);
-              document.body.removeChild(container);
-              resolve(`${mm}:${ss}`);
-            }
-          } catch (_) {}
-        };
+      const onMessage = (event) => {
+        try {
+          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          // Pega a duração de qualquer evento que o YouTube enviar que contenha a info
+          if (data?.info?.duration) {
+            const secs = Math.round(data.info.duration);
+            const mm = Math.floor(secs / 60).toString().padStart(2, '0');
+            const ss = (secs % 60).toString().padStart(2, '0');
+            clearTimeout(timeout);
+            window.removeEventListener('message', onMessage);
+            document.body.removeChild(container);
+            setNovaAula(prev => ({ ...prev, duracao: `${mm}:${ss}` }));
+            resolve(true);
+          }
+        } catch (_) {}
+      };
 
-        window.addEventListener('message', onMessage);
+      window.addEventListener('message', onMessage);
 
-        iframe.onload = () => {
-          setTimeout(() => {
-            iframe.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
-            iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onReady'] }), '*');
-          }, 500); // reduzido para 500ms
-        };
-      });
-    };
+      iframe.onload = () => {
+        // Envia os comandos para a API do player assim que o iframe carrega
+        setTimeout(() => {
+          iframe.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 1 }), '*');
+          iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onReady'] }), '*');
+          iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
+        }, 500);
+      };
+    });
 
-    // Executa as duas buscas ao mesmo tempo (Paralelo)
-    const [tituloResult, duracaoResult] = await Promise.all([fetchTitulo(), fetchDuracao()]);
-
-    setNovaAula(prev => ({
-      ...prev,
-      titulo: tituloResult || prev.titulo,
-      duracao: duracaoResult || prev.duracao || '',
-    }));
+    // Aguarda ambas terminarem apenas para tirar o "⏳ Buscando..."
+    const [temTitulo, temDuracao] = await Promise.all([promiseTitulo, promiseDuracao]);
     setFetchingYoutube(false);
 
-    if (!tituloResult && !duracaoResult) {
-      alert('Não foi possível buscar os dados automaticamente. Preencha os campos manualmente.');
-    } else if (tituloResult && !duracaoResult) {
-      alert('Título preenchido! A duração não pôde ser detectada e precisará ser preenchida manualmente.');
+    if (!temTitulo && !temDuracao) {
+      alert('Não foi possível buscar automaticamente. Preencha manualmente.');
+    } else if (temTitulo && !temDuracao) {
+      // Removido o alert irritante para quando só a duração falha, 
+      // pois o usuário já está vendo o resultado na tela.
+      console.warn("Duração não detectada pelo IFrame.");
     }
   };
 
