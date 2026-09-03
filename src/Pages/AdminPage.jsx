@@ -609,10 +609,21 @@ function AdminPage() {
   };
 
 
+  // ========== HELPER: Gera IDs seguros para URLs ========== 
+  // Remove acentos, barras, parênteses e outros caracteres especiais que quebram URLs
+  const slugify = (str) =>
+    str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove diacríticos (acentos)
+      .replace(/[^a-z0-9\s_]/g, '')    // remove / ( ) e qualquer char especial
+      .trim()
+      .replace(/\s+/g, '_');           // espaços → underscores
+
   // ========== CRUD CATEGORIAS (SUPABASE) ========== 
   const addCategoria = async () => {
     if (!novaCategoria.nome) return alert('Digite o nome');
-    const id = novaCategoria.nome.toLowerCase().replace(/ /g, '_');
+    const id = slugify(novaCategoria.nome);
     const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '', tipo_acesso: novaCategoria.tipo_acesso || 'livre' };
     const { error } = await supabase.from('categorias').upsert([nova]);
     if (!error) {
@@ -651,7 +662,7 @@ function AdminPage() {
   // ========== CRUD CARREIRAS (SUPABASE) ========== 
   const addCarreira = async () => {
     if (!novaCarreira.nome || !novaCarreira.categoriaId) return alert('Preencha todos os campos');
-    const id = novaCarreira.nome.toLowerCase().replace(/ /g, '_');
+    const id = slugify(novaCarreira.nome);
     const nova = {
       id,
       nome: novaCarreira.nome,
@@ -743,7 +754,7 @@ function AdminPage() {
 
   const addPreparatorio = async () => {
     if (!novoPreparatorio.nome) return alert('Digite o nome');
-    const id = novoPreparatorio.nome.toLowerCase().replace(/ /g, '_');
+    const id = slugify(novoPreparatorio.nome);
     // Como a coluna 'capa' não existe, usamos 'logo' para armazenar a imagem (URL ou Base64)
     const novo = { 
       id, 
@@ -808,7 +819,7 @@ function AdminPage() {
   // ========== CRUD DISCIPLINAS (SUPABASE) ========== 
   const addDisciplina = async (prepId) => {
     if (!novaDisciplina.nome || !prepId) return alert('Preencha o nome');
-    const id = `${prepId}_${novaDisciplina.nome.toLowerCase().replace(/ /g, '_')}`;
+    const id = `${prepId}_${slugify(novaDisciplina.nome)}`;
     const ordem = getDisciplinasPorPrep(prepId).length + 1;
     const nova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorioId: prepId, ordem };
     const dbNova = { id, nome: novaDisciplina.nome, icone: novaDisciplina.icone, preparatorio_id: prepId, ordem };
@@ -851,6 +862,57 @@ function AdminPage() {
     }
   };
 
+  // ========== MIGRAÇÃO: Corrige IDs de disciplinas quebrados ========== 
+  // Renomeia o ID primário da disciplina no banco, atualizando as chaves estrangeiras dos módulos
+  // e registros de progresso. Não apaga nenhum dado.
+  const migrarIdDisciplina = async (disc) => {
+    const prepId = disc.preparatorioId || disc.preparatorio_id;
+    const novoId = `${prepId}_${slugify(disc.nome)}`;
+    if (novoId === disc.id) {
+      alert('O ID já está correto, nenhuma migração necessária.');
+      return;
+    }
+    const confirmar = window.confirm(
+      `Migrar ID da disciplina:\n\nDE: ${disc.id}\nPARA: ${novoId}\n\nIsso atualizará todos os módulos vinculados. Confirmar?`
+    );
+    if (!confirmar) return;
+
+    try {
+      // 1. Insere a disciplina com o novo ID (preservando todos os dados)
+      const { error: insErr } = await supabase.from('disciplinas').insert([{
+        id: novoId,
+        nome: disc.nome,
+        icone: disc.icone || '',
+        preparatorio_id: prepId,
+        ordem: disc.ordem || 1,
+      }]);
+      if (insErr) { alert('Erro ao criar disciplina com novo ID: ' + insErr.message); return; }
+
+      // 2. Atualiza todos os módulos para apontar para o novo ID
+      const { error: modErr } = await supabase.from('modulos')
+        .update({ disciplina_id: novoId })
+        .eq('disciplina_id', disc.id);
+      if (modErr) { alert('Erro ao atualizar módulos: ' + modErr.message); return; }
+
+      // 3. Remove a disciplina com o ID antigo
+      await supabase.from('disciplinas').delete().eq('id', disc.id);
+
+      // 4. Atualiza o estado local
+      setDisciplinas(prev => prev.map(d => d.id === disc.id
+        ? { ...d, id: novoId }
+        : d
+      ));
+      setModulos(prev => prev.map(m =>
+        String(m.disciplinaId || m.disciplina_id) === String(disc.id)
+          ? { ...m, disciplinaId: novoId, disciplina_id: novoId }
+          : m
+      ));
+
+      alert(`✅ Migração concluída!\nNovo ID: ${novoId}\n\nA URL das aulas dessa disciplina agora funcionará corretamente.`);
+    } catch (err) {
+      alert('Erro inesperado na migração: ' + err.message);
+    }
+  };
 
   // ========== CRUD MÓDULOS (SUPABASE) ========== 
   const handleDropModulo = async (e, targetId, discId) => {
@@ -1909,6 +1971,13 @@ function AdminPage() {
                                       <div style={{display: 'flex', gap: '4px'}}>
                                         <button style={styles.editButtonSmall} onClick={(e) => { e.stopPropagation(); setEditandoDisciplina(disc); }}>Editar</button>
                                         <button style={styles.deleteButtonSmall} onClick={(e) => { e.stopPropagation(); removeDisciplina(disc.id); }}>Excluir</button>
+                                        {/[^\w_]/.test(disc.id) && (
+                                          <button
+                                            style={{...styles.editButtonSmall, backgroundColor: '#c0392b', color: '#fff', border: 'none'}}
+                                            onClick={(e) => { e.stopPropagation(); migrarIdDisciplina(disc); }}
+                                            title={`ID com caracteres inválidos: ${disc.id}`}
+                                          >🔧 Corrigir ID</button>
+                                        )}
                                       </div>
                                     </>
                                   )}
