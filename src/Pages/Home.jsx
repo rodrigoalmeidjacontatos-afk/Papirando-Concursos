@@ -12,6 +12,7 @@ function Home() {
   const [authChecked, setAuthChecked] = useState(false);
   const [userName, setUserName] = useState(() => sessionStorage.getItem('papirando_nome') || 'Aluno');
   const [planoUsuario, setPlanoUsuario] = useState(() => sessionStorage.getItem('papirando_plano') || 'basico'); 
+  const [dataExpiracao, setDataExpiracao] = useState(null); 
   const [avatarUrl, setAvatarUrl] = useState(() => sessionStorage.getItem('papirando_avatar') || null);
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
@@ -138,6 +139,7 @@ function Home() {
           if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
 
           setPlanoUsuario(planoNormalizado);
+          setDataExpiracao(profile.data_expiracao);
           sessionStorage.setItem('papirando_plano', planoNormalizado);
           
           setAvatarUrl(profile.avatar_url || null);
@@ -704,6 +706,16 @@ function Home() {
                 {/* ============================= */}
                 <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px'}}>
                   <span style={styles.userName}>Olá, {userName}</span>
+                  {/* Badge de expiração */}
+                  {dataExpiracao && (
+                    <span style={{
+                      fontSize: '10px',
+                      color: '#AAA',
+                      letterSpacing: '0.5px',
+                    }}>
+                      expira em {new Date(dataExpiracao).toLocaleDateString('pt-BR')}
+                    </span>
+                  )}
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <span style={{
                       fontSize: '10px', 

@@ -40,6 +40,7 @@ function AulaPage() {
   const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [temAcesso, setTemAcesso] = useState(true);
   const [carregandoAcesso, setCarregandoAcesso] = useState(true);
+  const [dataExpiracao, setDataExpiracao] = useState(null); // Novo estado para data de expiração
   const [isAdmin, setIsAdmin] = useState(false);
   const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
   const [userName, setUserName] = useState('Aluno');
@@ -237,6 +238,7 @@ function AulaPage() {
           
           const planoDoBanco = profile.plano || 'basico';
           const dataExp = profile.data_expiracao;
+          setDataExpiracao(dataExp); // Armazena a data de expiração no state
           
           // Normalização robusta do plano com trim()
           let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
@@ -1739,6 +1741,25 @@ function AulaPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="aula-header-buttons">
+            
+            {/* Badge de Expiração */}
+            {user && (
+              <div style={{
+                backgroundColor: '#1C1C1C',
+                color: '#E0E0E0',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                border: '1px solid #333',
+                marginRight: '8px'
+              }}>
+                {dataExpiracao ? `expira em ${new Date(dataExpiracao).toLocaleDateString('pt-BR')}` : 'Vitalício'}
+              </div>
+            )}
+
             <button 
               onClick={() => navigate(`/preparatorio/${carreiraId}/${preparatorioId}`)} 
               style={styles.backButton}
