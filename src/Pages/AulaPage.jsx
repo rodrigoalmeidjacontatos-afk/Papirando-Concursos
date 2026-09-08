@@ -191,6 +191,21 @@ function AulaPage() {
     };
   }, [aulaId]);
 
+  // Timeout de segurança: se carregandoAcesso ainda for true após 8s, libera forçadamente
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setCarregandoAcesso(prev => {
+        if (prev) {
+          console.warn('[AulaPage] Timeout de segurança: liberando tela de loading após 8s.');
+          setPlanoUsuario(p => p === 'carregando' ? 'basico' : p);
+          return false;
+        }
+        return prev;
+      });
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, []);
+
   // Pegar usuário logado e monitorar sessão com alta persistência
   useEffect(() => {
     let mounted = true;
@@ -299,6 +314,8 @@ function AulaPage() {
         const { data: { user: currentUser }, error } = await supabase.auth.getUser();
         if (error) {
           console.error("[Auth] Erro ao obter usuário inicial:", error);
+          // Garante que a tela de loading nunca trave quando há erro
+          if (mounted) setCarregandoAcesso(false);
           return;
         }
 
@@ -306,19 +323,31 @@ function AulaPage() {
           console.log("[Auth] AulaPage: Usuário detectado:", currentUser.email);
           setUser(currentUser);
           await carregarPerfil(currentUser);
+        } else if (mounted) {
+          // Usuário não está logado — libera a tela de carregamento
+          console.log("[Auth] AulaPage: Nenhum usuário autenticado.");
+          setPlanoUsuario('basico');
+          setCarregandoAcesso(false);
         }
       } catch (err) {
         console.error("[Auth] Falha no inicializarSessao:", err);
+        // Garante que a tela de loading nunca trave em caso de exceção
+        if (mounted) setCarregandoAcesso(false);
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[Auth] AulaPage: Evento ${event}`, session?.user?.email || 'sem usuário');
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      // INITIAL_SESSION: disparado imediatamente ao montar o componente com sessão já existente
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser && mounted) {
           setUser(currentUser);
           await carregarPerfil(currentUser);
+        } else if (mounted && event === 'INITIAL_SESSION') {
+          // Sem sessão no evento inicial — libera o loading
+          setPlanoUsuario('basico');
+          setCarregandoAcesso(false);
         }
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
@@ -326,6 +355,7 @@ function AulaPage() {
           setUserName('Aluno');
           setIsAdmin(false);
           setPlanoUsuario('basico');
+          setCarregandoAcesso(false);
         }
       }
     });
