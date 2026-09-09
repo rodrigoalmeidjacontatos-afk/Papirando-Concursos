@@ -142,10 +142,16 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
       console.log(`[AuthContext] Evento: ${event}`, session?.user?.email || 'sem usuário');
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN') {
         if (session?.user) {
           setUser(session.user);
           await carregarPerfil(session.user);
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Token renovado — atualiza apenas o objeto user (novo JWT),
+        // sem re-buscar perfil no banco. Evita flash ao trocar de aba.
+        if (session?.user) {
+          setUser(session.user);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
