@@ -148,11 +148,9 @@ export function AuthProvider({ children }) {
           await carregarPerfil(session.user);
         }
       } else if (event === 'TOKEN_REFRESHED') {
-        // Token renovado — atualiza apenas o objeto user (novo JWT),
-        // sem re-buscar perfil no banco. Evita flash ao trocar de aba.
-        if (session?.user) {
-          setUser(session.user);
-        }
+        // Token renovado — mesmo usuário, só JWT novo.
+        // NÃO atualiza state para evitar re-renders/flash ao trocar de aba.
+        console.log('[AuthContext] Token renovado silenciosamente.');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserName('Aluno');

@@ -123,7 +123,8 @@ function CarreiraPage() {
     carregarDados();
 
     return () => { mounted = false; };
-  }, [carreiraId, authLoading, user, planoUsuario, preparatoriosLiberados, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carreiraId, authLoading, user?.id, planoUsuario, preparatoriosLiberados, isAdmin]);
 
   if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
   if (!carreira) return <LoadingScreen />;

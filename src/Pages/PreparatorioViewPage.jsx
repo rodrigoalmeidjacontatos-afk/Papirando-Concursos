@@ -144,7 +144,8 @@ function PreparatorioViewPage() {
     return () => {
       mounted = false;
     };
-  }, [preparatorioId, carreiraId, authLoading, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preparatorioId, carreiraId, authLoading, user?.id]);
 
   const toggleModulo = (moduloId) => {
     setModulosExpandidos(prev => ({ ...prev, [moduloId]: !prev[moduloId] }));
