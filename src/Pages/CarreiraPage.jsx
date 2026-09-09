@@ -2,36 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import { useAuth } from '../contexts/AuthContext';
 
 function CarreiraPage() {
   const { carreiraId } = useParams();
   const navigate = useNavigate();
+  const { user, planoUsuario, preparatoriosLiberados, isAdmin, authLoading } = useAuth();
+
   const [carreira, setCarreira] = useState(null);
   const [preparatorios, setPreparatorios] = useState([]);
-  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
   // Para categoria 'restrito': lista de IDs de preps que o usuário tem acesso (null = sem restrição individual)
   const [prepsComAcesso, setPrepsComAcesso] = useState(null);
 
-  // Timeout de segurança: se após 5s ainda estiver carregando, libera forçadamente
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setCarregando(prev => {
-        if (prev) {
-          console.warn('[CarreiraPage] Timeout de segurança: liberando loading após 5s.');
-          setPlanoUsuario(p => p === 'carregando' ? 'basico' : p);
-          return false;
-        }
-        return prev;
-      });
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [carreiraId]);
+    // Aguarda o contexto de auth terminar de carregar antes de buscar os dados
+    if (authLoading) return;
 
-  useEffect(() => {
     let mounted = true;
 
     async function carregarDados() {
+      setCarregando(true);
       try {
         // 1. Buscar carreira
         const { data: carreirasData } = await supabase.from('carreiras').select('*');
@@ -70,59 +61,24 @@ function CarreiraPage() {
           });
         }
 
+        if (!mounted) return;
+
         // 4. Filtrar vinculados a esta carreira
         const carreiraVinculos = storedVinculos[carreiraId] || {};
         const prepIds = Object.keys(carreiraVinculos);
         let prepsFiltrados = (prepsData || []).filter(p => prepIds.includes(p.id));
 
-        // 5. Verificar plano e acesso do usuário
-        // getSession() lê do cache local (sem rede) — mais rápido e confiável
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user || null;
-        if (!mounted) return;
+        // 5. Aplicar lógica de acesso usando dados já prontos do contexto
+        console.log(`[CarreiraPage] Plano: "${planoUsuario}" | TipoAcesso: "${tipoAcesso}" | Admin: ${isAdmin}`);
 
         if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('plano, plano_anterior, preparatorios_liberados, data_expiracao')
-            .eq('id', user.id)
-            .single();
-
-          if (!mounted) return;
-
-          const dataExp = profile?.data_expiracao;
-          let planoNormalizado = String(profile?.plano || 'basico')
-            .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-          console.log(`[CarreiraPage] User: ${user.email} | Plano: "${planoNormalizado}" | TipoAcesso: "${tipoAcesso}"`);
-
-          if (dataExp && new Date(dataExp) < new Date()) {
-            planoNormalizado = profile?.plano_anterior || 'basico';
-            supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', user.id);
-          }
-
-          const userEmail = user?.email?.toLowerCase();
-          const isOwner = userEmail && userEmail.includes('rodrigoalmeidja');
-          if (isOwner) planoNormalizado = 'premium';
-
-          if (mounted) setPlanoUsuario(planoNormalizado);
-
           // ====================================================
           // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
           // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
-          // Chave: "carreiraId:prepId" = acesso nessa carreira apenas
-          //        "*:prepId"          = acesso em qualquer carreira
           // ====================================================
-          if ((tipoAcesso === 'restrito' || planoNormalizado === 'medio') && !isOwner && planoNormalizado !== 'premium') {
-            let liberados = profile?.preparatorios_liberados || [];
-            if (typeof liberados === 'string') {
-              try { liberados = JSON.parse(liberados); }
-              catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
-            }
-            if (!Array.isArray(liberados)) liberados = [];
-
+          if ((tipoAcesso === 'restrito' || planoUsuario === 'medio') && !isAdmin && planoUsuario !== 'premium') {
             const liberadosNesseContexto = prepsFiltrados
-              .filter(p => liberados.includes(`${carreiraId}:${p.id}`) || liberados.includes(`*:${p.id}`))
+              .filter(p => preparatoriosLiberados.includes(`${carreiraId}:${p.id}`) || preparatoriosLiberados.includes(`*:${p.id}`))
               .map(p => p.id);
 
             if (mounted) {
@@ -132,30 +88,23 @@ function CarreiraPage() {
             return;
           }
 
-          // Lógica original de plano (para categorias não restritas e planos básico/premium)
+          // Lógica original de plano
           if (!mounted) return;
-          if (planoNormalizado === 'basico') {
+          if (planoUsuario === 'basico') {
             setPreparatorios(prepsFiltrados);
-          } else if (planoNormalizado === 'medio') {
-            let liberados = profile?.preparatorios_liberados || [];
-            if (typeof liberados === 'string') {
-              try { liberados = JSON.parse(liberados); }
-              catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
-            }
-            if (!Array.isArray(liberados)) liberados = [];
-
-            if (liberados.length > 0) {
-              setPreparatorios(prepsFiltrados.filter(p => liberados.includes(p.id)));
+          } else if (planoUsuario === 'medio') {
+            if (preparatoriosLiberados.length > 0) {
+              setPreparatorios(prepsFiltrados.filter(p => preparatoriosLiberados.includes(p.id)));
             } else {
               setPreparatorios([]);
             }
           } else {
+            // premium ou admin
             setPreparatorios(prepsFiltrados);
           }
         } else {
           // Usuário não logado
           if (mounted) {
-            setPlanoUsuario('basico');
             if (tipoAcesso === 'restrito') {
               setPreparatorios(prepsFiltrados);
               setPrepsComAcesso([]);
@@ -166,10 +115,7 @@ function CarreiraPage() {
         }
       } catch (err) {
         console.error('[CarreiraPage] Erro ao carregar dados:', err);
-        // Garante que o loading nunca trave em caso de exceção
-        if (mounted) setPlanoUsuario('basico');
       } finally {
-        // SEMPRE libera o loading, independente de sucesso ou erro
         if (mounted) setCarregando(false);
       }
     }
@@ -177,10 +123,11 @@ function CarreiraPage() {
     carregarDados();
 
     return () => { mounted = false; };
-  }, [carreiraId]);
+  }, [carreiraId, authLoading, user, planoUsuario, preparatoriosLiberados, isAdmin]);
 
-  if (carregando || planoUsuario === 'carregando') return <LoadingScreen text="Verificando seu acesso..." />;
+  if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
   if (!carreira) return <LoadingScreen />;
+
 
   const isBasico = planoUsuario === 'basico';
   // Modo restrito: prepsComAcesso é array (mesmo vazio) → cada prep tem acesso individual

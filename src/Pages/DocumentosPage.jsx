@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import { useAuth } from '../contexts/AuthContext';
 
 // Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
 function PdfCover({ category, title, source, isBasico, url, hideSource }) {
@@ -287,15 +288,14 @@ function PdfCover({ category, title, source, isBasico, url, hideSource }) {
 
 function DocumentosPage() {
   const navigate = useNavigate();
+  const { planoUsuario, isAdmin, authLoading } = useAuth();
   const [documentos, setDocumentos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos');
   const [fonteAtiva, setFonteAtiva] = useState('Todos');
   const [fontes, setFontes] = useState(['Todos']);
-  const [planoUsuario, setPlanoUsuario] = useState('carregando');
   const [carregando, setCarregando] = useState(true);
   const [viewMode, setViewMode] = useState('shelves'); // 'shelves' para prateleiras Netflix, 'grid' para grade classica
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
   const shelfCategories = ['Simulado', 'Apostila', 'Edital', 'Outros'];
@@ -335,43 +335,9 @@ function DocumentosPage() {
         const uniqueFontes = ['Todos', ...new Set(mappedFontes)];
         setFontes(uniqueFontes);
 
-        // 2. Verificar perfil e plano do usuário logado
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const userEmail = user.email?.toLowerCase();
-          const isOwner = userEmail && userEmail.includes('rodrigoalmeidja');
-          
-          if (isOwner) {
-            setPlanoUsuario('premium');
-            setIsAdmin(true);
-          } else {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('plano, plano_anterior, data_expiracao')
-              .eq('id', user.id)
-              .single();
-
-            if (profile) {
-              const dataExp = profile.data_expiracao;
-              let planoNormalizado = String(profile.plano || 'basico')
-                .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-              // Verifica expiração do plano
-              if (dataExp && new Date(dataExp) < new Date()) {
-                planoNormalizado = profile?.plano_anterior || 'basico';
-                supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', user.id);
-              }
-              setPlanoUsuario(planoNormalizado);
-            } else {
-              setPlanoUsuario('basico');
-            }
-          }
-        } else {
-          setPlanoUsuario('basico');
-        }
+        // Plano e admin vêm do contexto global — sem re-fetch aqui
       } catch (err) {
         console.error("Erro ao carregar dados da Central de Documentos:", err);
-        setPlanoUsuario('basico');
       } finally {
         setCarregando(false);
       }
@@ -407,7 +373,7 @@ function DocumentosPage() {
 
   const isBasico = planoUsuario === 'basico';
 
-  if (carregando || planoUsuario === 'carregando') {
+  if (authLoading || carregando) {
     return <LoadingScreen text="Carregando biblioteca de materiais..." />;
   }
 

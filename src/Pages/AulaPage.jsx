@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
+import { useAuth } from '../contexts/AuthContext';
 
 // Mapeamento dos vídeos (SUBSTITUA PELOS SEUS IDs SE NECESSÁRIO)
 // Agora usaremos preferencialmente o videoId que vem do banco de dados
@@ -36,14 +37,9 @@ function AulaPage() {
   const [isSeeking, setIsSeeking] = useState(false);
 
   // Estados de Dados
-  const [user, setUser] = useState(null);
-  const [planoUsuario, setPlanoUsuario] = useState('carregando');
+  // Auth vem do contexto global — sem re-verificar a cada montagem
+  const { user, planoUsuario, isAdmin, dataExpiracao, preparatoriosLiberados, userName, authLoading, handleLogout: contextHandleLogout } = useAuth();
   const [temAcesso, setTemAcesso] = useState(true);
-  const [carregandoAcesso, setCarregandoAcesso] = useState(true);
-  const [dataExpiracao, setDataExpiracao] = useState(null); // Novo estado para data de expiração
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
-  const [userName, setUserName] = useState('Aluno');
   
   // Novos Estados para a Barra Lateral
   const [disciplina, setDisciplina] = useState(null);
@@ -191,185 +187,16 @@ function AulaPage() {
     };
   }, [aulaId]);
 
-  // Timeout de segurança: se carregandoAcesso ainda for true após 8s, libera forçadamente
+  // Verificar acesso do aluno baseado no plano e nível da aula
+  // (a lógica detalhada de bloqueio por nível já é feita no isBloqueada abaixo)
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setCarregandoAcesso(prev => {
-        if (prev) {
-          console.warn('[AulaPage] Timeout de segurança: liberando tela de loading após 8s.');
-          setPlanoUsuario(p => p === 'carregando' ? 'basico' : p);
-          return false;
-        }
-        return prev;
-      });
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // Pegar usuário logado e monitorar sessão com alta persistência
-  useEffect(() => {
-    let mounted = true;
-
-    const carregarPerfil = async (userObj) => {
-      if (!userObj) {
-        if (mounted) {
-          setPlanoUsuario('basico');
-          setCarregandoAcesso(false);
-        }
-        return;
-      }
-
-      // ADMIN: verifica email ANTES de qualquer consulta ao banco
-      const userEmail = userObj.email?.toLowerCase();
-      if (userEmail && userEmail.includes('rodrigoalmeidja')) {
-        if (mounted) {
-          setIsAdmin(true);
-          setPlanoUsuario('premium');
-          setUserName(userObj.email?.split('@')[0] || 'Admin');
-          setCarregandoAcesso(false);
-        }
-        return;
-      }
-
-      try {
-        console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('display_name, plano, plano_anterior, data_expiracao, preparatorios_liberados')
-          .eq('id', userObj.id)
-          .single();
-        
-        if (error) {
-          console.error("[Auth] Erro ao buscar profile:", error);
-          if (mounted) {
-            setPlanoUsuario('basico');
-            setCarregandoAcesso(false);
-          }
-          return;
-        }
-
-        if (mounted && profile) {
-          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
-          
-          const planoDoBanco = profile.plano || 'basico';
-          const dataExp = profile.data_expiracao;
-          setDataExpiracao(dataExp); // Armazena a data de expiração no state
-          
-          // Normalização robusta do plano com trim()
-          let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-          
-          console.log(`[AulaPage] Plano Banco: "${planoDoBanco}" | Normalizado: "${planoNormalizado}"`);
-          
-          // Verificação de expiração com GRACE PERIOD (5 minutos) para evitar erros de sincronia
-          if (dataExp) {
-            const dataExpiracaoDate = new Date(dataExp);
-            const agora = new Date();
-            const expirou = dataExpiracaoDate < agora;
-            
-            // Se expirou há menos de 5 minutos, ainda damos acesso (tolerância de clock drift)
-            const gracePeriodMs = 5 * 60 * 1000;
-            const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
-
-            if (expirou && !dentroDaTolerancia) {
-              console.log("[Auth] Plano expirado:", dataExp);
-              planoNormalizado = profile.plano_anterior || 'basico';
-              supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', userObj.id);
-            } else if (expirou && dentroDaTolerancia) {
-              console.log("[Auth] Plano expirado mas dentro da tolerância de 5min.");
-            }
-          }
-
-          // ADMIN: bypass total se email for o do dono
-          const isOwnerByRole = userEmail && userEmail.includes('rodrigoalmeidja');
-          setIsAdmin(isOwnerByRole);
-          if (isOwnerByRole) {
-            planoNormalizado = 'premium';
-            console.log("[Auth] Admin detectado, acesso total liberado.");
-          }
-
-          console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
-          setPlanoUsuario(planoNormalizado);
-          
-          let liberados = profile.preparatorios_liberados || [];
-          if (typeof liberados === 'string') {
-            try { liberados = JSON.parse(liberados); } catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
-          }
-          if (!Array.isArray(liberados)) liberados = [];
-          setPreparatoriosLiberados(liberados);
-          
-          setCarregandoAcesso(false);
-        }
-      } catch (e) {
-        console.error("[Auth] Erro catastrófico no carregarPerfil:", e);
-        if (mounted) {
-          setPlanoUsuario('basico');
-          setCarregandoAcesso(false);
-        }
-      }
-    };
-
-
-    const inicializarSessao = async () => {
-      try {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error("[Auth] Erro ao obter usuário inicial:", error);
-          // Garante que a tela de loading nunca trave quando há erro
-          if (mounted) setCarregandoAcesso(false);
-          return;
-        }
-
-        if (currentUser && mounted) {
-          console.log("[Auth] AulaPage: Usuário detectado:", currentUser.email);
-          setUser(currentUser);
-          await carregarPerfil(currentUser);
-        } else if (mounted) {
-          // Usuário não está logado — libera a tela de carregamento
-          console.log("[Auth] AulaPage: Nenhum usuário autenticado.");
-          setPlanoUsuario('basico');
-          setCarregandoAcesso(false);
-        }
-      } catch (err) {
-        console.error("[Auth] Falha no inicializarSessao:", err);
-        // Garante que a tela de loading nunca trave em caso de exceção
-        if (mounted) setCarregandoAcesso(false);
-      }
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] AulaPage: Evento ${event}`, session?.user?.email || 'sem usuário');
-      // INITIAL_SESSION: disparado imediatamente ao montar o componente com sessão já existente
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser && mounted) {
-          setUser(currentUser);
-          await carregarPerfil(currentUser);
-        } else if (mounted && event === 'INITIAL_SESSION') {
-          // Sem sessão no evento inicial — libera o loading
-          setPlanoUsuario('basico');
-          setCarregandoAcesso(false);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        if (mounted) {
-          setUser(null);
-          setUserName('Aluno');
-          setIsAdmin(false);
-          setPlanoUsuario('basico');
-          setCarregandoAcesso(false);
-        }
-      }
-    });
-
-    inicializarSessao();
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    if (!authLoading) {
+      setTemAcesso(true);
+    }
+  }, [authLoading]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await contextHandleLogout();
     navigate('/');
   };
 
@@ -378,18 +205,13 @@ function AulaPage() {
     if (!user || !aulaId) return;
 
     const carregarAnotacao = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('anotacoes')
         .select('conteudo')
         .eq('user_id', user.id)
         .eq('aula_id', aulaId)
         .single();
-      
-      if (data) {
-        setAnotacao(data.conteudo);
-      } else {
-        setAnotacao('');
-      }
+      setAnotacao(data ? data.conteudo : '');
     };
 
     carregarAnotacao();
@@ -401,9 +223,9 @@ function AulaPage() {
 
     const { error } = await supabase
       .from('anotacoes')
-      .upsert({ 
-        user_id: user.id, 
-        aula_id: aulaId, 
+      .upsert({
+        user_id: user.id,
+        aula_id: aulaId,
         conteudo: novoConteudo,
         updated_at: new Date()
       }, { onConflict: 'user_id,aula_id' });
@@ -419,25 +241,9 @@ function AulaPage() {
     if (anotacao === '') return;
     const delayDebounceFn = setTimeout(() => {
       salvarAnotacao(anotacao);
-    }, 2000); // Salva após 2 segundos de inatividade
-
+    }, 2000);
     return () => clearTimeout(delayDebounceFn);
   }, [anotacao]);
-
-  // Verificar acesso do aluno baseado no plano e nível da aula
-  // (a lógica detalhada de bloqueio por nível já é feita no isBloqueada abaixo)
-  // Apenas garante que o acesso básico seja permitido enquanto carrega
-  useEffect(() => {
-    if (planoUsuario !== 'carregando') {
-      // Admin e premium sempre têm acesso total
-      if (isAdmin || planoUsuario === 'premium') {
-        setTemAcesso(true);
-      } else {
-        setTemAcesso(true); // O bloqueio granular por nível é feito pelo isBloqueada
-      }
-      setCarregandoAcesso(false);
-    }
-  }, [planoUsuario, isAdmin]);
 
   // Buscar dados da disciplina, módulo e aulas
   useEffect(() => {
@@ -1661,9 +1467,10 @@ function AulaPage() {
   const progressoPercentual = duracao > 0 ? (tempoAtual / duracao) * 100 : 0;
 
   // Tela de carregamento
-  if (carregandoAcesso || planoUsuario === 'carregando') {
+  if (authLoading) {
     return <LoadingScreen text="Verificando seu acesso..." />;
   }
+
 
   // Verificação de bloqueio baseada no nível da aula
   const nivelAula = aulaPlaying?.nivel || 'basico'; // Pega o nível da aula (basico, medio, premium)

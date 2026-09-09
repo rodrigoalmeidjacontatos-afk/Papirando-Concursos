@@ -4,16 +4,15 @@ import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
 import EvolucaoQuestoes from '../components/EvolucaoQuestoes';
 import './Home.css';
+import { useAuth } from '../contexts/AuthContext';
 
 function Home() {
   const navigate = useNavigate();
+
+  // Auth vem do contexto global — sem re-verificar a cada montagem
+  const { user, userName, setUserName, planoUsuario, dataExpiracao, avatarUrl, setAvatarUrl, authLoading, handleLogout: contextHandleLogout } = useAuth();
+
   const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
-  const [user, setUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [userName, setUserName] = useState(() => sessionStorage.getItem('papirando_nome') || 'Aluno');
-  const [planoUsuario, setPlanoUsuario] = useState(() => sessionStorage.getItem('papirando_plano') || 'basico'); 
-  const [dataExpiracao, setDataExpiracao] = useState(null); 
-  const [avatarUrl, setAvatarUrl] = useState(() => sessionStorage.getItem('papirando_avatar') || null);
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
@@ -45,7 +44,15 @@ function Home() {
   };
 
   const [showConfig, setShowConfig] = useState(false);
-  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState(userName || '');
+
+  const handleLogout = async () => {
+    await contextHandleLogout();
+    navigate('/');
+  };
+
+  // Criar refs para cada carrossel
+  const carouselRefs = useRef({});
 
   // === SINO: buscar preparatórios atualizados ===
   useEffect(() => {
@@ -67,166 +74,6 @@ function Home() {
     };
     buscarAtualizacoes();
   }, []);
-
-  // ===============================================
-
-  // Criar refs para cada carrossel
-  const carouselRefs = useRef({});
-
-  // Pegar usuário logado
-  useEffect(() => {
-    let mounted = true;
-
-    const carregarPerfil = async (userObj) => {
-      if (!userObj?.id) return;
-      const userEmail = userObj.email?.toLowerCase() || '';
-      const nomeProvisorio = userEmail.split('@')[0] || 'Aluno';
-
-      try {
-        console.log(`[Auth] Home: Carregando perfil para: ${userEmail}`);
-        
-        // 1. TENTA BUSCAR PELO ID (Padrão)
-        let { data: profile, error } = await withTimeout(supabase
-          .from('profiles')
-          .select('id, plano, plano_anterior, avatar_url, display_name, data_expiracao')
-          .eq('id', userObj.id)
-          .maybeSingle(), 5000);
-
-        // 2. SE NÃO ACHOU PELO ID, TENTA PELO E-MAIL (Sincronização de contas órfãs)
-        if (!profile && !error && userEmail) {
-          console.log("[Auth] Perfil não achado por ID, tentando por e-mail...");
-          const { data: profileByEmail } = await withTimeout(supabase
-            .from('profiles')
-            .select('id, plano, plano_anterior, avatar_url, display_name, data_expiracao')
-            .eq('email', userEmail)
-            .maybeSingle(), 5000);
-          
-          if (profileByEmail) {
-            console.log("[Auth] Perfil achado por e-mail! Sincronizando ID...");
-            // Atualiza o perfil antigo com o novo ID de autenticação
-            const { data: updated } = await withTimeout(supabase
-              .from('profiles')
-              .update({ id: userObj.id })
-              .eq('id', profileByEmail.id)
-              .select()
-              .single(), 5000);
-            if (updated) profile = updated;
-          }
-        }
-
-        // 3. SE AINDA NÃO EXISTE NADA, CRIA UM NOVO
-        if (!profile && !error && mounted) {
-          console.log("[Auth] Criando perfil totalmente novo para:", userEmail);
-          const novoPerfil = { id: userObj.id, email: userEmail, plano: 'basico', display_name: nomeProvisorio };
-          const { data: created } = await withTimeout(supabase.from('profiles').insert([novoPerfil]).select().single(), 5000);
-          if (created) profile = created;
-        }
-
-        if (profile && mounted) {
-          // Normalização robusta com trim()
-          let planoNormalizado = String(profile.plano || 'basico')
-            .toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          
-          console.log(`[Home] User: ${userEmail} | Plano Banco: "${profile.plano}" | Normalizado: "${planoNormalizado}"`);
-          
-          if (profile.data_expiracao && new Date(profile.data_expiracao) < new Date()) {
-             if (!userEmail.includes('rodrigoalmeidja')) {
-                 planoNormalizado = profile.plano_anterior || 'basico';
-                 supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', profile.id).then(()=>console.log('[Auth] Plano expirado e revertido'));
-             }
-          }
-
-          if (userEmail.includes('rodrigoalmeidja')) planoNormalizado = 'premium';
-
-          setPlanoUsuario(planoNormalizado);
-          setDataExpiracao(profile.data_expiracao);
-          sessionStorage.setItem('papirando_plano', planoNormalizado);
-          
-          setAvatarUrl(profile.avatar_url || null);
-          if (profile.avatar_url) sessionStorage.setItem('papirando_avatar', profile.avatar_url);
-          
-          const nomeFinal = profile.display_name || nomeProvisorio;
-          setUserName(nomeFinal);
-          sessionStorage.setItem('papirando_nome', nomeFinal);
-          
-          setNewDisplayName(nomeFinal);
-        } else if (mounted) {
-          const planoFallback = userEmail.includes('rodrigoalmeidja') ? 'premium' : 'basico';
-          setPlanoUsuario(planoFallback);
-          sessionStorage.setItem('papirando_plano', planoFallback);
-          setUserName(nomeProvisorio);
-          sessionStorage.setItem('papirando_nome', nomeProvisorio);
-        }
-      } catch (e) {
-        console.error("[Auth] Erro crítico no carregamento de perfil:", e);
-      }
-    };
-
-    // getSession() lê do localStorage instantaneamente (sem rede)
-    // evita o flash de "deslogado" ao navegar de volta para a Home
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log("[Auth] Sessão local detectada:", session.user.email);
-          setUser(session.user);
-          setAuthChecked(true); // libera a UI imediatamente, sem flash
-          carregarPerfil(session.user); // carrega perfil em background (sem await)
-        } else {
-          console.log("[Auth] Sem sessão local.");
-          setAuthChecked(true);
-        }
-      } catch (err) {
-        console.error("[Auth] Falha no init:", err);
-        setAuthChecked(true);
-      }
-    };
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] Evento recebido: ${event}`, session?.user?.email || 'sem usuário');
-      
-      if (session?.user) {
-        setUser(session.user);
-        if (!mounted) return;
-        await carregarPerfil(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        console.log("[Auth] Logout detectado.");
-        setUser(null);
-        setUserName('Aluno');
-        setPlanoUsuario('basico');
-        setAvatarUrl(null);
-        sessionStorage.removeItem('papirando_plano');
-        sessionStorage.removeItem('papirando_nome');
-        sessionStorage.removeItem('papirando_avatar');
-      }
-      if (mounted) setAuthChecked(true);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // BYPASS DE EMERGÊNCIA: Força Premium para o Admin em tempo real
-  useEffect(() => {
-    if (user?.email?.toLowerCase().includes('rodrigoalmeidja')) {
-      if (planoUsuario !== 'premium') {
-        console.log("[Auth] Bypass Ativo: Forçando plano Premium para Admin.");
-        setPlanoUsuario('premium');
-      }
-    }
-  }, [user, planoUsuario]);
-
-  const handleLogout = async () => {
-    sessionStorage.removeItem('papirando_plano');
-    sessionStorage.removeItem('papirando_nome');
-    sessionStorage.removeItem('papirando_avatar');
-    await supabase.auth.signOut();
-    navigate('/');
-  };
 
   const trocarAvatar = async () => {
     // Agora damos a opção de link ou arquivo (via input invisível)
@@ -612,7 +459,7 @@ function Home() {
             )}
           </nav>
           <div style={styles.userArea} className="user-area">
-            {!authChecked ? (
+            {authLoading ? (
               <div style={{width: '120px', height: '38px'}} />
             ) : !user ? (
               <button 
@@ -980,7 +827,7 @@ function Home() {
               } else if (tipoAcesso === 'medio') {
                 bloqueado = planoUsuario !== 'medio' && planoUsuario !== 'premium';
               } else if (tipoAcesso === 'basico') {
-                bloqueado = authChecked && !user; // requer estar logado (pelo menos plano básico)
+                bloqueado = !authLoading && !user; // requer estar logado (pelo menos plano básico)
               } else {
                 bloqueado = false; // livre (visível para todos)
               }

@@ -4,10 +4,15 @@ import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
 import ContinuarEstudandoHero from '../components/ContinuarEstudandoHero';
 import { formatarUltimoAcesso, indiceAulaNoModulo, rotuloNumeroAula } from '../utils/aulaDuracao';
+import { useAuth } from '../contexts/AuthContext';
 
 function PreparatorioViewPage() {
   const { carreiraId, preparatorioId } = useParams();
   const navigate = useNavigate();
+
+  // Auth vem do contexto global — sem re-verificar a cada montagem
+  const { user, planoUsuario, userName, isAdmin, dataExpiracao, preparatoriosLiberados, authLoading } = useAuth();
+
   const [preparatorio, setPreparatorio] = useState(null);
   const [disciplinas, setDisciplinas] = useState([]);
   const [modulos, setModulos] = useState([]);
@@ -16,13 +21,7 @@ function PreparatorioViewPage() {
   const [disciplinasExpandidas, setDisciplinasExpandidas] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
-  const [planoUsuario, setPlanoUsuario] = useState('carregando');
-  const [user, setUser] = useState(null);
-  const [userName, setUserName] = useState('Aluno');
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [dataExpiracao, setDataExpiracao] = useState(null);
   const [progressoAulas, setProgressoAulas] = useState({});
-  const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
 
   const isRecente = (createdAtString) => {
     if (!createdAtString) return false;
@@ -33,121 +32,15 @@ function PreparatorioViewPage() {
   };
 
   useEffect(() => {
+    // Aguarda o contexto de auth terminar de carregar antes de buscar os dados
+    if (authLoading) return;
+
     let mounted = true;
-
-    const carregarPerfil = async (userObj) => {
-      if (!userObj) {
-        if (mounted) setPlanoUsuario('basico');
-        return;
-      }
-
-      // ADMIN: verifica email ANTES de qualquer consulta ao banco
-      const userEmail = userObj.email?.toLowerCase();
-      if (userEmail && userEmail.includes('rodrigoalmeidja')) {
-        if (mounted) {
-          setIsAdmin(true);
-          setPlanoUsuario('premium');
-          setUserName(userObj.email?.split('@')[0] || 'Admin');
-        }
-        return;
-      }
-
-      try {
-        console.log(`[Auth] Carregando perfil para: ${userObj.email}`);
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('plano, plano_anterior, display_name, data_expiracao, preparatorios_liberados')
-            .eq('id', userObj.id)
-            .single();
-            
-          if (error) {
-             console.error("[Auth] Erro ao buscar profile:", error);
-             if (mounted) setPlanoUsuario('basico');
-             return;
-          }
-  
-          if (mounted && profile) {
-            const planoDoBanco = profile.plano || 'basico';
-            const dataExp = profile.data_expiracao;
-            
-            // Normalização robusta do plano com trim()
-            let planoNormalizado = String(planoDoBanco).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || 'basico';
-            
-            console.log(`[PrepView] Plano Banco: "${planoDoBanco}" | Normalizado: "${planoNormalizado}"`);
-            
-            // Verificação de expiração com GRACE PERIOD (5 minutos)
-            if (dataExp) {
-              const dataExpiracaoDate = new Date(dataExp);
-              const agora = new Date();
-              const expirou = dataExpiracaoDate < agora;
-              const gracePeriodMs = 5 * 60 * 1000;
-              const dentroDaTolerancia = (agora - dataExpiracaoDate) < gracePeriodMs;
-  
-              if (expirou && !dentroDaTolerancia) {
-                console.log("[Auth] Plano expirado:", dataExp);
-                planoNormalizado = profile.plano_anterior || 'basico';
-                supabase.from('profiles').update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null }).eq('id', userObj.id);
-              }
-            }
-  
-            // ADMIN: bypass total se email for o do dono
-            const isOwnerByRole = userEmail && userEmail.includes('rodrigoalmeidja');
-            setIsAdmin(isOwnerByRole);
-            if (isOwnerByRole) {
-              planoNormalizado = 'premium';
-              console.log("[Auth] Admin detectado, acesso total liberado.");
-            }
-
-          console.log(`[Auth] Plano Final: ${planoNormalizado} (Banco: ${planoDoBanco})`);
-          setPlanoUsuario(planoNormalizado);
-          setUserName(profile.display_name || userObj.email?.split('@')[0] || 'Aluno');
-          setDataExpiracao(profile.data_expiracao);
-          
-          let liberados = profile.preparatorios_liberados || [];
-          if (typeof liberados === 'string') {
-            try { liberados = JSON.parse(liberados); } catch (e) { liberados = liberados.split(',').map(s => s.trim()); }
-          }
-          if (!Array.isArray(liberados)) liberados = [];
-          setPreparatoriosLiberados(liberados);
-        } else if (mounted) {
-          setPlanoUsuario('basico');
-          setDataExpiracao(null);
-        }
-      } catch (e) {
-        console.error("[Auth] Erro catastrófico no carregarPerfil:", e);
-        if (mounted) setPlanoUsuario('basico');
-      }
-    };
-
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] PreparatorioView: Evento ${event}`, session?.user?.email || 'sem usuário');
-      if (session?.user && mounted) {
-        setUser(session.user);
-        await carregarPerfil(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        if (mounted) {
-          setUser(null);
-          setPlanoUsuario('basico');
-        }
-      }
-    });
 
     const carregarTudo = async () => {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Primeiro garante a sessão e o perfil
-        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-        if (authError) console.error("[Auth] Erro ao obter usuário:", authError);
-
-        if (currentUser && mounted) {
-          setUser(currentUser);
-          await carregarPerfil(currentUser);
-        } else if (mounted) {
-          setPlanoUsuario('basico');
-        }
-
         // Helper para contornar limite de 1000 rows do Supabase
         const fetchAll = async (table, query = '*') => {
           let allRows = [];
@@ -163,14 +56,14 @@ function PreparatorioViewPage() {
           return allRows;
         };
 
-        // 2. Depois carrega os dados da página
+        // 1. Carrega os dados da página
         const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
         if (mounted) setPreparatorio(prepData);
 
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
         if (mounted) setDisciplinas(discData || []);
 
-        // Busca os vínculos PRIMEIRO (com paginação para evitar limite de 1000 rows se houver "Selecionar Tudo")
+        // Busca os vínculos (com paginação)
         let vData = [];
         let vFrom = 0;
         let vDone = false;
@@ -192,21 +85,16 @@ function PreparatorioViewPage() {
             const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
             const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            // Para garantir que não haja erros de URL longa (HTTP 414), buscamos tudo paginado e filtramos localmente.
             const modData = await fetchAll('modulos');
             const aulaData = await fetchAll('aulas');
 
             let modulosFiltrados = modData;
             let aulasCarregadas = aulaData;
 
-            // Se há Vínculos modernos definidos (módulo ou aula específicos), aplicamos o filtro.
-            // Se não, o curso é legado e todas as aulas e módulos são exibidos livremente.
             if (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0) {
               modulosFiltrados = modData.filter(m => modulosPermitidos.includes(m.id));
-              
-              // Uma aula é permitida se o seu módulo inteiro foi vinculado, OU se ela mesma foi vinculada individualmente.
-              aulasCarregadas = aulaData.filter(a => 
-                modulosCompletos.includes(a.modulo_id || a.moduloId) || 
+              aulasCarregadas = aulaData.filter(a =>
+                modulosCompletos.includes(a.modulo_id || a.moduloId) ||
                 aulasPermitidasIds.includes(a.id)
               );
             }
@@ -216,23 +104,23 @@ function PreparatorioViewPage() {
             setModulos(modulosFiltrados);
             setAulas(aulasFinal);
           } else {
-            // Fallback legado: carrega TODOS os módulos e TODAS as aulas do sistema (paginado para evitar limite de 1000)
+            // Fallback legado
             const modData = await fetchAll('modulos');
             const aulaData = await fetchAll('aulas');
-            
+
             aulasFinal = aulaData.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
             setModulos(modData);
             setAulas(aulasFinal);
           }
         }
 
-        // 3. Buscar progresso do usuário para essas aulas
+        // 2. Buscar progresso do usuário para essas aulas
         let progressoMap = {};
-        if (currentUser && aulasFinal.length > 0) {
+        if (user && aulasFinal.length > 0) {
           const { data: progressoData } = await supabase
             .from('progresso')
             .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
-            .eq('user_id', currentUser.id);
+            .eq('user_id', user.id);
 
           if (progressoData) {
             progressoData.forEach(p => {
@@ -255,9 +143,8 @@ function PreparatorioViewPage() {
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
-  }, [preparatorioId, carreiraId]);
+  }, [preparatorioId, carreiraId, authLoading, user]);
 
   const toggleModulo = (moduloId) => {
     setModulosExpandidos(prev => ({ ...prev, [moduloId]: !prev[moduloId] }));
@@ -451,7 +338,7 @@ function PreparatorioViewPage() {
     navigate(`/aula/${carreiraId}/${preparatorioId}/${disc.id}/${mod.id}/${aula.id}`);
   };
 
-  if (carregando || planoUsuario === 'carregando') return <LoadingScreen text="Verificando seu acesso..." />;
+  if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
   if (erro) return <div style={styles.loading}>Erro: {erro}</div>;
   if (!preparatorio) return <LoadingScreen />;
 

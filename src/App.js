@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import Home from './Pages/Home';
 import CategoriaPage from './Pages/CategoriaPage';
 import CarreiraPage from './Pages/CarreiraPage';
@@ -13,22 +14,24 @@ import QuestoesPage from './Pages/QuestoesPage';
 
 function App() {
   return (
-    <Router>
-      <div style={{ backgroundColor: '#0A0A0A', minHeight: '100vh', color: '#F5F5F5' }}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/categoria/:categoriaId" element={<CategoriaPage />} />
-          <Route path="/carreira/:carreiraId" element={<CarreiraPage />} />
-          <Route path="/preparatorio/:carreiraId/:preparatorioId" element={<PreparatorioViewPage />} />
-          <Route path="/aula/:carreiraId/:preparatorioId/:disciplinaId/:moduloId/:aulaId" element={<AulaPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/planos" element={<PlanosPage />} />
-          <Route path="/documentos" element={<DocumentosPage />} />
-          <Route path="/questoes" element={<QuestoesPage />} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div style={{ backgroundColor: '#0A0A0A', minHeight: '100vh', color: '#F5F5F5' }}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/categoria/:categoriaId" element={<CategoriaPage />} />
+            <Route path="/carreira/:carreiraId" element={<CarreiraPage />} />
+            <Route path="/preparatorio/:carreiraId/:preparatorioId" element={<PreparatorioViewPage />} />
+            <Route path="/aula/:carreiraId/:preparatorioId/:disciplinaId/:moduloId/:aulaId" element={<AulaPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/planos" element={<PlanosPage />} />
+            <Route path="/documentos" element={<DocumentosPage />} />
+            <Route path="/questoes" element={<QuestoesPage />} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

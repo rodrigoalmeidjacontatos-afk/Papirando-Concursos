@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import { supabase } from '../services/supabase';
 import QuestaoCard from '../components/QuestaoCard';
+import { useAuth } from '../contexts/AuthContext';
 
 // Busca todos os IDs do banco e filtra client-side pelo prefixo do UUID.
 // Abordagem simples e confiável: evita problemas com cast id::text no PostgREST.
@@ -22,8 +23,7 @@ async function buscarIdsPorPrefixoUUID(prefixo) {
 
 export default function QuestoesPage() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const isAdmin = user?.email?.toLowerCase()?.includes('rodrigoalmeidja');
+  const { user, isAdmin } = useAuth();
   
   const [questoes, setQuestoes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,12 +65,8 @@ export default function QuestoesPage() {
     placeholder: (base) => ({ ...base, color: '#888' })
   };
 
-  // Carrega Usuário e Opções de Filtro
+  // Carrega Opções de Filtro (user já vem do contexto)
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUser(user);
-    });
-    
     // Busca os valores únicos para popular os dropdowns
     const fetchOpcoes = async () => {
       try {
