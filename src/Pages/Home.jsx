@@ -640,7 +640,7 @@ function Home() {
                       padding: '2px 6px',
                       borderRadius: '4px'
                     }}>
-                      {planoUsuario}
+                      {planoUsuario && planoUsuario !== 'carregando' ? planoUsuario : (localStorage.getItem('papirando_plano_cache') || 'basico')}
                     </span>
                     <button 
                       onClick={handleLogout} 
@@ -730,7 +730,7 @@ function Home() {
               <div style={{width: '100%', padding: '15px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px'}}>
                 <p style={{margin: 0, color: '#888', fontSize: '12px'}}>Plano Atual:</p>
                 <p style={{margin: '5px 0 0', color: planoUsuario === 'premium' ? '#FFD700' : '#2196F3', fontWeight: 'bold', textTransform: 'uppercase'}}>
-                   {planoUsuario}
+                   {planoUsuario && planoUsuario !== 'carregando' ? planoUsuario : (localStorage.getItem('papirando_plano_cache') || 'basico')}
                 </p>
               </div>
 
