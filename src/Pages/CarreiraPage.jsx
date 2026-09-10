@@ -85,6 +85,15 @@ function CarreiraPage() {
         console.log(`[CarreiraPage] Plano: "${planoUsuario}" | TipoAcesso: "${tipoAcesso}" | Admin: ${isAdmin}`);
 
         if (user) {
+          // Se a categoria for exclusiva para administradores
+          if (tipoAcesso === 'admin' && !isAdmin) {
+            if (mounted) {
+              setPreparatorios(prepsFiltrados);
+              setPrepsComAcesso([]);
+            }
+            return;
+          }
+
           // ====================================================
           // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
           // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
@@ -118,7 +127,7 @@ function CarreiraPage() {
         } else {
           // Usuário não logado
           if (mounted) {
-            if (tipoAcesso === 'restrito') {
+            if (tipoAcesso === 'restrito' || tipoAcesso === 'admin') {
               setPreparatorios(prepsFiltrados);
               setPrepsComAcesso([]);
             } else {

@@ -1709,6 +1709,7 @@ function AdminPage() {
                             padding: '3px 10px',
                             borderRadius: '12px',
                             background:
+                              cat.tipo_acesso === 'admin'   ? 'linear-gradient(135deg, #e50914, #b20710)' :
                               cat.tipo_acesso === 'premium' ? 'linear-gradient(135deg, #f5a623, #e8880a)' :
                               cat.tipo_acesso === 'medio'   ? 'linear-gradient(135deg, #4a90e2, #2c6fbd)' :
                               cat.tipo_acesso === 'basico'  ? 'linear-gradient(135deg, #27ae60, #1e8449)' :
@@ -1717,7 +1718,8 @@ function AdminPage() {
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px'
                           }}>
-                            {cat.tipo_acesso === 'premium' ? '⭐ Premium' :
+                            {cat.tipo_acesso === 'admin'   ? '🔴 Admin' :
+                             cat.tipo_acesso === 'premium' ? '⭐ Premium' :
                              cat.tipo_acesso === 'medio'   ? '🔵 Médio' :
                              cat.tipo_acesso === 'basico'  ? '🟢 Básico' :
                              '🌐 Livre'}

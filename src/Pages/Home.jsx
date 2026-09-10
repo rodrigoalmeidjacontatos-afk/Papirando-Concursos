@@ -10,7 +10,7 @@ function Home() {
   const navigate = useNavigate();
 
   // Auth vem do contexto global — sem re-verificar a cada montagem
-  const { user, userName, setUserName, planoUsuario, dataExpiracao, avatarUrl, setAvatarUrl, authLoading, handleLogout: contextHandleLogout } = useAuth();
+  const { user, userName, setUserName, planoUsuario, dataExpiracao, avatarUrl, setAvatarUrl, authLoading, isAdmin: authIsAdmin, handleLogout: contextHandleLogout } = useAuth();
 
   const [categorias, setCategorias] = useState(() => {
     try {
@@ -165,7 +165,7 @@ function Home() {
   };
 
   // Verificar se é admin (e-mails autorizados)
-  const isAdmin = user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com';
+  const isAdmin = authIsAdmin || user?.email?.toLowerCase() === 'rodrigoalmeidja@gmail.com';
 
   // Carregar categorias e carreiras do Supabase
   useEffect(() => {
@@ -887,6 +887,7 @@ function Home() {
 
             {categorias.map((categoria) => {
               const tipoAcesso = categoria.tipo_acesso || 'livre';
+              if (tipoAcesso === 'admin' && !isAdmin) return null;
               let bloqueado = false;
               
               if (tipoAcesso === 'premium') {
