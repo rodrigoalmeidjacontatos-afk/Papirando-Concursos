@@ -222,15 +222,22 @@ function AdminPage() {
     }
   };
 
-  const notificarUsuarioEmTempoReal = (userId, novoPlano) => {
+  const notificarUsuarioEmTempoReal = (userId, email, novoPlano) => {
     try {
-      const ch = supabase.channel('global-user-sync');
+      const ch = supabase.channel('global-user-sync', {
+        config: { broadcast: { ack: false } }
+      });
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           ch.send({
             type: 'broadcast',
             event: 'sync-user',
-            payload: { userId, novoPlano, timestamp: Date.now() }
+            payload: {
+              userId: userId ? String(userId) : null,
+              email: email ? String(email).toLowerCase() : null,
+              novoPlano,
+              timestamp: Date.now()
+            }
           });
         }
       });
@@ -278,8 +285,10 @@ function AdminPage() {
     
     if (!error) {
       console.log(`[Admin] Plano de ${userId} atualizado com sucesso!`);
-      notificarUsuarioEmTempoReal(userId, novoPlano);
-      alert(`✅ Plano alterado para ${novoPlano.toUpperCase()}!`);
+      notificarUsuarioEmTempoReal(userId, usuarioAtual?.email, novoPlano);
+      setTimeout(() => {
+        alert(`✅ Plano alterado para ${novoPlano.toUpperCase()}!`);
+      }, 100);
     } else {
       console.error("[Admin] Erro ao atualizar plano no Supabase:", error);
       setUsuarios(backupUsuarios); // Reverte em caso de erro
@@ -340,11 +349,13 @@ function AdminPage() {
       .eq('id', userId);
       
     if (!error) {
-      notificarUsuarioEmTempoReal(userId, updates.plano || usuarioAtual?.plano);
+      notificarUsuarioEmTempoReal(userId, usuarioAtual?.email, updates.plano || usuarioAtual?.plano);
       const msg = dataFinal 
         ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
         : 'Acesso Vitalício!';
-      alert(`✅ Sucesso! ${msg}`);
+      setTimeout(() => {
+        alert(`✅ Sucesso! ${msg}`);
+      }, 100);
     } else {
       setUsuarios(backupUsuarios);
       alert('❌ Erro ao atualizar: ' + error.message);
@@ -400,10 +411,12 @@ function AdminPage() {
       .update({ preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados })
       .eq('id', usuarioEditandoAcesso.id);
     if (!error) {
-      notificarUsuarioEmTempoReal(usuarioEditandoAcesso.id, usuarioEditandoAcesso.plano);
+      notificarUsuarioEmTempoReal(usuarioEditandoAcesso.id, usuarioEditandoAcesso.email, usuarioEditandoAcesso.plano);
       setUsuarios(prev => prev.map(u => u.id === usuarioEditandoAcesso.id ? { ...u, preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados } : u));
       setUsuarioEditandoAcesso(null);
-      alert('✅ Acesso atualizado com sucesso!');
+      setTimeout(() => {
+        alert('✅ Acesso atualizado com sucesso!');
+      }, 100);
     } else {
       alert('❌ Erro ao salvar acesso: ' + error.message);
     }

@@ -1,24 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Usa cache do sessionStorage para evitar flash de "deslogado" ao navegar
+  const location = useLocation();
+
   const [user, setUser] = useState(null);
-  const [planoUsuario, setPlanoUsuario] = useState(
-    () => sessionStorage.getItem('papirando_plano') || 'carregando'
-  );
-  const [userName, setUserName] = useState(
-    () => sessionStorage.getItem('papirando_nome') || 'Aluno'
-  );
-  const [avatarUrl, setAvatarUrl] = useState(
-    () => sessionStorage.getItem('papirando_avatar') || null
-  );
+  const [planoUsuario, setPlanoUsuario] = useState('carregando');
+  const [userName, setUserName] = useState('Aluno');
+  const [avatarUrl, setAvatarUrl] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [preparatoriosLiberados, setPreparatoriosLiberados] = useState([]);
   const [dataExpiracao, setDataExpiracao] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Semáforo para evitar requisições concorrentes idênticas
+  const carregandoPerfilRef = useRef(false);
 
   const aplicarPerfil = useCallback((profile, userObj) => {
     if (!userObj) return;
@@ -31,8 +30,6 @@ export function AuthProvider({ children }) {
       setIsAdmin(true);
       setPlanoUsuario('premium');
       setUserName(nome);
-      sessionStorage.setItem('papirando_plano', 'premium');
-      sessionStorage.setItem('papirando_nome', nome);
       setAuthLoading(false);
       return;
     }
@@ -40,7 +37,6 @@ export function AuthProvider({ children }) {
     if (!profile) {
       console.warn('[AuthContext] Perfil não encontrado, usando basico.');
       setPlanoUsuario('basico');
-      sessionStorage.setItem('papirando_plano', 'basico');
       setAuthLoading(false);
       return;
     }
@@ -93,10 +89,6 @@ export function AuthProvider({ children }) {
     setPreparatoriosLiberados(liberados);
     setAvatarUrl(profile.avatar_url || null);
     setIsAdmin(false);
-
-    sessionStorage.setItem('papirando_plano', planoNormalizado);
-    sessionStorage.setItem('papirando_nome', nomeFinal);
-    if (profile.avatar_url) sessionStorage.setItem('papirando_avatar', profile.avatar_url);
     setAuthLoading(false);
   }, []);
 
@@ -115,11 +107,12 @@ export function AuthProvider({ children }) {
       setIsAdmin(true);
       setPlanoUsuario('premium');
       setUserName(nome);
-      sessionStorage.setItem('papirando_plano', 'premium');
-      sessionStorage.setItem('papirando_nome', nome);
       setAuthLoading(false);
       return;
     }
+
+    if (carregandoPerfilRef.current) return;
+    carregandoPerfilRef.current = true;
 
     try {
       // 1. Tenta buscar pelo ID (padrão Supabase)
@@ -146,7 +139,6 @@ export function AuthProvider({ children }) {
 
       // 2. Se não achou por ID, tenta por e-mail (sincronização de contas órfãs ou recriadas)
       if (!profile && userEmail) {
-        console.log('[AuthContext] Perfil não achado por ID, buscando por e-mail:', userEmail);
         const { data: profileByEmail, error: emailErr } = await supabase
           .from('profiles')
           .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
@@ -154,33 +146,22 @@ export function AuthProvider({ children }) {
           .maybeSingle();
 
         if (profileByEmail && !emailErr) {
-          console.log('[AuthContext] Perfil localizado por e-mail! Sincronizando ID com a conta atual...');
-          // Atualiza o ID do perfil com o novo ID de autenticação do usuário
-          await supabase
-            .from('profiles')
-            .update({ id: userObj.id })
-            .eq('id', profileByEmail.id);
-          profile = { ...profileByEmail, id: userObj.id };
+          profile = profileByEmail;
         }
       }
 
-      if (error && !profile) {
-        console.warn('[AuthContext] Erro ao buscar perfil:', error?.message);
-      }
-
-      if (!profile) {
+      if (profile) {
+        aplicarPerfil(profile, userObj);
+      } else {
         console.warn('[AuthContext] Perfil não encontrado para o usuário, usando básico.');
         setPlanoUsuario('basico');
-        sessionStorage.setItem('papirando_plano', 'basico');
         setAuthLoading(false);
-        return;
       }
-
-      aplicarPerfil(profile, userObj);
     } catch (e) {
       console.error('[AuthContext] Erro ao carregar perfil:', e);
-      setPlanoUsuario('basico');
       setAuthLoading(false);
+    } finally {
+      carregandoPerfilRef.current = false;
     }
   }, [aplicarPerfil]);
 
@@ -263,9 +244,6 @@ export function AuthProvider({ children }) {
         setDataExpiracao(null);
         setAvatarUrl(null);
         setAuthLoading(false);
-        sessionStorage.removeItem('papirando_plano');
-        sessionStorage.removeItem('papirando_nome');
-        sessionStorage.removeItem('papirando_avatar');
       }
     });
 
@@ -278,23 +256,43 @@ export function AuthProvider({ children }) {
     };
   }, [carregarPerfil]);
 
-  // Sincronização em TEMPO REAL (Supabase Realtime) e Revalidação ao focar na aba
+  // =========================================================================
+  // 1. VERIFICAÇÃO EM TODAS AS ALAS (AO NAVEGAR ENTRE ROTAS/PÁGINAS)
+  // Sempre que o aluno entra em qualquer ala (/carreira, /preparatorio, /aula, /, etc.),
+  // revalida imediatamente o plano com o Supabase em segundo plano.
+  // =========================================================================
+  useEffect(() => {
+    if (user?.id) {
+      carregarPerfil(user);
+    }
+  }, [location.pathname, user, carregarPerfil]);
+
+  // =========================================================================
+  // 2. SINCRONIZAÇÃO INSTANTÂNEA EM TEMPO REAL (< 200ms) + HEARTBEAT DE 1.5s
+  // =========================================================================
   useEffect(() => {
     if (!user?.id) return;
 
-    // 1. Canal Realtime para escutar atualizações instantâneas no perfil do usuário via WebSocket Broadcast
+    // A. Canal Realtime Broadcast ultra-rápido (<200ms)
     const channel = supabase
-      .channel('global-user-sync')
+      .channel('global-user-sync', {
+        config: { broadcast: { ack: false } }
+      })
       .on(
         'broadcast',
         { event: 'sync-user' },
         (payload) => {
           const data = payload?.payload;
-          if (data && (data.userId === user.id || data.email === user.email)) {
+          if (!data) return;
+
+          const isTargetUser = 
+            (data.userId && String(data.userId) === String(user.id)) ||
+            (data.email && user.email && String(data.email).toLowerCase() === String(user.email).toLowerCase());
+
+          if (isTargetUser) {
             console.log('[AuthContext] ⚡ Alteração instantânea recebida do Admin:', data.novoPlano);
             if (data.novoPlano) {
               setPlanoUsuario(data.novoPlano);
-              sessionStorage.setItem('papirando_plano', data.novoPlano);
             }
             carregarPerfil(user);
           }
@@ -323,33 +321,27 @@ export function AuthProvider({ children }) {
         console.log(`[AuthContext] Status Realtime: ${status}`);
       });
 
-    // 2. Revalidação ao focar na aba ou voltar de segundo plano
-    let lastCheck = 0;
+    // B. Revalidação ao focar na aba ou retornar ao app
     const handleRevalidate = () => {
-      const now = Date.now();
-      if (document.visibilityState === 'visible' && now - lastCheck > 1500) {
-        lastCheck = now;
-        console.log('[AuthContext] Revalidando perfil ao focar na aba...');
+      if (document.visibilityState === 'visible') {
         carregarPerfil(user);
       }
     };
 
     window.addEventListener('focus', handleRevalidate);
     window.addEventListener('visibilitychange', handleRevalidate);
-    window.addEventListener('popstate', handleRevalidate);
 
-    // 3. Heartbeat periódico a cada 5 segundos para garantir sincronismo contínuo
+    // C. Heartbeat periódico a cada 1.5s para sincronismo automático permanente
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         carregarPerfil(user);
       }
-    }, 5000);
+    }, 1500);
 
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('focus', handleRevalidate);
       window.removeEventListener('visibilitychange', handleRevalidate);
-      window.removeEventListener('popstate', handleRevalidate);
       clearInterval(interval);
     };
   }, [user, carregarPerfil, aplicarPerfil]);

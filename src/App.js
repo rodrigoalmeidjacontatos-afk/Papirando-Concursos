@@ -14,8 +14,8 @@ import QuestoesPage from './Pages/QuestoesPage';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <div style={{ backgroundColor: '#0A0A0A', minHeight: '100vh', color: '#F5F5F5' }}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -30,8 +30,8 @@ function App() {
             <Route path="/questoes" element={<QuestoesPage />} />
           </Routes>
         </div>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
