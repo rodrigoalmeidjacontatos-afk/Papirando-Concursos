@@ -38,7 +38,9 @@ function PreparatorioViewPage() {
 
     const carregarTudo = async () => {
       if (!mounted) return;
-      setCarregando(true);
+      if (!preparatorio) {
+        setCarregando(true);
+      }
       try {
         // Helper para contornar limite de 1000 rows do Supabase
         const fetchAll = async (table, query = '*') => {
@@ -238,7 +240,7 @@ function PreparatorioViewPage() {
     return map;
   }, [disciplinasFiltradas, progressoAulas, modulos, aulas]);
 
-  if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
+  if ((authLoading && !preparatorio) || (carregando && !preparatorio)) return <LoadingScreen text="Carregando..." />;
 
   if (erro) {
     return (

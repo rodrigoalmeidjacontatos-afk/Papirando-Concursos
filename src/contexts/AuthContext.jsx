@@ -136,13 +136,17 @@ export function AuthProvider({ children }) {
 
     const nomeFinal = profile.display_name || userEmail.split('@')[0] || 'Aluno';
 
-    setPlanoUsuario(planoNormalizado);
-    setUserName(nomeFinal);
-    setDataExpiracao(dataExp);
-    setPreparatoriosLiberados(liberados);
-    setAvatarUrl(profile.avatar_url || null);
-    setIsAdmin(false);
-    setAuthLoading(false);
+    setPlanoUsuario(prev => (prev === planoNormalizado ? prev : planoNormalizado));
+    setUserName(prev => (prev === nomeFinal ? prev : nomeFinal));
+    setDataExpiracao(prev => (prev === dataExp ? prev : dataExp));
+    setPreparatoriosLiberados(prev => {
+      const prevJson = JSON.stringify(prev || []);
+      const nextJson = JSON.stringify(liberados || []);
+      return prevJson === nextJson ? prev : liberados;
+    });
+    setAvatarUrl(prev => (prev === (profile.avatar_url || null) ? prev : (profile.avatar_url || null)));
+    setIsAdmin(prev => (prev === false ? prev : false));
+    setAuthLoading(prev => (prev === false ? prev : false));
 
     try {
       localStorage.setItem('papirando_plano_cache', planoNormalizado);
@@ -415,12 +419,12 @@ export function AuthProvider({ children }) {
     window.addEventListener('focus', handleRevalidate);
     window.addEventListener('visibilitychange', handleRevalidate);
 
-    // C. Heartbeat periódico a cada 1.5s para sincronismo automático permanente
+    // C. Heartbeat de segurança periódico a cada 30s para sincronismo automático
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         carregarPerfil(user);
       }
-    }, 1500);
+    }, 30000);
 
     return () => {
       supabase.removeChannel(channel);

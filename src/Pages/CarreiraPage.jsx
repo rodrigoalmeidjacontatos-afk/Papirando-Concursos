@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
@@ -9,20 +9,28 @@ function CarreiraPage() {
   const navigate = useNavigate();
   const { user, planoUsuario, preparatoriosLiberados, isAdmin, authLoading } = useAuth();
 
-  const [carreira, setCarreira] = useState(null);
+  const [carreira, setCarreira] = useState(() => {
+    try {
+      const cacheCars = JSON.parse(localStorage.getItem('papirando_cars_cache') || '[]');
+      return cacheCars.find(s => s.id === carreiraId) || null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [preparatorios, setPreparatorios] = useState([]);
+  const [tipoAcesso, setTipoAcesso] = useState('livre');
   const [carregando, setCarregando] = useState(true);
-  // Para categoria 'restrito': lista de IDs de preps que o usuário tem acesso (null = sem restrição individual)
-  const [prepsComAcesso, setPrepsComAcesso] = useState(null);
 
+  // 1. Carrega os dados da carreira e preparatórios vinculados (depende apenas do carreiraId)
   useEffect(() => {
-    // Aguarda o contexto de auth terminar de carregar antes de buscar os dados
-    if (authLoading) return;
-
     let mounted = true;
 
     async function carregarDados() {
-      setCarregando(true);
+      // Só exibe a tela cheia de loading se ainda não temos os dados essenciais
+      if (!carreira) {
+        setCarregando(true);
+      }
+
       try {
         // 1. Buscar carreira
         let { data: carreirasData, error: carError } = await supabase.from('carreiras').select('*');
@@ -44,14 +52,15 @@ function CarreiraPage() {
         setCarreira(encontrada);
 
         // 1b. Buscar tipo_acesso da categoria desta carreira
-        let tipoAcesso = 'livre';
+        let catTipoAcesso = 'livre';
         if (encontrada) {
           const catId = encontrada.categoriaId || encontrada.categoria_id;
           if (catId) {
             const { data: catData } = await supabase.from('categorias').select('tipo_acesso').eq('id', catId).single();
-            tipoAcesso = catData?.tipo_acesso || 'livre';
+            catTipoAcesso = catData?.tipo_acesso || 'livre';
           }
         }
+        if (mounted) setTipoAcesso(catTipoAcesso);
 
         // 2. Buscar preparatórios
         const { data: prepsData } = await supabase.from('preparatorios').select('*');
@@ -79,61 +88,10 @@ function CarreiraPage() {
         // 4. Filtrar vinculados a esta carreira
         const carreiraVinculos = storedVinculos[carreiraId] || {};
         const prepIds = Object.keys(carreiraVinculos);
-        let prepsFiltrados = (prepsData || []).filter(p => prepIds.includes(p.id));
+        const prepsFiltrados = (prepsData || []).filter(p => prepIds.includes(p.id));
 
-        // 5. Aplicar lógica de acesso usando dados já prontos do contexto
-        console.log(`[CarreiraPage] Plano: "${planoUsuario}" | TipoAcesso: "${tipoAcesso}" | Admin: ${isAdmin}`);
-
-        if (user) {
-          // Se a categoria for exclusiva para administradores
-          if (tipoAcesso === 'admin' && !isAdmin) {
-            if (mounted) {
-              setPreparatorios(prepsFiltrados);
-              setPrepsComAcesso([]);
-            }
-            return;
-          }
-
-          // ====================================================
-          // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
-          // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
-          // ====================================================
-          if ((tipoAcesso === 'restrito' || planoUsuario === 'medio') && !isAdmin && planoUsuario !== 'premium') {
-            const liberadosNesseContexto = prepsFiltrados
-              .filter(p => preparatoriosLiberados.includes(`${carreiraId}:${p.id}`) || preparatoriosLiberados.includes(`*:${p.id}`))
-              .map(p => p.id);
-
-            if (mounted) {
-              setPreparatorios(prepsFiltrados);
-              setPrepsComAcesso(liberadosNesseContexto);
-            }
-            return;
-          }
-
-          // Lógica original de plano
-          if (!mounted) return;
-          if (planoUsuario === 'basico') {
-            setPreparatorios(prepsFiltrados);
-          } else if (planoUsuario === 'medio') {
-            if (preparatoriosLiberados.length > 0) {
-              setPreparatorios(prepsFiltrados.filter(p => preparatoriosLiberados.includes(p.id)));
-            } else {
-              setPreparatorios([]);
-            }
-          } else {
-            // premium ou admin
-            setPreparatorios(prepsFiltrados);
-          }
-        } else {
-          // Usuário não logado
-          if (mounted) {
-            if (tipoAcesso === 'restrito' || tipoAcesso === 'admin') {
-              setPreparatorios(prepsFiltrados);
-              setPrepsComAcesso([]);
-            } else {
-              setPreparatorios(prepsFiltrados);
-            }
-          }
+        if (mounted) {
+          setPreparatorios(prepsFiltrados);
         }
       } catch (err) {
         console.error('[CarreiraPage] Erro ao carregar dados:', err);
@@ -146,9 +104,38 @@ function CarreiraPage() {
 
     return () => { mounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carreiraId, authLoading, user?.id, planoUsuario, preparatoriosLiberados, isAdmin]);
+  }, [carreiraId]);
 
-  if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
+  // 2. Cálculo reativo de permissões em memória (useMemo síncrono e ultra-rápido, sem re-fetch e sem loading)
+  const prepsComAcesso = useMemo(() => {
+    if (user) {
+      // Se a categoria for exclusiva para administradores
+      if (tipoAcesso === 'admin' && !isAdmin) {
+        return [];
+      }
+
+      // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
+      // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
+      if ((tipoAcesso === 'restrito' || planoUsuario === 'medio') && !isAdmin && planoUsuario !== 'premium') {
+        const liberados = Array.isArray(preparatoriosLiberados) ? preparatoriosLiberados : [];
+        return preparatorios
+          .filter(p => liberados.includes(`${carreiraId}:${p.id}`) || liberados.includes(`*:${p.id}`))
+          .map(p => p.id);
+      }
+
+      return null;
+    } else {
+      // Usuário não logado
+      if (tipoAcesso === 'restrito' || tipoAcesso === 'admin') {
+        return [];
+      }
+      return null;
+    }
+  }, [user, tipoAcesso, isAdmin, planoUsuario, preparatoriosLiberados, preparatorios, carreiraId]);
+
+  if ((authLoading && !carreira) || (carregando && !carreira)) {
+    return <LoadingScreen text="Carregando..." />;
+  }
 
   if (!carreira) {
     return (
