@@ -32,63 +32,52 @@ function CarreiraPage() {
       }
 
       try {
-        // 1. Buscar carreira
-        let { data: carreirasData, error: carError } = await supabase.from('carreiras').select('*');
-        if (carError && (String(carError.message).includes('JWT') || carError.status === 401)) {
-          console.warn('[CarreiraPage] Token expirado ao buscar carreiras. Renovando...');
-          await supabase.auth.refreshSession();
-          const retry = await supabase.from('carreiras').select('*');
-          carreirasData = retry.data;
-        }
-
-        if (!mounted) return;
-        let encontrada = (carreirasData || []).find(s => s.id === carreiraId);
+        // 1. Tentar pegar carreira do cache imediatamente
+        let encontrada = carreira;
         if (!encontrada) {
           try {
             const cacheCars = JSON.parse(localStorage.getItem('papirando_cars_cache') || '[]');
             encontrada = cacheCars.find(s => s.id === carreiraId);
+            if (encontrada) setCarreira(encontrada);
           } catch (e) {}
         }
-        setCarreira(encontrada);
 
-        // 1b. Buscar tipo_acesso da categoria desta carreira
-        let catTipoAcesso = 'livre';
-        if (encontrada) {
-          const catId = encontrada.categoriaId || encontrada.categoria_id;
-          if (catId) {
-            const { data: catData } = await supabase.from('categorias').select('tipo_acesso').eq('id', catId).single();
-            catTipoAcesso = catData?.tipo_acesso || 'livre';
-          }
-        }
-        if (mounted) setTipoAcesso(catTipoAcesso);
-
-        // 2. Buscar preparatórios
-        const { data: prepsData } = await supabase.from('preparatorios').select('*');
-
-        // 3. Buscar vínculos
-        const { data: vData } = await supabase.from('vinculos').select('*');
-        const storedVinculos = {};
-        if (vData) {
-          const legado = vData.find(row => row.data);
-          if (legado && legado.data) {
-            Object.assign(storedVinculos, legado.data);
-          }
-          vData.forEach(row => {
-            if (!row.data && row.carreira_id && row.preparatorio_id) {
-              if (!storedVinculos[row.carreira_id]) storedVinculos[row.carreira_id] = {};
-              if (!storedVinculos[row.carreira_id][row.preparatorio_id]) {
-                storedVinculos[row.carreira_id][row.preparatorio_id] = { modulos: {} };
-              }
-            }
-          });
-        }
+        // 2. Executar TODAS as buscas em PARALELO (Promise.all)
+        const [carRes, prepsRes, vRes] = await Promise.all([
+          !encontrada ? supabase.from('carreiras').select('*') : Promise.resolve({ data: null }),
+          supabase.from('preparatorios').select('*'),
+          supabase.from('vinculos').select('*').eq('carreira_id', carreiraId)
+        ]);
 
         if (!mounted) return;
 
-        // 4. Filtrar vinculados a esta carreira
-        const carreiraVinculos = storedVinculos[carreiraId] || {};
-        const prepIds = Object.keys(carreiraVinculos);
-        const prepsFiltrados = (prepsData || []).filter(p => prepIds.includes(p.id));
+        if (!encontrada && carRes.data) {
+          encontrada = carRes.data.find(s => s.id === carreiraId);
+          if (encontrada) setCarreira(encontrada);
+        }
+
+        // Tipo de acesso da categoria
+        let catTipoAcesso = 'livre';
+        const catId = encontrada?.categoriaId || encontrada?.categoria_id;
+        if (catId) {
+          try {
+            const cacheCats = JSON.parse(localStorage.getItem('papirando_cats_cache') || '[]');
+            const catCache = cacheCats.find(c => c.id === catId);
+            if (catCache?.tipo_acesso) {
+              catTipoAcesso = catCache.tipo_acesso;
+            } else {
+              const { data: catData } = await supabase.from('categorias').select('tipo_acesso').eq('id', catId).single();
+              catTipoAcesso = catData?.tipo_acesso || 'livre';
+            }
+          } catch (e) {}
+        }
+        if (mounted) setTipoAcesso(catTipoAcesso);
+
+        // Preparatórios vinculados
+        const vData = vRes.data || [];
+        const prepIds = [...new Set(vData.map(v => v.preparatorio_id).filter(Boolean))];
+        const prepsData = prepsRes.data || [];
+        const prepsFiltrados = prepsData.filter(p => prepIds.includes(p.id));
 
         if (mounted) {
           setPreparatorios(prepsFiltrados);

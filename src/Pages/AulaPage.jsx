@@ -249,50 +249,38 @@ function AulaPage() {
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        // Disciplina Atual (para o cabeçalho)
-        if (!disciplina) {
-          const { data: d } = await supabase.from('disciplinas').select('*').eq('id', disciplinaId).single();
-          setDisciplina(d);
-        }
+        // Busca paralela ultra-rápida de todos os dados essenciais para o vídeo
+        const [dRes, todasDiscRes, prepRes, modsRes, aulasRes] = await Promise.all([
+          !disciplina
+            ? supabase.from('disciplinas').select('*').eq('id', disciplinaId).single()
+            : Promise.resolve({ data: disciplina }),
+          supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId),
+          supabase.from('preparatorios').select('nome, logo').eq('id', preparatorioId).single(),
+          supabase.from('modulos').select('*').eq('disciplina_id', browsingDisciplinaId),
+          supabase.from('aulas').select('*').eq('modulo_id', browsingModuloId).order('ordem', { ascending: true })
+        ]);
 
-        // Dados de Navegação (Módulos e Aulas) baseados no que o usuário está "explorando"
-        const { data: discExplora } = await supabase.from('disciplinas').select('*').eq('id', browsingDisciplinaId).single();
+        if (dRes?.data) setDisciplina(dRes.data);
+
+        const todasDisciplinas = todasDiscRes?.data || [];
+        setListaDisciplinas(todasDisciplinas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
+
+        // Encontra disciplina e módulo explorados diretamente na memória sem requisições extras
+        const discExplora = todasDisciplinas.find(d => d.id === browsingDisciplinaId) || null;
         setBrowsingDisciplina(discExplora);
 
-        const { data: modExplora } = await supabase.from('modulos').select('*').eq('id', browsingModuloId).single();
+        const todosModulos = (modsRes?.data || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+        setListaModulos(todosModulos);
+
+        const modExplora = todosModulos.find(m => m.id === browsingModuloId) || null;
         setBrowsingModulo(modExplora);
 
-        // Todas as Disciplinas do Preparatório
-        const { data: todasDisciplinas } = await supabase
-          .from('disciplinas')
-          .select('*')
-          .eq('preparatorio_id', preparatorioId);
-        setListaDisciplinas((todasDisciplinas || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
-
-        // Carregar Preparatório e seus Documentos vinculados
-        const { data: prepObj } = await supabase.from('preparatorios').select('nome, logo').eq('id', preparatorioId).single();
-        if (prepObj) { setPrepNome(prepObj.nome || ''); setPrepLogo(prepObj.logo || ''); }
+        const prepObj = prepRes?.data;
         if (prepObj) {
-          const { data: allDocs } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
-          if (allDocs) {
-            const cleanDocs = allDocs.map(doc => {
-              let fonte = 'Avulso';
-              let tituloLimpo = doc.titulo;
-              if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
-                const parts = doc.titulo.split('] ');
-                fonte = parts[0].replace('[', '').trim();
-                tituloLimpo = parts.slice(1).join('] ').trim();
-              }
-              return { ...doc, fonte, tituloLimpo };
-            });
-            // Filtra os documentos onde a fonte/preparatório bate com o nome do preparatório atual
-            const filteredDocs = cleanDocs.filter(d => d.fonte === prepObj.nome);
-            setDocsDoPreparatorio(filteredDocs);
-          }
+          setPrepNome(prepObj.nome || '');
+          setPrepLogo(prepObj.logo || '');
         }
 
-        // BUSCA DE AULAS DO MÓDULO EXPLORADO
-        let aulasFinais = [];
         const normalizar = (lista) => (lista || []).map(a => ({
           ...a,
           moduloId: a.moduloId || a.modulo_id,
@@ -302,25 +290,28 @@ function AulaPage() {
           pdf_url: a.pdf_url || null
         }));
 
-
-        // Todos os Módulos da Disciplina que está sendo explorada
-        const { data: todosModulos } = await supabase
-          .from('modulos')
-          .select('*')
-          .eq('disciplina_id', browsingDisciplinaId);
-        setListaModulos((todosModulos || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))));
-
-        if (todosModulos && todosModulos.length > 0) {
-          const { data: aulasData } = await supabase
-            .from('aulas')
-            .select('*')
-            .eq('modulo_id', browsingModuloId)
-            .order('ordem', { ascending: true });
-          
-          aulasFinais = normalizar(aulasData).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-        }
+        const aulasFinais = normalizar(aulasRes?.data || []).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
         setListaAulas(aulasFinais);
 
+        // Carregar Documentos em segundo plano para liberar o player de vídeo imediatamente
+        if (prepObj?.nome) {
+          supabase.from('documentos').select('*').order('created_at', { ascending: false }).then(({ data: allDocs }) => {
+            if (allDocs) {
+              const cleanDocs = allDocs.map(doc => {
+                let fonte = 'Avulso';
+                let tituloLimpo = doc.titulo;
+                if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
+                  const parts = doc.titulo.split('] ');
+                  fonte = parts[0].replace('[', '').trim();
+                  tituloLimpo = parts.slice(1).join('] ').trim();
+                }
+                return { ...doc, fonte, tituloLimpo };
+              });
+              const filteredDocs = cleanDocs.filter(d => d.fonte === prepObj.nome);
+              setDocsDoPreparatorio(filteredDocs);
+            }
+          });
+        }
       } catch (err) {
         console.error('Erro inesperado no carregarDados:', err);
       }

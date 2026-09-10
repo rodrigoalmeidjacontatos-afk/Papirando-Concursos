@@ -42,102 +42,87 @@ function PreparatorioViewPage() {
         setCarregando(true);
       }
       try {
-        // Helper para contornar limite de 1000 rows do Supabase
-        const fetchAll = async (table, query = '*') => {
-          let allRows = [];
-          let from = 0;
-          let done = false;
-          while (!done) {
-            const { data, error } = await supabase.from(table).select(query).range(from, from + 999);
-            if (error) throw error;
-            allRows = allRows.concat(data || []);
-            if (!data || data.length < 1000) done = true;
-            else from += 1000;
-          }
-          return allRows;
-        };
+        // 1. Executa em PARALELO as 3 buscas iniciais específicas para este preparatório
+        const [prepRes, discRes, vRes] = await Promise.all([
+          supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle(),
+          supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId),
+          supabase.from('vinculos').select('modulo_id, aula_id').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId)
+        ]);
 
-        // 1. Carrega os dados da página
-        let { data: prepData, error: prepErr } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle();
-        if (prepErr && (String(prepErr.message).includes('JWT') || prepErr.status === 401)) {
+        let prepData = prepRes?.data;
+        if (prepRes?.error && (String(prepRes.error.message).includes('JWT') || prepRes.error.status === 401)) {
           console.warn('[PreparatorioViewPage] Token expirado ao buscar preparatório. Renovando...');
           await supabase.auth.refreshSession();
           const retry = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle();
-          prepData = retry.data;
+          prepData = retry?.data;
         }
-        if (mounted) setPreparatorio(prepData);
+        if (!mounted) return;
+        setPreparatorio(prepData);
 
-        const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
-        if (mounted) setDisciplinas(discData || []);
+        const disciplinasData = discRes?.data || [];
+        setDisciplinas(disciplinasData);
 
-        // Busca os vínculos (com paginação)
-        let vData = [];
-        let vFrom = 0;
-        let vDone = false;
-        while (!vDone) {
-          const { data } = await supabase.from('vinculos')
-            .select('*')
-            .eq('carreira_id', carreiraId)
-            .eq('preparatorio_id', preparatorioId)
-            .range(vFrom, vFrom + 999);
-          vData = vData.concat(data || []);
-          if (!data || data.length < 1000) vDone = true;
-          else vFrom += 1000;
+        const vData = vRes?.data || [];
+        const discIds = disciplinasData.map(d => d.id).filter(Boolean);
+
+        // 2. Buscar APENAS os módulos dessas disciplinas específicas
+        let modulosCarregados = [];
+        if (discIds.length > 0) {
+          const { data: mods } = await supabase.from('modulos').select('*').in('disciplina_id', discIds);
+          modulosCarregados = mods || [];
         }
 
-        let aulasFinal = [];
-        if (mounted) {
-          if (vData && vData.length > 0) {
-            const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
-            const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
-            const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
+        // 3. Filtrar módulos de acordo com os vínculos da carreira (se houver restrição)
+        const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
+        const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
+        const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
 
-            const modData = await fetchAll('modulos');
-            const aulaData = await fetchAll('aulas');
-
-            let modulosFiltrados = modData;
-            let aulasCarregadas = aulaData;
-
-            if (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0) {
-              modulosFiltrados = modData.filter(m => modulosPermitidos.includes(m.id));
-              aulasCarregadas = aulaData.filter(a =>
-                modulosCompletos.includes(a.modulo_id || a.moduloId) ||
-                aulasPermitidasIds.includes(a.id)
-              );
-            }
-
-            aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
-            aulasFinal = aulasCarregadas;
-            setModulos(modulosFiltrados);
-            setAulas(aulasFinal);
-          } else {
-            // Fallback legado
-            const modData = await fetchAll('modulos');
-            const aulaData = await fetchAll('aulas');
-
-            aulasFinal = aulaData.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
-            setModulos(modData);
-            setAulas(aulasFinal);
-          }
+        let modulosFiltrados = modulosCarregados;
+        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
+          modulosFiltrados = modulosCarregados.filter(m => modulosPermitidos.includes(m.id));
         }
 
-        // 2. Buscar progresso do usuário para essas aulas
+        // 4. Buscar APENAS as aulas dos módulos filtrados e o progresso do usuário EM PARALELO
+        const targetModIds = modulosFiltrados.map(m => m.id).filter(Boolean);
+
+        const [aulasRes, progressoRes] = await Promise.all([
+          targetModIds.length > 0
+            ? supabase
+                .from('aulas')
+                .select('id, modulo_id, moduloId, titulo, duracao, duracao_str, nivel, ordem, created_at')
+                .in('modulo_id', targetModIds)
+                .order('ordem', { ascending: true })
+            : Promise.resolve({ data: [] }),
+          user?.id
+            ? supabase
+                .from('progresso')
+                .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
+                .eq('user_id', user.id)
+            : Promise.resolve({ data: [] })
+        ]);
+
+        if (!mounted) return;
+
+        let aulasCarregadas = aulasRes?.data || [];
+        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
+          aulasCarregadas = aulasCarregadas.filter(a =>
+            modulosCompletos.includes(a.modulo_id || a.moduloId) ||
+            aulasPermitidasIds.includes(a.id)
+          );
+        }
+
+        aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+        setModulos(modulosFiltrados);
+        setAulas(aulasCarregadas);
+
+        // 5. Mapear progresso
         let progressoMap = {};
-        if (user && aulasFinal.length > 0) {
-          const { data: progressoData } = await supabase
-            .from('progresso')
-            .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
-            .eq('user_id', user.id);
-
-          if (progressoData) {
-            progressoData.forEach(p => {
-              progressoMap[p.aula_id] = p;
-            });
-          }
+        if (progressoRes?.data) {
+          progressoRes.data.forEach(p => {
+            progressoMap[p.aula_id] = p;
+          });
         }
-        if (mounted) {
-          setProgressoAulas(progressoMap);
-        }
+        setProgressoAulas(progressoMap);
       } catch (err) {
         console.error('Erro geral:', err);
         if (mounted) setErro(err.message);
