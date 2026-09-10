@@ -87,7 +87,7 @@ function PreparatorioViewPage() {
           targetModIds.length > 0
             ? supabase
                 .from('aulas')
-                .select('id, modulo_id, moduloId, titulo, duracao, duracao_str, nivel, ordem, created_at')
+                .select('*')
                 .in('modulo_id', targetModIds)
                 .order('ordem', { ascending: true })
             : Promise.resolve({ data: [] }),
@@ -101,7 +101,16 @@ function PreparatorioViewPage() {
 
         if (!mounted) return;
 
-        let aulasCarregadas = aulasRes?.data || [];
+        if (aulasRes?.error) {
+          console.error('[PreparatorioViewPage] Erro ao buscar aulas:', aulasRes.error);
+        }
+
+        let aulasCarregadas = (aulasRes?.data || []).map(a => ({
+          ...a,
+          modulo_id: a.modulo_id || a.moduloId,
+          moduloId: a.moduloId || a.modulo_id,
+        }));
+
         if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
           aulasCarregadas = aulasCarregadas.filter(a =>
             modulosCompletos.includes(a.modulo_id || a.moduloId) ||
@@ -146,11 +155,11 @@ function PreparatorioViewPage() {
   };
 
   const getModulosDaDisciplina = (disciplinaId) => {
-    return modulos.filter(m => m.disciplina_id === disciplinaId).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+    return modulos.filter(m => String(m.disciplina_id || m.disciplinaId) === String(disciplinaId)).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
   };
 
   const getAulasDoModulo = (moduloId) => {
-    return aulas.filter(a => a.modulo_id === moduloId).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
+    return aulas.filter(a => String(a.modulo_id || a.moduloId) === String(moduloId)).sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
   };
 
   const formatarTempo = (segundos) => {
