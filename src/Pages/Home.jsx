@@ -48,7 +48,6 @@ function Home() {
 
   const handleLogout = async () => {
     await contextHandleLogout();
-    navigate('/');
   };
 
   // Criar refs para cada carrossel

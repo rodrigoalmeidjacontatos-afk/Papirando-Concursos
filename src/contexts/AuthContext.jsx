@@ -328,10 +328,43 @@ export function AuthProvider({ children }) {
   }, [user, carregarPerfil, aplicarPerfil]);
 
   const handleLogout = async () => {
-    sessionStorage.removeItem('papirando_plano');
-    sessionStorage.removeItem('papirando_nome');
-    sessionStorage.removeItem('papirando_avatar');
-    await supabase.auth.signOut();
+    console.log('[AuthContext] Executando logout completo...');
+    try {
+      // 1. Limpa todas as informações da sessão
+      sessionStorage.clear();
+
+      // 2. Limpa todas as chaves do Supabase no localStorage
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') || key.includes('supabase') || key.includes('papirando')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (e) {
+        console.warn('[AuthContext] Erro ao limpar localStorage:', e);
+      }
+
+      // 3. Reseta estados React imediatamente
+      setUser(null);
+      setUserName('Aluno');
+      setIsAdmin(false);
+      setPlanoUsuario('basico');
+      setPreparatoriosLiberados([]);
+      setDataExpiracao(null);
+      setAvatarUrl(null);
+      setAuthLoading(false);
+
+      // 4. Dispara signOut no Supabase com limite de 1.5s para não travar a interface
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
+    } catch (err) {
+      console.warn('[AuthContext] Aviso durante logout:', err);
+    } finally {
+      // 5. Força redirecionamento limpo para a tela de login
+      window.location.href = '/login';
+    }
   };
 
   const value = {
