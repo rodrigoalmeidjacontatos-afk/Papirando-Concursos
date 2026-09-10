@@ -35,7 +35,13 @@ function CategoriaPage() {
         if (carErr) throw carErr;
         if (vErr) throw vErr;
 
-        const encontrada = (catData || []).find((c) => c.id === categoriaId);
+        let encontrada = (catData || []).find((c) => c.id === categoriaId);
+        if (!encontrada) {
+          try {
+            const cacheCats = JSON.parse(localStorage.getItem('papirando_cats_cache') || '[]');
+            encontrada = cacheCats.find((c) => c.id === categoriaId);
+          } catch (e) {}
+        }
         const filtradas = (carreirasData || [])
           .filter((c) => (c.categoria_id || c.categoriaId) === categoriaId)
           .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999));
@@ -45,8 +51,8 @@ function CategoriaPage() {
         setCategoria(encontrada || null);
         setCarreiras(filtradas);
         setVinculos(parseVinculosFromRows(vData));
-      } catch (e) {
-        console.error('[CategoriaPage] Erro ao carregar:', e);
+      } catch (err) {
+        console.error('[CategoriaPage] Erro ao carregar dados:', err);
         if (mounted) setErro('Não foi possível carregar os dados. Tente novamente.');
       } finally {
         if (mounted) setCarregando(false);
@@ -66,7 +72,20 @@ function CategoriaPage() {
       </div>
     );
   }
-  if (!categoria) return <LoadingScreen text="Categoria não encontrada" />;
+  if (!categoria) {
+    return (
+      <div style={styles.container}>
+        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px', color: '#FFF' }}>Categoria não encontrada</h2>
+          <p style={{ color: '#AAA', marginBottom: '24px', maxWidth: '400px', margin: '0 auto 24px' }}>
+            Não encontramos a categoria selecionada ou ela pode ter sido renomeada.
+          </p>
+          <button type="button" onClick={() => navigate('/')} style={styles.backButton}>← Voltar para o Início</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>

@@ -25,9 +25,22 @@ function CarreiraPage() {
       setCarregando(true);
       try {
         // 1. Buscar carreira
-        const { data: carreirasData } = await supabase.from('carreiras').select('*');
+        let { data: carreirasData, error: carError } = await supabase.from('carreiras').select('*');
+        if (carError && (String(carError.message).includes('JWT') || carError.status === 401)) {
+          console.warn('[CarreiraPage] Token expirado ao buscar carreiras. Renovando...');
+          await supabase.auth.refreshSession();
+          const retry = await supabase.from('carreiras').select('*');
+          carreirasData = retry.data;
+        }
+
         if (!mounted) return;
-        const encontrada = (carreirasData || []).find(s => s.id === carreiraId);
+        let encontrada = (carreirasData || []).find(s => s.id === carreiraId);
+        if (!encontrada) {
+          try {
+            const cacheCars = JSON.parse(localStorage.getItem('papirando_cars_cache') || '[]');
+            encontrada = cacheCars.find(s => s.id === carreiraId);
+          } catch (e) {}
+        }
         setCarreira(encontrada);
 
         // 1b. Buscar tipo_acesso da categoria desta carreira
@@ -127,7 +140,34 @@ function CarreiraPage() {
   }, [carreiraId, authLoading, user?.id, planoUsuario, preparatoriosLiberados, isAdmin]);
 
   if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
-  if (!carreira) return <LoadingScreen />;
+
+  if (!carreira) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px', color: '#FFF' }}>Carreira não encontrada</h2>
+        <p style={{ color: '#AAA', marginBottom: '28px', maxWidth: '420px', fontSize: '15px', lineHeight: '1.5' }}>
+          Não conseguimos carregar as informações desta carreira. Verifique o link ou retorne para a página inicial.
+        </p>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            backgroundColor: '#E50914',
+            color: '#FFF',
+            border: 'none',
+            padding: '14px 32px',
+            borderRadius: '8px',
+            fontWeight: 700,
+            fontSize: '15px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(229, 9, 20, 0.4)'
+          }}
+        >
+          ← Voltar para o Início
+        </button>
+      </div>
+    );
+  }
 
 
   const isBasico = planoUsuario === 'basico';

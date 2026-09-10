@@ -12,7 +12,38 @@ function Home() {
   // Auth vem do contexto global — sem re-verificar a cada montagem
   const { user, userName, setUserName, planoUsuario, dataExpiracao, avatarUrl, setAvatarUrl, authLoading, handleLogout: contextHandleLogout } = useAuth();
 
-  const [categorias, setCategorias] = useState([{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }]);
+  const [categorias, setCategorias] = useState(() => {
+    try {
+      const cacheCat = localStorage.getItem('papirando_cats_cache') || sessionStorage.getItem('papirando_cats');
+      const cacheCar = localStorage.getItem('papirando_cars_cache') || sessionStorage.getItem('papirando_cars');
+      if (cacheCat && cacheCar) {
+        const catData = JSON.parse(cacheCat);
+        const carData = JSON.parse(cacheCar);
+        if (Array.isArray(catData) && catData.length > 0 && Array.isArray(carData)) {
+          const categoriasComCursos = catData.filter(c => c.id !== 'sys_config_abas').map(cat => ({
+            id: cat.id,
+            nome: cat.nome,
+            tipo_acesso: cat.tipo_acesso || 'livre',
+            cursos: carData.filter(car => car.categoriaId === cat.id || car.categoria_id === cat.id).sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999)).map(car => ({
+              id: car.id,
+              nome: car.nome,
+              capa: car.capa || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(car.nome),
+              cor: '#1565c0'
+            }))
+          }));
+          categoriasComCursos.sort((a, b) => {
+            if (a.id === 'policiais') return -1;
+            if (b.id === 'policiais') return 1;
+            if (a.id === 'preparatorios') return 1;
+            if (b.id === 'preparatorios') return -1;
+            return 0;
+          });
+          if (categoriasComCursos.length > 0) return categoriasComCursos;
+        }
+      }
+    } catch (e) {}
+    return [{ id: 'loading', nome: '⏳ Conectando aos servidores...', cursos: [] }];
+  });
   const [continueAssistindo, setContinueAssistindo] = useState([]);
   const [activeHomeTab, setActiveHomeTab] = useState('inicio'); // 'inicio', 'evolucao'
   const [cursosAtualizados, setCursosAtualizados] = useState([]);
@@ -180,9 +211,9 @@ function Home() {
         let categoriasSupabase = [];
         let carreirasSupabase = [];
 
-        // 1. Tentar carregar do cache da sessão (instantâneo)
-        const cacheCat = sessionStorage.getItem('papirando_cats');
-        const cacheCar = sessionStorage.getItem('papirando_cars');
+        // 1. Tentar carregar do cache local ou de sessão (instantâneo)
+        const cacheCat = localStorage.getItem('papirando_cats_cache') || sessionStorage.getItem('papirando_cats');
+        const cacheCar = localStorage.getItem('papirando_cars_cache') || sessionStorage.getItem('papirando_cars');
         let usouCache = false;
 
         if (cacheCat && cacheCar) {
@@ -208,7 +239,12 @@ function Home() {
             }
           }
           categoriasSupabase = resCat?.data || [];
-          if (categoriasSupabase.length > 0) sessionStorage.setItem('papirando_cats', JSON.stringify(categoriasSupabase));
+          if (categoriasSupabase.length > 0) {
+            try {
+              localStorage.setItem('papirando_cats_cache', JSON.stringify(categoriasSupabase));
+              sessionStorage.setItem('papirando_cats', JSON.stringify(categoriasSupabase));
+            } catch (e) {}
+          }
         } catch (e) { console.warn('Timeout categorias', e); }
 
         try {
@@ -216,11 +252,18 @@ function Home() {
           if (resCar?.error) {
             console.error('Erro RLS/Supabase Carreiras:', resCar.error);
             if (String(resCar.error.message).includes('JWT') || String(resCar.error.code).includes('PGRST301') || resCar.error.status === 401) {
+              console.warn('[Home] JWT expirado ao buscar carreiras. Renovando sessão...');
+              await supabase.auth.refreshSession();
               resCar = await withTimeout(supabase.from('carreiras').select('*'), 15000);
             }
           }
           carreirasSupabase = resCar?.data || [];
-          if (carreirasSupabase.length > 0) sessionStorage.setItem('papirando_cars', JSON.stringify(carreirasSupabase));
+          if (carreirasSupabase.length > 0) {
+            try {
+              localStorage.setItem('papirando_cars_cache', JSON.stringify(carreirasSupabase));
+              sessionStorage.setItem('papirando_cars', JSON.stringify(carreirasSupabase));
+            } catch (e) {}
+          }
         } catch (e) { console.warn('Timeout carreiras', e); }
 
         if (categoriasSupabase.length > 0) {

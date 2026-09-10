@@ -217,7 +217,13 @@ export default function QuestoesPage() {
     setPaginaAtual(1);
   };
 
-  const pesquisar = () => setPaginaAtual(prev => { fetchQuestoes(); return 1; });
+  const pesquisar = () => {
+    if (paginaAtual === 1) {
+      fetchQuestoes();
+    } else {
+      setPaginaAtual(1);
+    }
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#141419', color: '#FFF', fontFamily: 'Inter, sans-serif' }}>
@@ -289,11 +295,11 @@ export default function QuestoesPage() {
                 placeholder="Palavra Chave"
                 value={palavraChave}
                 onChange={(e) => setPalavraChave(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchQuestoes()}
+                onKeyDown={(e) => e.key === 'Enter' && pesquisar()}
                 style={{ ...inputStyle, paddingRight: '48px', width: '100%' }}
               />
               <button
-                onClick={() => { setPaginaAtual(1); fetchQuestoes(); }}
+                onClick={pesquisar}
                 title="Pesquisar"
                 style={{
                   position: 'absolute', right: '4px',

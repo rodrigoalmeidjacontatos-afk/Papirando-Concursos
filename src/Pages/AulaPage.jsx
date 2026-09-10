@@ -519,7 +519,7 @@ function AulaPage() {
   }, [user, preparatorioId, listaDisciplinas]);
 
   // Salvar progresso no Supabase
-  const salvarProgresso = async (tempo, forceSave = false, marcarConcluida = false) => {
+  const salvarProgresso = useCallback(async (tempo, forceSave = false, marcarConcluida = false) => {
     if (!user || !temAcesso) return;
     if (!progressoAulasLoadedRef.current) return; // Aguarda carregar dados reais do DB antes de sobrescrever
     
@@ -623,7 +623,7 @@ function AulaPage() {
 
     saveQueueRef.current = currentSavePromise;
     return currentSavePromise;
-  };
+  }, [user, temAcesso, aulaId, duracao, aulaPlaying]);
 
   const marcarAulaComoAssistida = async (playerInstance) => {
     let dur = duracaoRef.current || duracao || Number(aulaPlaying?.duracao) || 0;

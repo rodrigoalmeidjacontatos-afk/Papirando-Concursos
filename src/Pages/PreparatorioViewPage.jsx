@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
-import ContinuarEstudandoHero from '../components/ContinuarEstudandoHero';
 import { formatarUltimoAcesso, indiceAulaNoModulo, rotuloNumeroAula } from '../utils/aulaDuracao';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,7 +10,7 @@ function PreparatorioViewPage() {
   const navigate = useNavigate();
 
   // Auth vem do contexto global — sem re-verificar a cada montagem
-  const { user, planoUsuario, userName, isAdmin, dataExpiracao, preparatoriosLiberados, authLoading } = useAuth();
+  const { user, planoUsuario, isAdmin, preparatoriosLiberados, authLoading } = useAuth();
 
   const [preparatorio, setPreparatorio] = useState(null);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -57,7 +56,13 @@ function PreparatorioViewPage() {
         };
 
         // 1. Carrega os dados da página
-        const { data: prepData } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).single();
+        let { data: prepData, error: prepErr } = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle();
+        if (prepErr && (String(prepErr.message).includes('JWT') || prepErr.status === 401)) {
+          console.warn('[PreparatorioViewPage] Token expirado ao buscar preparatório. Renovando...');
+          await supabase.auth.refreshSession();
+          const retry = await supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle();
+          prepData = retry.data;
+        }
         if (mounted) setPreparatorio(prepData);
 
         const { data: discData } = await supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId);
@@ -176,17 +181,7 @@ function PreparatorioViewPage() {
     return `${minutos}:${segs.toString().padStart(2, '0')}`;
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
 
-  const renderIcon = (iconStr) => {
-    if (typeof iconStr === 'string' && (iconStr.startsWith('http') || iconStr.startsWith('data:'))) {
-      return <img src={iconStr} alt="logo" style={{width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover'}} />;
-    }
-    return <span style={{fontSize: '24px'}}>{iconStr}</span>;
-  };
 
   const disciplinasFiltradas = useMemo(
     () => disciplinas
@@ -243,105 +238,41 @@ function PreparatorioViewPage() {
     return map;
   }, [disciplinasFiltradas, progressoAulas, modulos, aulas]);
 
-  const continuarItem = useMemo(() => {
-    if (!aulas.length) return null;
-
-    const montarItem = (aula, progressoReg) => {
-      if (!aula) return null;
-      const modulo = modulos.find((m) => m.id === (aula.modulo_id || aula.moduloId));
-      const disciplina = disciplinas.find((d) => d.id === (modulo?.disciplina_id || modulo?.disciplinaId));
-      if (!modulo || !disciplina) return null;
-      const aulasMod = aulas
-        .filter((a) => (a.modulo_id || a.moduloId) === modulo.id)
-        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-      return {
-        aula,
-        modulo,
-        disciplina,
-        progresso: progressoReg || null,
-        indiceAula: indiceAulaNoModulo(aula, aulasMod),
-        totalAulasModulo: aulasMod.length,
-      };
-    };
-
-    const idsPrep = new Set(aulas.map((a) => a.id));
-    const lista = Object.entries(progressoAulas)
-      .filter(([aid]) => idsPrep.has(aid))
-      .map(([aid, prog]) => ({ aula_id: aid, ...prog }))
-      .sort((a, b) => {
-        const ta = a.ultimo_acesso ? new Date(a.ultimo_acesso).getTime() : 0;
-        const tb = b.ultimo_acesso ? new Date(b.ultimo_acesso).getTime() : 0;
-        return tb - ta;
-      });
-
-    // Criar o currículo linear e totalmente ordenado para conseguir encontrar a 'próxima' aula
-    const aulasCurriculo = [];
-    const discsOrdenadas = [...disciplinas].sort(
-      (a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))
-    );
-    for (const disc of discsOrdenadas) {
-      const mods = modulos
-        .filter((m) => (m.disciplina_id || m.disciplinaId) === disc.id)
-        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-      for (const mod of mods) {
-        const aulasMod = aulas
-          .filter((a) => (a.modulo_id || a.moduloId) === mod.id)
-          .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-        aulasCurriculo.push(...aulasMod);
-      }
-    }
-
-    if (lista.length > 0) {
-      const maisRecente = lista[0];
-      
-      // Se a última aula que o usuário acessou já está concluída, sugere a PRÓXIMA
-      if (maisRecente.concluida) {
-        const idx = aulasCurriculo.findIndex(a => a.id === maisRecente.aula_id);
-        if (idx >= 0 && idx < aulasCurriculo.length - 1) {
-          const proximaAula = aulasCurriculo[idx + 1];
-          const proximoProgresso = progressoAulas[proximaAula.id] || null;
-          return montarItem(proximaAula, proximoProgresso);
-        }
-      }
-      
-      // Caso contrário (ainda em andamento ou última aula do curso), continua de onde parou
-      const escolhido = lista.find((p) => !p.concluida) || maisRecente;
-      const aula = aulas.find((a) => a.id === escolhido.aula_id);
-      return montarItem(aula, escolhido);
-    }
-
-    const fallbackDiscsOrdenadas = [...disciplinas].sort(
-      (a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id))
-    );
-    for (const disc of fallbackDiscsOrdenadas) {
-      const mods = modulos
-        .filter((m) => (m.disciplina_id || m.disciplinaId) === disc.id)
-        .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-      for (const mod of mods) {
-        const aulasMod = aulas
-          .filter((a) => (a.modulo_id || a.moduloId) === mod.id)
-          .sort((a, b) => (a.ordem || 999) - (b.ordem || 999) || String(a.id).localeCompare(String(b.id)));
-        const emAndamento = aulasMod.find((a) => {
-          const p = progressoAulas[a.id];
-          return p && !p.concluida;
-        });
-        const escolhida = emAndamento || aulasMod[0];
-        if (escolhida) {
-          return montarItem(escolhida, progressoAulas[escolhida.id] || null);
-        }
-      }
-    }
-    return null;
-  }, [aulas, modulos, disciplinas, progressoAulas]);
-
-  const irParaAula = (aula, mod, disc) => {
-    if (!aula || !mod || !disc) return;
-    navigate(`/aula/${carreiraId}/${preparatorioId}/${disc.id}/${mod.id}/${aula.id}`);
-  };
-
   if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
-  if (erro) return <div style={styles.loading}>Erro: {erro}</div>;
-  if (!preparatorio) return <LoadingScreen />;
+
+  if (erro) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px', color: '#FFF' }}>Erro ao Carregar Curso</h2>
+        <p style={{ color: '#AAA', marginBottom: '28px', maxWidth: '420px', fontSize: '15px' }}>{erro}</p>
+        <button
+          onClick={() => navigate(`/carreira/${carreiraId}`)}
+          style={{ backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          ← Voltar para a Carreira
+        </button>
+      </div>
+    );
+  }
+
+  if (!preparatorio) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px', color: '#FFF' }}>Preparatório não encontrado</h2>
+        <p style={{ color: '#AAA', marginBottom: '28px', maxWidth: '420px', fontSize: '15px', lineHeight: '1.5' }}>
+          Não foi possível localizar este curso preparatório. Ele pode ter sido atualizado ou removido.
+        </p>
+        <button
+          onClick={() => navigate(`/carreira/${carreiraId}`)}
+          style={{ backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          ← Voltar para a Carreira
+        </button>
+      </div>
+    );
+  }
 
   // Imagem de fundo fixa (soldado SWAT - Pinterest)
   const bgImage = '/images/bg-swat.jpg';

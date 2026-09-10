@@ -16,23 +16,24 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
     setRespostaMarcada(null);
     setStatus(null);
     setMostrarComentario(false);
-    checkSeFavorita();
-  }, [questao.id]);
 
-  const checkSeFavorita = async () => {
-    if (!userEmail) return;
-    try {
-      const { data } = await supabase
-        .from('questoes_favoritas')
-        .select('id')
-        .eq('questao_id', questao.id)
-        .eq('user_email', userEmail);
-      if (data && data.length > 0) setFavorita(true);
-      else setFavorita(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    const checkSeFavorita = async () => {
+      if (!userEmail) return;
+      try {
+        const { data } = await supabase
+          .from('questoes_favoritas')
+          .select('id')
+          .eq('questao_id', questao.id)
+          .eq('user_email', userEmail);
+        if (data && data.length > 0) setFavorita(true);
+        else setFavorita(false);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    checkSeFavorita();
+  }, [questao.id, userEmail]);
 
   const toggleFavorito = async () => {
     if (!userEmail) return alert("Faça login para favoritar.");
@@ -108,7 +109,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
 
   // Removemos qualquer numeração que venha no texto (ex: "14. ", "14 - ") para evitar confusão com o contador real
   let enunciadoLimpo = questao.enunciado 
-    ? questao.enunciado.replace(/^\s*\d+[\.\-\)]\s*/, '')
+    ? questao.enunciado.replace(/^\s*\d+[.\-)]\s*/, '')
     : '';
 
   let imagemEnunciado = null;
