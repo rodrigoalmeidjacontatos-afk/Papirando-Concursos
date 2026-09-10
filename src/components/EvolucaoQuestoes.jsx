@@ -17,7 +17,12 @@ export default function EvolucaoQuestoes({ userEmail }) {
   ]);
 
   useEffect(() => {
-    if (userEmail) fetchStats();
+    if (userEmail) {
+      fetchStats();
+    } else {
+      setLoading(false);
+      setStats({ vazio: true });
+    }
   }, [userEmail, periodoSelecionado]);
 
   const fetchStats = async () => {
@@ -41,7 +46,15 @@ export default function EvolucaoQuestoes({ userEmail }) {
         query = query.gte('created_at', new Date(Date.now() - periodoSelecionado * 24 * 60 * 60 * 1000).toISOString());
       }
 
-      const { data: respostasRaw, error: errRespostas } = await query;
+      let { data: respostasRaw, error: errRespostas } = await query;
+
+      if (errRespostas && (String(errRespostas.message).includes('JWT') || String(errRespostas.code).includes('PGRST301') || errRespostas.status === 401)) {
+        console.warn('[EvolucaoQuestoes] Token expirado. Renovando...');
+        await supabase.auth.refreshSession();
+        const retry = await query;
+        respostasRaw = retry.data;
+        errRespostas = retry.error;
+      }
 
       if (errRespostas) throw errRespostas;
       if (!respostasRaw || respostasRaw.length === 0) {

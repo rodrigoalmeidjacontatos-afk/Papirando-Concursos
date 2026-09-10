@@ -54,11 +54,19 @@ export function AuthProvider({ children }) {
       const gracePeriodMs = 5 * 60 * 1000;
       const dentroDaTolerancia = (new Date() - new Date(dataExp)) < gracePeriodMs;
       if (expirou && !dentroDaTolerancia) {
-        planoNormalizado = profile.plano_anterior || 'basico';
-        dataExp = null;
-        supabase.from('profiles')
-          .update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null })
-          .eq('id', userObj.id);
+        const targetId = profile.id || userObj.id;
+        if (profile.plano_anterior && profile.plano_anterior !== planoNormalizado) {
+          planoNormalizado = profile.plano_anterior;
+          dataExp = null;
+          supabase.from('profiles')
+            .update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null })
+            .eq('id', targetId);
+        } else {
+          dataExp = null;
+          supabase.from('profiles')
+            .update({ data_expiracao: null })
+            .eq('id', targetId);
+        }
       }
     }
 
@@ -112,6 +120,21 @@ export function AuthProvider({ children }) {
         .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
         .eq('id', userObj.id)
         .maybeSingle();
+
+      // Se deu erro de token expirado (401 / JWT), renova a sessão e tenta novamente
+      if (error && (String(error.message).toLowerCase().includes('jwt') || String(error.code) === '401' || String(error.code) === 'PGRST301' || error.status === 401)) {
+        console.warn('[AuthContext] Token expirado ao buscar perfil. Renovando sessão...');
+        const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+        if (!refreshErr && refreshData?.session) {
+          const retry = await supabase
+            .from('profiles')
+            .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+            .eq('id', userObj.id)
+            .maybeSingle();
+          profile = retry.data;
+          error = retry.error;
+        }
+      }
 
       // 2. Se não achou por ID, tenta por e-mail (sincronização de contas órfãs ou recriadas)
       if (!profile && userEmail) {
@@ -171,14 +194,30 @@ export function AuthProvider({ children }) {
 
     const init = async () => {
       try {
-        // getSession() lê do localStorage — INSTANTÂNEO, sem rede
-        const { data: { session } } = await supabase.auth.getSession();
+        let { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
+
+        // Se houver sessão mas o token expirou (ou está prestes a expirar), renova proativamente
+        if (session) {
+          const agoraSegundos = Math.floor(Date.now() / 1000);
+          if (session.expires_at && session.expires_at <= agoraSegundos + 60) {
+            console.log('[AuthContext] Sessão com token vencido detectada no init. Renovando credencial...');
+            const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+            if (!refreshErr && refreshData?.session) {
+              session = refreshData.session;
+            } else if (refreshErr) {
+              console.warn('[AuthContext] Erro ao renovar token no init:', refreshErr.message);
+              await supabase.auth.signOut();
+              session = null;
+            }
+          }
+        }
 
         if (session?.user) {
           setUser(session.user);
           await carregarPerfil(session.user);
         } else {
+          setUser(null);
           setPlanoUsuario('basico');
           setAuthLoading(false);
         }
@@ -201,7 +240,12 @@ export function AuthProvider({ children }) {
           await carregarPerfil(session.user);
         }
       } else if (event === 'TOKEN_REFRESHED') {
-        console.log('[AuthContext] Token renovado silenciosamente.');
+        console.log('[AuthContext] Token renovado com sucesso:', session?.user?.email);
+        if (session?.user) {
+          setUser(session.user);
+          // Recarrega o perfil garantindo que dados pós-renovação reflitam o plano correto
+          await carregarPerfil(session.user);
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserName('Aluno');

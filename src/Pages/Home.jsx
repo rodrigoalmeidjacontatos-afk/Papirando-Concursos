@@ -199,15 +199,27 @@ function Home() {
 
         // 2. Buscar atualizado em segundo plano
         try {
-          const resCat = await withTimeout(supabase.from('categorias').select('*'), 15000);
-          if (resCat && resCat.error) console.error('Erro RLS/Supabase Categorias:', resCat.error);
+          let resCat = await withTimeout(supabase.from('categorias').select('*'), 15000);
+          if (resCat?.error) {
+            console.error('Erro RLS/Supabase Categorias:', resCat.error);
+            if (String(resCat.error.message).includes('JWT') || String(resCat.error.code).includes('PGRST301') || resCat.error.status === 401) {
+              console.warn('[Home] JWT expirado ao buscar categorias. Renovando sessão...');
+              await supabase.auth.refreshSession();
+              resCat = await withTimeout(supabase.from('categorias').select('*'), 15000);
+            }
+          }
           categoriasSupabase = resCat?.data || [];
           if (categoriasSupabase.length > 0) sessionStorage.setItem('papirando_cats', JSON.stringify(categoriasSupabase));
         } catch (e) { console.warn('Timeout categorias', e); }
 
         try {
-          const resCar = await withTimeout(supabase.from('carreiras').select('*'), 15000);
-          if (resCar && resCar.error) console.error('Erro RLS/Supabase Carreiras:', resCar.error);
+          let resCar = await withTimeout(supabase.from('carreiras').select('*'), 15000);
+          if (resCar?.error) {
+            console.error('Erro RLS/Supabase Carreiras:', resCar.error);
+            if (String(resCar.error.message).includes('JWT') || String(resCar.error.code).includes('PGRST301') || resCar.error.status === 401) {
+              resCar = await withTimeout(supabase.from('carreiras').select('*'), 15000);
+            }
+          }
           carreirasSupabase = resCar?.data || [];
           if (carreirasSupabase.length > 0) sessionStorage.setItem('papirando_cars', JSON.stringify(carreirasSupabase));
         } catch (e) { console.warn('Timeout carreiras', e); }
@@ -255,7 +267,20 @@ function Home() {
     }
 
     carregarESincronizarDados();
-  }, []);
+
+    // Se estiver em modo de erro e o foco voltar ou o status mudar, re-tenta carregar
+    const handleRecheck = () => {
+      if (document.visibilityState === 'visible') {
+        carregarESincronizarDados();
+      }
+    };
+    window.addEventListener('focus', handleRecheck);
+    window.addEventListener('online', handleRecheck);
+    return () => {
+      window.removeEventListener('focus', handleRecheck);
+      window.removeEventListener('online', handleRecheck);
+    };
+  }, [user]);
 
   // Buscar progresso recente e Estatisticas de Estudo (Netflix Style)
   useEffect(() => {
