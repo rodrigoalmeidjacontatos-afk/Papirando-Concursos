@@ -26,11 +26,7 @@ function CarreiraPage() {
     let mounted = true;
 
     async function carregarDados() {
-      // Só exibe a tela cheia de loading se ainda não temos os dados essenciais
-      if (!carreira) {
-        setCarregando(true);
-      }
-
+      setCarregando(true);
       try {
         // 1. Tentar pegar carreira do cache imediatamente
         let encontrada = carreira;
@@ -122,7 +118,7 @@ function CarreiraPage() {
     }
   }, [user, tipoAcesso, isAdmin, planoUsuario, preparatoriosLiberados, preparatorios, carreiraId]);
 
-  if ((authLoading && !carreira) || (carregando && !carreira)) {
+  if (authLoading || carregando) {
     return <LoadingScreen text="Carregando..." />;
   }
 
@@ -430,7 +426,7 @@ function CarreiraPage() {
           </div>
         )}
 
-        {preparatorios.length === 0 && !isBasico && !isModoRestrito && (
+        {preparatorios.length === 0 && !carregando && !isBasico && !isModoRestrito && (
           <p style={styles.empty}>Nenhum preparatório disponível para sua conta nesta carreira.</p>
         )}
       </main>

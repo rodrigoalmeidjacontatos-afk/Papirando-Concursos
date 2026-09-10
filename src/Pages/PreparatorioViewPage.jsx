@@ -38,9 +38,7 @@ function PreparatorioViewPage() {
 
     const carregarTudo = async () => {
       if (!mounted) return;
-      if (!preparatorio) {
-        setCarregando(true);
-      }
+      setCarregando(true);
       try {
         // 1. Executa em PARALELO as 3 buscas iniciais específicas para este preparatório
         const [prepRes, discRes, vRes] = await Promise.all([
@@ -225,7 +223,7 @@ function PreparatorioViewPage() {
     return map;
   }, [disciplinasFiltradas, progressoAulas, modulos, aulas]);
 
-  if ((authLoading && !preparatorio) || (carregando && !preparatorio)) return <LoadingScreen text="Carregando..." />;
+  if (authLoading || carregando) return <LoadingScreen text="Carregando..." />;
 
   if (erro) {
     return (
@@ -636,7 +634,7 @@ function PreparatorioViewPage() {
           );
         })}
 
-        {disciplinasFiltradas.length === 0 && (
+        {disciplinasFiltradas.length === 0 && !carregando && (
           <div style={styles.emptyMessage}>
             Nenhuma disciplina habilitada para esta carreira neste preparatório.
           </div>
