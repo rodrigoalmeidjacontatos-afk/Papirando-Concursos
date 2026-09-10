@@ -282,35 +282,52 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user?.id) return;
 
-    // 1. Canal Realtime para escutar atualizações instantâneas no perfil do usuário
+    // 1. Canal Realtime para escutar atualizações instantâneas no perfil do usuário via WebSocket Broadcast
     const channel = supabase
-      .channel(`profile-realtime-${user.id}`)
+      .channel('global-user-sync')
+      .on(
+        'broadcast',
+        { event: 'sync-user' },
+        (payload) => {
+          const data = payload?.payload;
+          if (data && (data.userId === user.id || data.email === user.email)) {
+            console.log('[AuthContext] ⚡ Alteração instantânea recebida do Admin:', data.novoPlano);
+            if (data.novoPlano) {
+              setPlanoUsuario(data.novoPlano);
+              sessionStorage.setItem('papirando_plano', data.novoPlano);
+            }
+            carregarPerfil(user);
+          }
+        }
+      )
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`
+          table: 'profiles'
         },
         (payload) => {
-          console.log('[AuthContext] ⚡ Alteração de perfil em tempo real detectada:', payload);
-          if (payload.new) {
-            aplicarPerfil(payload.new, user);
-          } else {
-            carregarPerfil(user);
+          const changedId = payload.new?.id || payload.old?.id;
+          if (changedId === user.id || payload.new?.email === user.email) {
+            console.log('[AuthContext] ⚡ Postgres change detectada para este usuário:', payload);
+            if (payload.new) {
+              aplicarPerfil(payload.new, user);
+            } else {
+              carregarPerfil(user);
+            }
           }
         }
       )
       .subscribe((status) => {
-        console.log(`[AuthContext] Status Realtime (profiles): ${status}`);
+        console.log(`[AuthContext] Status Realtime: ${status}`);
       });
 
     // 2. Revalidação ao focar na aba ou voltar de segundo plano
     let lastCheck = 0;
     const handleRevalidate = () => {
       const now = Date.now();
-      if (document.visibilityState === 'visible' && now - lastCheck > 2500) {
+      if (document.visibilityState === 'visible' && now - lastCheck > 1500) {
         lastCheck = now;
         console.log('[AuthContext] Revalidando perfil ao focar na aba...');
         carregarPerfil(user);
@@ -321,12 +338,12 @@ export function AuthProvider({ children }) {
     window.addEventListener('visibilitychange', handleRevalidate);
     window.addEventListener('popstate', handleRevalidate);
 
-    // 3. Heartbeat periódico a cada 8 segundos para garantir sincronismo contínuo
+    // 3. Heartbeat periódico a cada 5 segundos para garantir sincronismo contínuo
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         carregarPerfil(user);
       }
-    }, 8000);
+    }, 5000);
 
     return () => {
       supabase.removeChannel(channel);

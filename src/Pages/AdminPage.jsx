@@ -222,6 +222,23 @@ function AdminPage() {
     }
   };
 
+  const notificarUsuarioEmTempoReal = (userId, novoPlano) => {
+    try {
+      const ch = supabase.channel('global-user-sync');
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          ch.send({
+            type: 'broadcast',
+            event: 'sync-user',
+            payload: { userId, novoPlano, timestamp: Date.now() }
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Erro ao disparar broadcast:', e);
+    }
+  };
+
   const atualizarPlano = async (userId, novoPlano) => {
     console.log(`[Admin] Tentando atualizar plano de ${userId} para ${novoPlano}...`);
     
@@ -261,6 +278,7 @@ function AdminPage() {
     
     if (!error) {
       console.log(`[Admin] Plano de ${userId} atualizado com sucesso!`);
+      notificarUsuarioEmTempoReal(userId, novoPlano);
       alert(`✅ Plano alterado para ${novoPlano.toUpperCase()}!`);
     } else {
       console.error("[Admin] Erro ao atualizar plano no Supabase:", error);
@@ -322,6 +340,7 @@ function AdminPage() {
       .eq('id', userId);
       
     if (!error) {
+      notificarUsuarioEmTempoReal(userId, updates.plano || usuarioAtual?.plano);
       const msg = dataFinal 
         ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
         : 'Acesso Vitalício!';
@@ -381,6 +400,7 @@ function AdminPage() {
       .update({ preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados })
       .eq('id', usuarioEditandoAcesso.id);
     if (!error) {
+      notificarUsuarioEmTempoReal(usuarioEditandoAcesso.id, usuarioEditandoAcesso.plano);
       setUsuarios(prev => prev.map(u => u.id === usuarioEditandoAcesso.id ? { ...u, preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados } : u));
       setUsuarioEditandoAcesso(null);
       alert('✅ Acesso atualizado com sucesso!');
