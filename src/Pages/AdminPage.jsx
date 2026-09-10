@@ -243,19 +243,16 @@ function AdminPage() {
     setUsuarios(prev => prev.map(u => u.id === userId ? { 
       ...u, 
       plano: novoPlano, 
-      data_expiracao: dataExpiracaoFinal, 
-      plano_anterior: (usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : u.plano_anterior 
+      data_expiracao: novoPlano === 'basico' ? null : dataExpiracaoFinal, 
+      plano_anterior: novoPlano === 'basico' ? null : ((usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : u.plano_anterior) 
     } : u));
 
     const updates = { 
       plano: novoPlano,
-      data_expiracao: dataExpiracaoFinal,
-      preparatorios_liberados: novoPlano === 'premium' ? [] : (usuarioAtual?.preparatorios_liberados || [])
+      data_expiracao: novoPlano === 'basico' ? null : dataExpiracaoFinal,
+      preparatorios_liberados: novoPlano === 'premium' ? [] : (usuarioAtual?.preparatorios_liberados || []),
+      plano_anterior: novoPlano === 'basico' ? null : ((usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : usuarioAtual?.plano_anterior)
     };
-
-    if (usuarioAtual && usuarioAtual.plano !== novoPlano) {
-       updates.plano_anterior = usuarioAtual.plano;
-    }
 
     const { error } = await supabase
       .from('profiles')

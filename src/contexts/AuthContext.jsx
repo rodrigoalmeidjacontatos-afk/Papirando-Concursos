@@ -55,16 +55,24 @@ export function AuthProvider({ children }) {
       const dentroDaTolerancia = (new Date() - new Date(dataExp)) < gracePeriodMs;
       if (expirou && !dentroDaTolerancia) {
         const targetId = profile.id || userObj.id;
-        if (profile.plano_anterior && profile.plano_anterior !== planoNormalizado) {
-          planoNormalizado = profile.plano_anterior;
+        
+        // REGRA DE SEGURANÇA CRÍTICA:
+        // A expiração de data só pode REBAIXAR um plano pago (premium/medio) para basico.
+        // NUNCA pode transformar um plano basico em premium!
+        if (planoNormalizado !== 'basico') {
+          const planoRevertido = (profile.plano_anterior && profile.plano_anterior !== 'premium') 
+            ? profile.plano_anterior 
+            : 'basico';
+          planoNormalizado = planoRevertido;
           dataExp = null;
           supabase.from('profiles')
-            .update({ plano: planoNormalizado, data_expiracao: null, plano_anterior: null })
+            .update({ plano: planoRevertido, data_expiracao: null, plano_anterior: null })
             .eq('id', targetId);
         } else {
+          // Se o plano já é basico, apenas limpa a data expirada e o histórico para não haver conflitos
           dataExp = null;
           supabase.from('profiles')
-            .update({ data_expiracao: null })
+            .update({ data_expiracao: null, plano_anterior: null })
             .eq('id', targetId);
         }
       }
@@ -310,19 +318,21 @@ export function AuthProvider({ children }) {
     };
 
     window.addEventListener('focus', handleRevalidate);
-    document.addEventListener('visibilitychange', handleRevalidate);
+    window.addEventListener('visibilitychange', handleRevalidate);
+    window.addEventListener('popstate', handleRevalidate);
 
-    // 3. Heartbeat periódico a cada 20 segundos para garantir sincronismo contínuo
+    // 3. Heartbeat periódico a cada 8 segundos para garantir sincronismo contínuo
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         carregarPerfil(user);
       }
-    }, 20000);
+    }, 8000);
 
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('focus', handleRevalidate);
-      document.removeEventListener('visibilitychange', handleRevalidate);
+      window.removeEventListener('visibilitychange', handleRevalidate);
+      window.removeEventListener('popstate', handleRevalidate);
       clearInterval(interval);
     };
   }, [user, carregarPerfil, aplicarPerfil]);
