@@ -228,14 +228,29 @@ function AdminPage() {
     // Atualização otimista (na interface primeiro)
     const usuarioAtual = usuarios.find(u => u.id === userId);
     
-    // Atualização otimista
     const backupUsuarios = [...usuarios];
-    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, plano: novoPlano, data_expiracao: null, plano_anterior: (usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : u.plano_anterior } : u));
+    
+    // Se o usuário tem validade futura e está mudando para premium ou médio, mantemos a validade.
+    // Se está sendo rebaixado para básico, limpa a expiração.
+    let dataExpiracaoFinal = null;
+    if (novoPlano !== 'basico' && usuarioAtual?.data_expiracao) {
+      const expDate = new Date(usuarioAtual.data_expiracao);
+      if (expDate > new Date()) {
+        dataExpiracaoFinal = usuarioAtual.data_expiracao;
+      }
+    }
+
+    setUsuarios(prev => prev.map(u => u.id === userId ? { 
+      ...u, 
+      plano: novoPlano, 
+      data_expiracao: dataExpiracaoFinal, 
+      plano_anterior: (usuarioAtual && usuarioAtual.plano !== novoPlano) ? usuarioAtual.plano : u.plano_anterior 
+    } : u));
 
     const updates = { 
       plano: novoPlano,
-      data_expiracao: null,
-      preparatorios_liberados: novoPlano === 'premium' ? [] : undefined 
+      data_expiracao: dataExpiracaoFinal,
+      preparatorios_liberados: novoPlano === 'premium' ? [] : (usuarioAtual?.preparatorios_liberados || [])
     };
 
     if (usuarioAtual && usuarioAtual.plano !== novoPlano) {
@@ -282,17 +297,27 @@ function AdminPage() {
       dataFinal = d.toISOString();
     }
     
+    const usuarioAtual = usuarios.find(u => u.id === userId);
     const updates = { data_expiracao: dataFinal };
     
-    // REGRA: Apenas o botão de 15 minutos (degustação) força o plano PREMIUM
-    // Os outros botões (+1d, +30d) apenas definem o tempo do plano que o usuário já tem
-    if (unidade === 'minutos' && tempo !== null) {
-      const usuarioAtual = usuarios.find(u => u.id === userId);
-      if (usuarioAtual && usuarioAtual.plano !== 'premium') {
-         updates.plano_anterior = usuarioAtual.plano;
+    // REGRA DE CONVERSÃO AUTOMÁTICA:
+    // Se o usuário está no plano 'basico' (ou indefinido) e o admin está concedendo tempo de acesso
+    // (+1d, +7d, +30d, 15m, calendário) OU vitalício, ele DEVE ser promovido para PREMIUM!
+    // Não faz nenhum sentido dar validade temporária para um plano básico (gratuito).
+    if (tempo !== null) {
+      if (!usuarioAtual || usuarioAtual.plano === 'basico') {
+        updates.plano_anterior = 'basico';
+        updates.plano = 'premium';
       }
-      updates.plano = 'premium';
+    } else {
+      // Vitalício
+      if (!usuarioAtual || usuarioAtual.plano === 'basico') {
+        updates.plano = 'premium';
+      }
     }
+    
+    const backupUsuarios = [...usuarios];
+    setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
     
     const { error } = await supabase
       .from('profiles')
@@ -300,12 +325,12 @@ function AdminPage() {
       .eq('id', userId);
       
     if (!error) {
-      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       const msg = dataFinal 
         ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
         : 'Acesso Vitalício!';
       alert(`✅ Sucesso! ${msg}`);
     } else {
+      setUsuarios(backupUsuarios);
       alert('❌ Erro ao atualizar: ' + error.message);
     }
   };
@@ -2792,15 +2817,17 @@ function AdminPage() {
                                   🚫 Bloquear
                                 </button>
                                 <input 
-                                  type="date" 
-                                  style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 4px', borderRadius: '4px'}}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val) {
-                                      const d = new Date(val);
-                                      atualizarExpiracao(u.id, Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24)));
-                                    }
-                                  }}
+                                   type="date" 
+                                   style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 4px', borderRadius: '4px'}}
+                                   onChange={(e) => {
+                                     const val = e.target.value;
+                                     if (val) {
+                                       const [ano, mes, dia] = val.split('-');
+                                       const d = new Date(Number(ano), Number(mes) - 1, Number(dia), 23, 59, 59);
+                                       const diffDias = Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+                                       atualizarExpiracao(u.id, Math.max(1, diffDias));
+                                     }
+                                   }}
                                 />
                               </div>
                             </div>
