@@ -39,10 +39,11 @@ function CarreiraPage() {
         }
 
         // 2. Executar TODAS as buscas em PARALELO (Promise.all)
-        const [carRes, prepsRes, vRes] = await Promise.all([
+        const [carRes, prepsRes, vRes, catRes] = await Promise.all([
           !encontrada ? supabase.from('carreiras').select('*') : Promise.resolve({ data: null }),
           supabase.from('preparatorios').select('*'),
-          supabase.from('vinculos').select('*').eq('carreira_id', carreiraId)
+          supabase.from('vinculos').select('*').eq('carreira_id', carreiraId),
+          supabase.from('categorias').select('*')
         ]);
 
         if (!mounted) return;
@@ -52,19 +53,24 @@ function CarreiraPage() {
           if (encontrada) setCarreira(encontrada);
         }
 
-        // Tipo de acesso da categoria
+        // Tipo de acesso da categoria (sempre atualizado do Supabase com fallback seguro)
         let catTipoAcesso = 'livre';
         const catId = encontrada?.categoriaId || encontrada?.categoria_id;
         if (catId) {
+          const catSupabase = (catRes?.data || []).find(c => c.id === catId);
+          if (catSupabase?.tipo_acesso) {
+            catTipoAcesso = catSupabase.tipo_acesso;
+          } else {
+            try {
+              const cacheCats = JSON.parse(localStorage.getItem('papirando_cats_cache') || '[]');
+              const catCache = cacheCats.find(c => c.id === catId);
+              catTipoAcesso = catCache?.tipo_acesso || 'livre';
+            } catch (e) {}
+          }
+        }
+        if (catRes?.data && catRes.data.length > 0) {
           try {
-            const cacheCats = JSON.parse(localStorage.getItem('papirando_cats_cache') || '[]');
-            const catCache = cacheCats.find(c => c.id === catId);
-            if (catCache?.tipo_acesso) {
-              catTipoAcesso = catCache.tipo_acesso;
-            } else {
-              const { data: catData } = await supabase.from('categorias').select('tipo_acesso').eq('id', catId).single();
-              catTipoAcesso = catData?.tipo_acesso || 'livre';
-            }
+            localStorage.setItem('papirando_cats_cache', JSON.stringify(catRes.data));
           } catch (e) {}
         }
         if (mounted) setTipoAcesso(catTipoAcesso);

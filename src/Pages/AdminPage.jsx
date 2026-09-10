@@ -54,8 +54,19 @@ function AdminPage() {
   const [expandedDiscVinculo, setExpandedDiscVinculo] = useState(null);
   const [filtroDisciplinaVinculo, setFiltroDisciplinaVinculo] = useState('');
   const [buscaModuloVinculo, setBuscaModuloVinculo] = useState('');
+  const [buscaPrepVinculo, setBuscaPrepVinculo] = useState('');
+  const [filtroStatusVinculo, setFiltroStatusVinculo] = useState('todos'); // 'todos', 'vinculados', 'nao_vinculados'
+  const [salvandoVinculoId, setSalvandoVinculoId] = useState(null); // prepId or 'todos'
+  const [notificacaoVinculo, setNotificacaoVinculo] = useState(null); // { tipo: 'sucesso'|'erro', texto: '' }
   const [expandedModuloAulas, setExpandedModuloAulas] = useState({});
   const toggleModuloAulasExpand = (modId) => setExpandedModuloAulas(prev => ({ ...prev, [modId]: !prev[modId] }));
+
+  useEffect(() => {
+    if (notificacaoVinculo) {
+      const t = setTimeout(() => setNotificacaoVinculo(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [notificacaoVinculo]);
   
   // ========== FORMULÁRIOS ==========
   const [novaCategoria, setNovaCategoria] = useState({ nome: '', icone: '', tipo_acesso: 'livre' });
@@ -678,24 +689,35 @@ function AdminPage() {
 
   // ========== CRUD CATEGORIAS (SUPABASE) ========== 
   const addCategoria = async () => {
-    if (!novaCategoria.nome) return alert('Digite o nome');
+    if (!novaCategoria.nome) return alert('Digite o nome da categoria');
     const id = slugify(novaCategoria.nome);
     const nova = { id, nome: novaCategoria.nome, icone: novaCategoria.icone || '', tipo_acesso: novaCategoria.tipo_acesso || 'livre' };
     const { error } = await supabase.from('categorias').upsert([nova]);
     if (!error) {
-      setCategorias([...categorias, nova]);
+      const updated = [...categorias, nova];
+      setCategorias(updated);
+      try {
+        localStorage.setItem('papirando_cats_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cats', JSON.stringify(updated));
+      } catch (e) {}
       setNovaCategoria({ nome: '', icone: '', tipo_acesso: 'livre' });
     } else {
-      alert('Erro ao adicionar categoria');
+      alert('Erro ao adicionar categoria: ' + error.message);
     }
   };
 
   const removeCategoria = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta categoria?')) return;
     const { error } = await supabase.from('categorias').delete().eq('id', id);
     if (!error) {
-      setCategorias(categorias.filter(c => c.id !== id));
+      const updated = categorias.filter(c => c.id !== id);
+      setCategorias(updated);
+      try {
+        localStorage.setItem('papirando_cats_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cats', JSON.stringify(updated));
+      } catch (e) {}
     } else {
-      alert('Erro ao remover categoria');
+      alert('Erro ao remover categoria: ' + error.message);
     }
   };
 
@@ -703,10 +725,15 @@ function AdminPage() {
     if (!editandoCategoria.nome) return alert('Preencha o nome');
     const { error } = await supabase.from('categorias').upsert([editandoCategoria]);
     if (!error) {
-      setCategorias(categorias.map(c => c.id === editandoCategoria.id ? editandoCategoria : c));
+      const updated = categorias.map(c => c.id === editandoCategoria.id ? editandoCategoria : c);
+      setCategorias(updated);
+      try {
+        localStorage.setItem('papirando_cats_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cats', JSON.stringify(updated));
+      } catch (e) {}
       setEditandoCategoria(null);
     } else {
-      alert('Erro ao editar categoria');
+      alert('Erro ao editar categoria: ' + error.message);
     }
   };
 
@@ -728,19 +755,30 @@ function AdminPage() {
     };
     const { error } = await supabase.from('carreiras').upsert([nova]);
     if (!error) {
-      setCarreiras([...carreiras, nova]);
+      const updated = [...carreiras, nova];
+      setCarreiras(updated);
+      try {
+        localStorage.setItem('papirando_cars_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cars', JSON.stringify(updated));
+      } catch (e) {}
       setNovaCarreira({ nome: '', icone: '', capa: '', categoriaId: '' });
     } else {
-      alert('Erro ao adicionar carreira');
+      alert('Erro ao adicionar carreira: ' + error.message);
     }
   };
 
   const removeCarreira = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta carreira?')) return;
     const { error } = await supabase.from('carreiras').delete().eq('id', id);
     if (!error) {
-      setCarreiras(carreiras.filter(c => c.id !== id));
+      const updated = carreiras.filter(c => c.id !== id);
+      setCarreiras(updated);
+      try {
+        localStorage.setItem('papirando_cars_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cars', JSON.stringify(updated));
+      } catch (e) {}
     } else {
-      alert('Erro ao remover carreira');
+      alert('Erro ao remover carreira: ' + error.message);
     }
   };
 
@@ -753,10 +791,15 @@ function AdminPage() {
     if (!editandoCarreira.nome) return alert('Preencha o nome');
     const { error } = await supabase.from('carreiras').upsert([editandoCarreira]);
     if (!error) {
-      setCarreiras(carreiras.map(c => c.id === editandoCarreira.id ? editandoCarreira : c));
+      const updated = carreiras.map(c => c.id === editandoCarreira.id ? editandoCarreira : c);
+      setCarreiras(updated);
+      try {
+        localStorage.setItem('papirando_cars_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cars', JSON.stringify(updated));
+      } catch (e) {}
       setEditandoCarreira(null);
     } else {
-      alert('Erro ao editar carreira');
+      alert('Erro ao editar carreira: ' + error.message);
     }
   };
 
@@ -1494,7 +1537,9 @@ function AdminPage() {
       }
       await marcarPrepComoAtualizado(prepId);
     }
-    alert('✅ Todos os módulos e aulas selecionados!');
+    setSalvandoVinculoId(null);
+    const prep = preparatorios.find(p => p.id === prepId);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `✅ Curso "${prep?.nome || prepId}" vinculado com sucesso! (${inserts.length} novas aulas)` });
   };
 
   const selecionarDisciplinaVinculo = async (carreiraId, prepId, discId) => {
@@ -1538,7 +1583,7 @@ function AdminPage() {
       await marcarPrepComoAtualizado(prepId);
     }
     const disc = disciplinas.find(d => d.id === discId);
-    alert(`✅ Disciplina "${disc?.nome || ''}" selecionada! (${modsDaDisc.length} módulo(s))`);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `✅ Disciplina "${disc?.nome || ''}" vinculada! (${modsDaDisc.length} módulo(s))` });
   };
 
   const selecionarModuloVinculo = async (carreiraId, prepId, moduloId) => {
@@ -1580,7 +1625,73 @@ function AdminPage() {
       }
       await marcarPrepComoAtualizado(prepId);
     }
-    alert(`✅ ${aulasDoMod.length} aula(s) do módulo selecionadas!`);
+    const mod = modulos.find(m => m.id === moduloId);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `✅ ${aulasDoMod.length} aula(s) do módulo "${mod?.nome || ''}" vinculadas!` });
+  };
+
+  /** Vincula um preparatório completo (todas as aulas) com 1 clique */
+  const vincularPrepCompleto = async (carreiraId, prepId) => {
+    setSalvandoVinculoId(prepId);
+    // Garante vínculo base
+    if (!isPrepVinculado(carreiraId, prepId)) {
+      const carrVinculos = vinculos[carreiraId] || {};
+      setVinculos({ ...vinculos, [carreiraId]: { ...carrVinculos, [prepId]: { modulos: {} } } });
+      await supabase.from('vinculos').upsert([{ carreira_id: carreiraId, preparatorio_id: prepId }]);
+    }
+    await selecionarTudoVinculo(carreiraId, prepId);
+  };
+
+  /** Desvincula completamente um preparatório e todas suas aulas de uma carreira */
+  const desvincularPrep = async (carreiraId, prepId) => {
+    const prep = preparatorios.find(p => p.id === prepId);
+    if (!window.confirm(`Deseja desvincular completamente o curso "${prep?.nome || prepId}" desta carreira? Todas as aulas serão removidas.`)) return;
+    setSalvandoVinculoId(prepId);
+    await supabase.from('vinculos').delete().eq('carreira_id', carreiraId).eq('preparatorio_id', prepId);
+    const carrVinculos = { ...(vinculos[carreiraId] || {}) };
+    delete carrVinculos[prepId];
+    setVinculos({ ...vinculos, [carreiraId]: carrVinculos });
+    setSalvandoVinculoId(null);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `🗑️ Curso "${prep?.nome || prepId}" desvinculado com sucesso!` });
+  };
+
+  /** Vincula TODOS os preparatórios a uma carreira de uma só vez */
+  const vincularTodosPreps = async (carreiraId) => {
+    if (!window.confirm(`Deseja vincular TODOS os ${preparatorios.length} cursos a esta carreira com todas as aulas?`)) return;
+    setSalvandoVinculoId('todos');
+    for (const prep of preparatorios) {
+      await vincularPrepCompleto(carreiraId, prep.id);
+    }
+    setSalvandoVinculoId(null);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `✅ Todos os ${preparatorios.length} cursos vinculados com sucesso!` });
+  };
+
+  /** Desvincula todos os preparatórios de uma carreira */
+  const desvincularTodosPreps = async (carreiraId) => {
+    const carreira = carreiras.find(c => c.id === carreiraId);
+    if (!window.confirm(`Deseja DESVINCULAR TODOS os cursos da carreira "${carreira?.nome || carreiraId}"? Isso removerá todos os vínculos.`)) return;
+    setSalvandoVinculoId('todos');
+    await supabase.from('vinculos').delete().eq('carreira_id', carreiraId);
+    const novoVinculos = { ...vinculos };
+    delete novoVinculos[carreiraId];
+    setVinculos(novoVinculos);
+    setSalvandoVinculoId(null);
+    setNotificacaoVinculo({ tipo: 'sucesso', texto: `🗑️ Todos os vínculos da carreira removidos!` });
+  };
+
+  /** Atualiza a categoria de uma carreira para 'livre' diretamente */
+  const atualizarCategoriaParaLivre = async (categoriaId) => {
+    const { error } = await supabase.from('categorias').update({ tipo_acesso: 'livre' }).eq('id', categoriaId);
+    if (!error) {
+      const updated = categorias.map(c => c.id === categoriaId ? { ...c, tipo_acesso: 'livre' } : c);
+      setCategorias(updated);
+      try {
+        localStorage.setItem('papirando_cats_cache', JSON.stringify(updated));
+        sessionStorage.setItem('papirando_cats', JSON.stringify(updated));
+      } catch (e) {}
+      setNotificacaoVinculo({ tipo: 'sucesso', texto: `✅ Categoria atualizada para "Livre" — agora visível para todos os alunos!` });
+    } else {
+      setNotificacaoVinculo({ tipo: 'erro', texto: `❌ Erro ao atualizar categoria: ${error.message}` });
+    }
   };
 
   const marcarPrepComoAtualizado = async (prepId) => {
@@ -1667,11 +1778,11 @@ function AdminPage() {
                     value={novaCategoria.tipo_acesso}
                     onChange={e => setNovaCategoria({...novaCategoria, tipo_acesso: e.target.value})}
                   >
-                    <option value="livre">🌐 Livre (todos)</option>
-                    <option value="basico">🟢 Básico</option>
-                    <option value="medio">🔵 Médio</option>
-                    <option value="premium">🟡 Premium</option>
-                    <option value="admin">🔴 Admin (Apenas Admins)</option>
+                    <option value="livre">🌐 Livre (Visível para todos os alunos)</option>
+                    <option value="basico">🟢 Básico (Requer login)</option>
+                    <option value="medio">🔵 Médio (Requer plano Médio ou Premium)</option>
+                    <option value="premium">🟡 Premium (Apenas plano Premium)</option>
+                    <option value="admin">🔴 Apenas Admin — OCULTO PARA ALUNOS</option>
                   </select>
                   <button style={styles.addButton} onClick={addCategoria}>Adicionar</button>
                 </div>
@@ -2341,49 +2452,192 @@ function AdminPage() {
             </div>
           )}
 
-          {activeMenu === 'vincular' && (
-            <div>
+          {activeMenu === 'vincular' && (() => {
+            const carreiraInfo = carreiras.find(c => c.id === selectedCarreira);
+            const categoriaInfo = carreiraInfo ? categorias.find(c => c.id === (carreiraInfo.categoriaId || carreiraInfo.categoria_id)) : null;
+            const isCatAdmin = categoriaInfo?.tipo_acesso === 'admin';
+
+            const prepsFiltrados = preparatorios.filter(prep => {
+              const matchBusca = !buscaPrepVinculo || prep.nome.toLowerCase().includes(buscaPrepVinculo.toLowerCase());
+              const vinculado = isPrepVinculado(selectedCarreira, prep.id);
+              const matchStatus = filtroStatusVinculo === 'todos' || (filtroStatusVinculo === 'vinculados' && vinculado) || (filtroStatusVinculo === 'nao_vinculados' && !vinculado);
+              return matchBusca && matchStatus;
+            });
+
+            const totalVinculados = preparatorios.filter(p => isPrepVinculado(selectedCarreira, p.id)).length;
+
+            const getCountAulasVinculadas = (carreiraId, prepId) => {
+              const mods = vinculos[carreiraId]?.[prepId]?.modulos || {};
+              return Object.values(mods).reduce((acc, m) => acc + Object.keys(m.aulas || {}).length, 0);
+            };
+
+            const getTotalAulasPrep = (prepId) => {
+              const discs = getDisciplinasPorPrep(prepId);
+              return discs.reduce((acc, d) => {
+                const mods = getModulosPorDisciplina(d.id);
+                return acc + mods.reduce((a, m) => a + getAulasPorModulo(m.id).length, 0);
+              }, 0);
+            };
+
+            return (
+            <div style={{ position: 'relative' }}>
+              {/* TOAST NOTIFICATION */}
+              {notificacaoVinculo && (
+                <div style={{
+                  position: 'fixed', top: '20px', right: '24px', zIndex: 99999,
+                  backgroundColor: notificacaoVinculo.tipo === 'sucesso' ? '#1b4332' : '#5f1d1d',
+                  border: `1px solid ${notificacaoVinculo.tipo === 'sucesso' ? '#4CAF50' : '#E50914'}`,
+                  borderRadius: '10px', padding: '14px 20px', maxWidth: '420px',
+                  color: '#FFF', fontSize: '14px', fontWeight: '500',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+                  display: 'flex', alignItems: 'center', gap: '10px'
+                }}>
+                  <span style={{ fontSize: '18px' }}>{notificacaoVinculo.tipo === 'sucesso' ? '✅' : '❌'}</span>
+                  <span>{notificacaoVinculo.texto}</span>
+                  <button onClick={() => setNotificacaoVinculo(null)} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#FFF', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+              )}
+
               <h2 style={{color: '#fff', marginBottom: 20}}>Vincular Conteúdos às Carreiras</h2>
+
+              {/* SELETOR DE CARREIRA */}
               <div style={styles.formCard}>
-                <label style={{color: '#AAA'}}>Selecione a Carreira para configurar seus vínculos:</label>
-                <select style={{...styles.select, width: '100%', marginTop: '8px'}} value={selectedCarreira} onChange={e => setSelectedCarreira(e.target.value)}>
+                <label style={{color: '#AAA', fontSize: '13px', marginBottom: '6px', display: 'block'}}>Selecione a Carreira para configurar seus vínculos:</label>
+                <select style={{...styles.select, width: '100%', marginTop: '8px'}} value={selectedCarreira} onChange={e => { setSelectedCarreira(e.target.value); setBuscaPrepVinculo(''); setFiltroStatusVinculo('todos'); }}>
                   <option value="">-- Escolha uma Carreira --</option>
-                  {carreiras.map(c => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
+                  {carreiras.map(c => {
+                    const catC = categorias.find(cat => cat.id === (c.categoriaId || c.categoria_id));
+                    const label = catC?.tipo_acesso === 'admin' ? ' 🔴' : '';
+                    return <option key={c.id} value={c.id}>{c.icone} {c.nome}{label}</option>;
+                  })}
                 </select>
               </div>
 
               {selectedCarreira && (
                 <div>
-                  <h3 style={{color: '#F5F5F5', marginBottom: '16px'}}>Cursos Disponíveis</h3>
-                  {preparatorios.map(prep => {
+                  {/* PAINEL DE DIAGNÓSTICO DA CARREIRA */}
+                  <div style={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                      {carreiraInfo?.capa && <img src={carreiraInfo.capa} alt="" style={{ width: '52px', height: '52px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #444' }} />}
+                      <div>
+                        <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '16px' }}>{carreiraInfo?.icone} {carreiraInfo?.nome}</div>
+                        <div style={{ color: '#888', fontSize: '12px', marginTop: '2px' }}>Categoria: {categoriaInfo?.nome || '—'}
+                          <span style={{
+                            marginLeft: '8px', padding: '2px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 'bold',
+                            backgroundColor: isCatAdmin ? 'rgba(229,9,20,0.2)' : categoriaInfo?.tipo_acesso === 'premium' ? 'rgba(245,166,35,0.2)' : categoriaInfo?.tipo_acesso === 'medio' ? 'rgba(74,144,226,0.2)' : 'rgba(39,174,96,0.2)',
+                            color: isCatAdmin ? '#E50914' : categoriaInfo?.tipo_acesso === 'premium' ? '#f5a623' : categoriaInfo?.tipo_acesso === 'medio' ? '#4a90e2' : '#27ae60',
+                          }}>
+                            {isCatAdmin ? '🔴 Admin' : categoriaInfo?.tipo_acesso === 'premium' ? '⭐ Premium' : categoriaInfo?.tipo_acesso === 'medio' ? '🔵 Médio' : categoriaInfo?.tipo_acesso === 'basico' ? '🟢 Básico' : '🌐 Livre'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ color: '#AAA', fontSize: '12px' }}>📌 {totalVinculados}/{preparatorios.length} cursos vinculados</span>
+                      <button style={{...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px'}} onClick={() => vincularTodosPreps(selectedCarreira)} disabled={salvandoVinculoId === 'todos'}>
+                        {salvandoVinculoId === 'todos' ? '⏳...' : '⚡ Vincular Tudo'}
+                      </button>
+                      <button style={{...styles.smallButton, backgroundColor: '#c62828', fontSize: '11px'}} onClick={() => desvincularTodosPreps(selectedCarreira)} disabled={salvandoVinculoId === 'todos'}>
+                        🗑️ Limpar Tudo
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* BANNER DE ALERTA: CATEGORIA ADMIN */}
+                  {isCatAdmin && (
+                    <div style={{ backgroundColor: 'rgba(229,9,20,0.12)', border: '1px solid rgba(229,9,20,0.5)', borderRadius: '10px', padding: '14px 18px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '22px' }}>⚠️</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: '14px' }}>Categoria configurada como "Apenas Admin"</div>
+                        <div style={{ color: '#aaa', fontSize: '12px', marginTop: '3px' }}>
+                          Esta carreira pertence à categoria <strong style={{color:'#FFF'}}>"{categoriaInfo?.nome}"</strong> que está oculta para os alunos. 
+                          Mesmo com vínculos ativos, os alunos <strong style={{color:'#E50914'}}>NÃO conseguem ver nem acessar</strong> nenhum curso desta carreira.
+                        </div>
+                      </div>
+                      <button
+                        style={{ ...styles.saveButton, backgroundColor: '#E50914', whiteSpace: 'nowrap', fontSize: '12px', padding: '8px 14px' }}
+                        onClick={() => atualizarCategoriaParaLivre(categoriaInfo.id)}
+                      >
+                        🌐 Tornar Categoria Livre Agora
+                      </button>
+                    </div>
+                  )}
+
+                  {/* BUSCA E FILTRO DE CURSOS */}
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input
+                      placeholder="🔍 Buscar curso..."
+                      value={buscaPrepVinculo}
+                      onChange={e => setBuscaPrepVinculo(e.target.value)}
+                      style={{ ...styles.input, flex: 1, minWidth: '200px', margin: 0 }}
+                    />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[['todos', 'Todos'], ['vinculados', 'Vinculados'], ['nao_vinculados', 'Não Vinculados']].map(([v, l]) => (
+                        <button key={v} onClick={() => setFiltroStatusVinculo(v)} style={{
+                          padding: '8px 14px', borderRadius: '8px', border: '1px solid',
+                          fontSize: '12px', cursor: 'pointer', fontWeight: filtroStatusVinculo === v ? 'bold' : 'normal',
+                          backgroundColor: filtroStatusVinculo === v ? '#E50914' : 'transparent',
+                          borderColor: filtroStatusVinculo === v ? '#E50914' : '#444',
+                          color: filtroStatusVinculo === v ? '#FFF' : '#AAA'
+                        }}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* LISTA DE CURSOS */}
+                  <h3 style={{color: '#F5F5F5', marginBottom: '12px', fontSize: '15px'}}>
+                    Cursos ({prepsFiltrados.length}{filtroStatusVinculo !== 'todos' ? ` de ${preparatorios.length}` : ''})
+                  </h3>
+
+                  {prepsFiltrados.map(prep => {
                     const vinculado = isPrepVinculado(selectedCarreira, prep.id);
                     const isExpanded = expandedPrepVinculo === prep.id;
-                    
+                    const aulasVinc = getCountAulasVinculadas(selectedCarreira, prep.id);
+                    const aulasTotal = getTotalAulasPrep(prep.id);
+                    const isSalvando = salvandoVinculoId === prep.id;
+
+                    let statusBadge = { label: '⚪ Não vinculado', color: '#666' };
+                    if (vinculado && aulasVinc > 0 && aulasVinc >= aulasTotal && aulasTotal > 0) statusBadge = { label: `🟢 ${aulasVinc} aulas`, color: '#4CAF50' };
+                    else if (vinculado && aulasVinc > 0) statusBadge = { label: `🟡 ${aulasVinc}/${aulasTotal} aulas`, color: '#f5a623' };
+                    else if (vinculado) statusBadge = { label: '🔵 Vinculado', color: '#4a90e2' };
+
                     return (
-                      <div key={prep.id} style={styles.vinculoPrepCard}>
+                      <div key={prep.id} style={{...styles.vinculoPrepCard, border: vinculado ? '1px solid rgba(76,175,80,0.35)' : '1px solid #333'}}>
                         <div style={styles.vinculoPrepHeader}>
-                          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                          <div style={{display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1}}>
                             <label style={styles.checkboxLabel}>
-                              <input type="checkbox" checked={vinculado} onChange={() => togglePrepVinculo(selectedCarreira, prep.id)} style={{width: '18px', height: '18px'}} />
+                              <input type="checkbox" checked={vinculado} onChange={() => togglePrepVinculo(selectedCarreira, prep.id)} style={{width: '18px', height: '18px', accentColor: '#4CAF50'}} />
                               <span style={styles.prepLogo}>{renderIcon(prep.logo)}</span>
                               <span style={styles.prepNome}>{prep.nome}</span>
                             </label>
-                            {vinculado && (
-                              <button style={{...styles.smallButton, backgroundColor: '#4CAF50', marginLeft: '12px'}} onClick={(e) => { e.stopPropagation(); selecionarTudoVinculo(selectedCarreira, prep.id); }}>
-                                ☑️ Selecionar Tudo
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: statusBadge.color, padding: '2px 8px', borderRadius: '999px', border: `1px solid ${statusBadge.color}33` }}>
+                              {isSalvando ? '⏳ Salvando...' : statusBadge.label}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {!vinculado ? (
+                              <button style={{...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px'}} onClick={() => vincularPrepCompleto(selectedCarreira, prep.id)} disabled={isSalvando}>
+                                {isSalvando ? '⏳...' : '⚡ Vincular Completo'}
                               </button>
+                            ) : (
+                              <>
+                                <button style={{...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px'}} onClick={(e) => { e.stopPropagation(); setSalvandoVinculoId(prep.id); selecionarTudoVinculo(selectedCarreira, prep.id); }} disabled={isSalvando}>
+                                  {isSalvando ? '⏳...' : '☑️ Sel. Tudo'}
+                                </button>
+                                <button style={{...styles.smallButton, backgroundColor: '#c62828', fontSize: '11px'}} onClick={() => desvincularPrep(selectedCarreira, prep.id)} disabled={isSalvando}>
+                                  🗑️ Desvincular
+                                </button>
+                                <button style={styles.expandButton} onClick={() => setExpandedPrepVinculo(isExpanded ? null : prep.id)}>
+                                  {isExpanded ? '▼ Minimizar' : '▶ Ver Módulos'}
+                                </button>
+                              </>
                             )}
                           </div>
-                          {vinculado && (
-                            <button style={styles.expandButton} onClick={() => setExpandedPrepVinculo(isExpanded ? null : prep.id)}>
-                              {isExpanded ? 'Esconder Módulos' : 'Ver Módulos'}
-                            </button>
-                          )}
                         </div>
 
                         {vinculado && isExpanded && (
                           <div style={styles.vinculoDetails}>
-                            {/* FILTROS */}
+                            {/* FILTROS DOS MÓDULOS */}
                             <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
                               <select
                                 value={filtroDisciplinaVinculo}
@@ -2402,10 +2656,7 @@ function AdminPage() {
                                 style={{ ...styles.input, flex: 1, minWidth: '180px', margin: 0 }}
                               />
                               {(filtroDisciplinaVinculo || buscaModuloVinculo) && (
-                                <button
-                                  onClick={() => { setFiltroDisciplinaVinculo(''); setBuscaModuloVinculo(''); }}
-                                  style={{ ...styles.smallButton, backgroundColor: '#555', whiteSpace: 'nowrap' }}
-                                >
+                                <button onClick={() => { setFiltroDisciplinaVinculo(''); setBuscaModuloVinculo(''); }} style={{ ...styles.smallButton, backgroundColor: '#555', whiteSpace: 'nowrap' }}>
                                   ✕ Limpar filtros
                                 </button>
                               )}
@@ -2418,17 +2669,21 @@ function AdminPage() {
                                 const modulosDaDisc = getModulosPorDisciplina(disc.id)
                                   .filter(mod => !buscaModuloVinculo || mod.nome.toLowerCase().includes(buscaModuloVinculo.toLowerCase()));
 
+                                const totalAulasDis = modulosDaDisc.reduce((a, m) => a + getAulasPorModulo(m.id).length, 0);
+                                const vinculadasDis = modulosDaDisc.reduce((a, m) => a + (isModuloVinculado(selectedCarreira, prep.id, m.id) ? getAulasPorModulo(m.id).length : 0), 0);
+
                                 if (modulosDaDisc.length === 0) return null;
                                 return (
                                   <div key={disc.id} style={styles.vinculoDisciplina}>
                                     <div style={styles.vinculoDisciplinaHeader} onClick={() => setExpandedDiscVinculo(isDiscExp ? null : disc.id)}>
                                       <span>{disc.icone} {disc.nome}</span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '11px', color: '#888' }}>{vinculadasDis}/{totalAulasDis} aulas</span>
                                         <button
                                           style={{ ...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px', padding: '4px 12px' }}
                                           onClick={e => { e.stopPropagation(); selecionarDisciplinaVinculo(selectedCarreira, prep.id, disc.id); }}
                                         >
-                                          ☑️ Selecionar Disciplina
+                                          ☑️ Sel. Disciplina
                                         </button>
                                         <span>{isDiscExp ? '▼' : '▶'}</span>
                                       </div>
@@ -2438,13 +2693,14 @@ function AdminPage() {
                                       <div style={styles.vinculoModulos}>
                                         {modulosDaDisc.map(mod => {
                                           const modVinc = isModuloVinculado(selectedCarreira, prep.id, mod.id);
-                                          
+                                          const aulasDoMod = getAulasPorModulo(mod.id);
                                           return (
                                             <div key={mod.id} style={styles.vinculoModulo}>
                                               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px'}}>
                                                 <label style={styles.checkboxLabel}>
                                                   <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
                                                   <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
+                                                  <span style={{ color: '#666', fontSize: '11px', marginLeft: '4px' }}>({aulasDoMod.length} aulas)</span>
                                                 </label>
                                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                                   {modVinc && (
@@ -2452,7 +2708,7 @@ function AdminPage() {
                                                       style={{...styles.smallButton, backgroundColor: '#2196F3', fontSize: '11px', padding: '4px 10px'}}
                                                       onClick={(e) => { e.stopPropagation(); selecionarModuloVinculo(selectedCarreira, prep.id, mod.id); }}
                                                     >
-                                                      ☑️ Selecionar Módulo
+                                                      ☑️ Sel. Módulo
                                                     </button>
                                                   )}
                                                   {modVinc && (
@@ -2468,7 +2724,7 @@ function AdminPage() {
                                               
                                               {modVinc && expandedModuloAulas[mod.id] && (
                                                 <div style={styles.vinculoAulas}>
-                                                  {getAulasPorModulo(mod.id).map(aula => (
+                                                  {aulasDoMod.map(aula => (
                                                     <label key={aula.id} style={styles.checkboxLabelAula}>
                                                       <input type="checkbox" checked={isAulaVinculada(selectedCarreira, prep.id, mod.id, aula.id)} onChange={() => toggleAulaVinculo(selectedCarreira, prep.id, mod.id, aula.id)} />
                                                       <span style={{color: '#CCC', fontSize: '13px'}}>{aula.titulo} ({aula.duracao})</span>
@@ -2477,22 +2733,30 @@ function AdminPage() {
                                                 </div>
                                               )}
                                             </div>
-                                        );
+                                          );
                                         })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                           </div>
                         )}
                       </div>
                     );
                   })}
+
+                  {prepsFiltrados.length === 0 && (
+                    <div style={{ color: '#666', textAlign: 'center', padding: '40px', fontSize: '14px' }}>
+                      Nenhum curso encontrado com os filtros aplicados.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
+
 
           {/* Modal global de edição de preparatório */}
           {editandoPreparatorio && (

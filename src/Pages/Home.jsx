@@ -20,7 +20,7 @@ function Home() {
         const catData = JSON.parse(cacheCat);
         const carData = JSON.parse(cacheCar);
         if (Array.isArray(catData) && catData.length > 0 && Array.isArray(carData)) {
-          const categoriasComCursos = catData.filter(c => c.id !== 'sys_config_abas').map(cat => ({
+          const categoriasComCursos = catData.filter(c => !c.id.startsWith('sys_config_')).map(cat => ({
             id: cat.id,
             nome: cat.nome,
             tipo_acesso: cat.tipo_acesso || 'livre',
@@ -180,7 +180,7 @@ function Home() {
           } catch(e){}
         }
 
-        const categoriasComCursos = catData.filter(c => c.id !== 'sys_config_abas').map(cat => ({
+        const categoriasComCursos = catData.filter(c => !c.id.startsWith('sys_config_')).map(cat => ({
           id: cat.id,
           nome: cat.nome,
           tipo_acesso: cat.tipo_acesso || 'livre',
