@@ -106,14 +106,39 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const { data: profile, error } = await supabase
+      // 1. Tenta buscar pelo ID (padrão Supabase)
+      let { data: profile, error } = await supabase
         .from('profiles')
-        .select('id, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+        .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
         .eq('id', userObj.id)
         .maybeSingle();
 
-      if (error || !profile) {
-        console.warn('[AuthContext] Perfil não encontrado, usando basico.', error?.message);
+      // 2. Se não achou por ID, tenta por e-mail (sincronização de contas órfãs ou recriadas)
+      if (!profile && userEmail) {
+        console.log('[AuthContext] Perfil não achado por ID, buscando por e-mail:', userEmail);
+        const { data: profileByEmail, error: emailErr } = await supabase
+          .from('profiles')
+          .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+          .eq('email', userEmail)
+          .maybeSingle();
+
+        if (profileByEmail && !emailErr) {
+          console.log('[AuthContext] Perfil localizado por e-mail! Sincronizando ID com a conta atual...');
+          // Atualiza o ID do perfil com o novo ID de autenticação do usuário
+          await supabase
+            .from('profiles')
+            .update({ id: userObj.id })
+            .eq('id', profileByEmail.id);
+          profile = { ...profileByEmail, id: userObj.id };
+        }
+      }
+
+      if (error && !profile) {
+        console.warn('[AuthContext] Erro ao buscar perfil:', error?.message);
+      }
+
+      if (!profile) {
+        console.warn('[AuthContext] Perfil não encontrado para o usuário, usando básico.');
         setPlanoUsuario('basico');
         sessionStorage.setItem('papirando_plano', 'basico');
         setAuthLoading(false);
