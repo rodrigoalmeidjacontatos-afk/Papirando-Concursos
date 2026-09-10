@@ -112,6 +112,7 @@ function AdminPage() {
 
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
   const [usuarioEditandoAcesso, setUsuarioEditandoAcesso] = useState(null); // {id, email, preparatorios_liberados: []}
+  const [buscaPrepAcesso, setBuscaPrepAcesso] = useState('');
 
   // ========== FUNÇÕES DE USUÁRIOS ==========
   const buscarUsuarios = async () => {
@@ -120,7 +121,7 @@ function AdminPage() {
     
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, created_at, plano, plano_anterior, data_expiracao, preparatorios_liberados') 
+      .select('id, email, nome, display_name, created_at, plano, plano_anterior, data_expiracao, preparatorios_liberados') 
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -379,55 +380,74 @@ function AdminPage() {
       try { liberados = JSON.parse(liberados); } catch (e) { liberados = []; }
     }
     if (!Array.isArray(liberados)) liberados = [];
+    setBuscaPrepAcesso('');
     setUsuarioEditandoAcesso({
       ...usuario,
       preparatorios_liberados: liberados
     });
   };
 
-  // key = "carreiraId:prepId" ou "*:prepId" (global)
-  const toggleAcessoCombo = (key) => {
-    setUsuarioEditandoAcesso(prev => {
-      const atual = prev.preparatorios_liberados || [];
-      const jatem = atual.includes(key);
-      return {
-        ...prev,
-        preparatorios_liberados: jatem ? atual.filter(k => k !== key) : [...atual, key]
-      };
-    });
-  };
-
-  // Libera o preparatório em TODAS as carreiras (global: *:prepId)
-  // e remove quaisquer combos específicos daquele preparatório
-  const toggleAcessoGlobal = (prepId) => {
+  // Alterna o acesso de um preparatório inteiro para o aluno (simples, 1 clique)
+  const toggleAcessoPrepSimples = (prepId) => {
     const globalKey = `*:${prepId}`;
     setUsuarioEditandoAcesso(prev => {
       const atual = prev.preparatorios_liberados || [];
-      const jaTemGlobal = atual.includes(globalKey);
-      // Remove todas as entradas deste prep (específicas e global)
-      const semEstePrep = atual.filter(k => !k.endsWith(`:${prepId}`));
-      if (jaTemGlobal) {
-        // Desmarca global
-        return { ...prev, preparatorios_liberados: semEstePrep };
+      const isLiberado = atual.includes(globalKey) || atual.some(k => k.endsWith(`:${prepId}`));
+      if (isLiberado) {
+        return {
+          ...prev,
+          preparatorios_liberados: atual.filter(k => !k.endsWith(`:${prepId}`) && k !== globalKey)
+        };
       } else {
-        // Marca global (remove específicos e adiciona *)
-        return { ...prev, preparatorios_liberados: [...semEstePrep, globalKey] };
+        return {
+          ...prev,
+          preparatorios_liberados: [...atual.filter(k => !k.endsWith(`:${prepId}`)), globalKey]
+        };
       }
     });
   };
 
+  const liberarTodosPrepsUsuario = () => {
+    const todos = preparatorios.map(p => `*:${p.id}`);
+    setUsuarioEditandoAcesso(prev => ({
+      ...prev,
+      preparatorios_liberados: todos
+    }));
+  };
+
+  const bloquearTodosPrepsUsuario = () => {
+    setUsuarioEditandoAcesso(prev => ({
+      ...prev,
+      preparatorios_liberados: []
+    }));
+  };
+
   const salvarAcessoUsuario = async () => {
+    const liberados = usuarioEditandoAcesso.preparatorios_liberados || [];
+    // Se o usuário tem cursos liberados e estava no plano 'basico', promove automaticamente para 'medio'
+    let novoPlano = usuarioEditandoAcesso.plano;
+    if (liberados.length > 0 && (!novoPlano || novoPlano === 'basico')) {
+      novoPlano = 'medio';
+    }
+
+    const updates = { 
+      preparatorios_liberados: liberados,
+      plano: novoPlano
+    };
+
     const { error } = await supabase
       .from('profiles')
-      .update({ preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados })
+      .update(updates)
       .eq('id', usuarioEditandoAcesso.id);
+
     if (!error) {
-      notificarUsuarioEmTempoReal(usuarioEditandoAcesso.id, usuarioEditandoAcesso.email, usuarioEditandoAcesso.plano);
-      setUsuarios(prev => prev.map(u => u.id === usuarioEditandoAcesso.id ? { ...u, preparatorios_liberados: usuarioEditandoAcesso.preparatorios_liberados } : u));
+      notificarUsuarioEmTempoReal(usuarioEditandoAcesso.id, usuarioEditandoAcesso.email, novoPlano);
+      setUsuarios(prev => prev.map(u => u.id === usuarioEditandoAcesso.id ? { ...u, ...updates } : u));
       setUsuarioEditandoAcesso(null);
-      setTimeout(() => {
-        alert('✅ Acesso atualizado com sucesso!');
-      }, 100);
+      setNotificacaoVinculo({
+        tipo: 'sucesso',
+        texto: `✅ Acessos de ${usuarioEditandoAcesso.email} salvos com sucesso!`
+      });
     } else {
       alert('❌ Erro ao salvar acesso: ' + error.message);
     }
@@ -3014,25 +3034,113 @@ function AdminPage() {
           )}
 
           {activeMenu === 'usuarios' && (() => {
-            const usuariosFiltrados = usuarios.filter(u => 
-              (u.email || '').toLowerCase().includes(buscaUsuario.toLowerCase())
-            );
+            const busca = (buscaUsuario || '').toLowerCase().trim();
+            const usuariosFiltrados = usuarios.filter(u => {
+              if (!busca) return true;
+              const matchEmail = (u.email || '').toLowerCase().includes(busca);
+              const matchNome = (u.nome || u.display_name || '').toLowerCase().includes(busca);
+              return matchEmail || matchNome;
+            });
+
+            const getStatusUsuario = (u) => {
+              const agora = new Date();
+              const dataExp = u.data_expiracao ? new Date(u.data_expiracao) : null;
+              const isExpirado = dataExp && dataExp < agora;
+              const plano = String(u.plano || 'basico').toLowerCase();
+              const qtdCursos = Array.isArray(u.preparatorios_liberados) ? u.preparatorios_liberados.length : 0;
+
+              if (isExpirado) {
+                const diffDias = Math.max(1, Math.floor((agora - dataExp) / (1000 * 60 * 60 * 24)));
+                return {
+                  label: `🔴 Expirado há ${diffDias}d`,
+                  sublabel: `venceu em ${dataExp.toLocaleDateString('pt-BR')}`,
+                  bg: 'rgba(229, 9, 20, 0.15)',
+                  color: '#ff4d4f',
+                  border: 'rgba(229, 9, 20, 0.4)'
+                };
+              }
+
+              if (plano === 'premium') {
+                if (!dataExp) {
+                  return {
+                    label: '🟢 ⭐ Premium Vitalício',
+                    sublabel: 'Acesso total ilimitado',
+                    bg: 'rgba(76, 175, 80, 0.15)',
+                    color: '#4CAF50',
+                    border: 'rgba(76, 175, 80, 0.4)'
+                  };
+                } else {
+                  const diasRestantes = Math.ceil((dataExp - agora) / (1000 * 60 * 60 * 24));
+                  return {
+                    label: `🟢 ⭐ Premium (${diasRestantes}d restantes)`,
+                    sublabel: `até ${dataExp.toLocaleDateString('pt-BR')}`,
+                    bg: 'rgba(76, 175, 80, 0.15)',
+                    color: '#4CAF50',
+                    border: 'rgba(76, 175, 80, 0.4)'
+                  };
+                }
+              }
+
+              if (plano === 'medio') {
+                if (!dataExp) {
+                  return {
+                    label: `🔵 🥈 Médio (${qtdCursos} cursos)`,
+                    sublabel: 'Acesso Vitalício',
+                    bg: 'rgba(33, 150, 243, 0.15)',
+                    color: '#2196F3',
+                    border: 'rgba(33, 150, 243, 0.4)'
+                  };
+                } else {
+                  const diasRestantes = Math.ceil((dataExp - agora) / (1000 * 60 * 60 * 24));
+                  return {
+                    label: `🔵 🥈 Médio (${diasRestantes}d restantes)`,
+                    sublabel: `${qtdCursos} cursos até ${dataExp.toLocaleDateString('pt-BR')}`,
+                    bg: 'rgba(33, 150, 243, 0.15)',
+                    color: '#2196F3',
+                    border: 'rgba(33, 150, 243, 0.4)'
+                  };
+                }
+              }
+
+              // Básico
+              if (qtdCursos > 0) {
+                return {
+                  label: `🟡 🔒 Básico (${qtdCursos} cursos liberados)`,
+                  sublabel: 'Acesso individual aos cursos',
+                  bg: 'rgba(255, 152, 0, 0.15)',
+                  color: '#FF9800',
+                  border: 'rgba(255, 152, 0, 0.4)'
+                };
+              }
+
+              return {
+                label: '⚪ 🔒 Básico (Gratuito)',
+                sublabel: 'Sem plano ativo',
+                bg: 'rgba(255, 255, 255, 0.05)',
+                color: '#AAA',
+                border: 'rgba(255, 255, 255, 0.1)'
+              };
+            };
+
             return (
             <div>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-                <h2 style={{color: '#fff', margin: 0}}>Gerenciar Usuários</h2>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: '12px'}}>
+                <div>
+                  <h2 style={{color: '#fff', margin: 0}}>Gerenciar Usuários</h2>
+                  <span style={{color: '#888', fontSize: '13px'}}>Total de {usuariosFiltrados.length} usuário(s) encontrados</span>
+                </div>
                 <input
                   type="text"
-                  placeholder="🔍 Buscar por email..."
+                  placeholder="🔍 Buscar por e-mail ou nome..."
                   value={buscaUsuario}
                   onChange={(e) => setBuscaUsuario(e.target.value)}
                   style={{
-                    padding: '10px 14px',
+                    padding: '10px 16px',
                     borderRadius: '8px',
-                    border: '1px solid #333',
+                    border: '1px solid #444',
                     backgroundColor: '#111',
                     color: '#FFF',
-                    width: '300px',
+                    width: '320px',
                     outline: 'none',
                     fontSize: '14px'
                   }}
@@ -3045,76 +3153,85 @@ function AdminPage() {
                   <table style={{width: '100%', borderCollapse: 'collapse', color: '#FFF'}}>
                     <thead>
                       <tr style={{borderBottom: '1px solid #333', textAlign: 'left'}}>
-                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Email</th>
-                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Data de Criação</th>
-                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Plano</th>
-                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Acesso</th>
-                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Ações</th>
+                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Aluno</th>
+                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Status do Acesso</th>
+                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Validade do Acesso</th>
+                        <th style={{padding: '12px', color: '#AAA', fontWeight: '500'}}>Cursos & Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {usuariosFiltrados.length === 0 ? (
                         <tr>
-                          <td colSpan="5" style={{padding: '20px', textAlign: 'center', color: '#888'}}>
+                          <td colSpan="4" style={{padding: '20px', textAlign: 'center', color: '#888'}}>
                             Nenhum usuário encontrado.
                           </td>
                         </tr>
-                      ) : usuariosFiltrados.map(u => (
-                        <tr key={u.id} style={{borderBottom: '1px solid #333', transition: 'background 0.2s'}}>
-                          <td style={{padding: '20px 12px'}}>
+                      ) : usuariosFiltrados.map(u => {
+                        const status = getStatusUsuario(u);
+                        const qtdCursos = Array.isArray(u.preparatorios_liberados) ? u.preparatorios_liberados.length : 0;
+                        return (
+                        <tr key={u.id} style={{borderBottom: '1px solid #2a2a2a', transition: 'background 0.2s'}}>
+                          {/* ALUNO */}
+                          <td style={{padding: '16px 12px'}}>
                             <div style={{display: 'flex', flexDirection: 'column'}}>
-                              <span style={{fontWeight: '600', fontSize: '15px'}}>{u.email}</span>
-                              <span style={{color: '#888', fontSize: '11px', marginTop: '4px'}}>Criado em: {new Date(u.created_at).toLocaleDateString('pt-BR')}</span>
+                              <span style={{fontWeight: '600', fontSize: '14px'}}>{u.email}</span>
+                              {(u.nome || u.display_name) && (
+                                <span style={{color: '#90CAF9', fontSize: '13px', marginTop: '2px'}}>👤 {u.nome || u.display_name}</span>
+                              )}
+                              <span style={{color: '#666', fontSize: '11px', marginTop: '4px'}}>
+                                Cadastro: {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                              </span>
                             </div>
                           </td>
                           
-                          <td style={{padding: '20px 12px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                              <span style={{
-                                padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', width: 'fit-content',
-                                backgroundColor: u.plano === 'premium' ? 'rgba(76,175,80,0.15)' : u.plano === 'medio' ? 'rgba(33,150,243,0.15)' : 'rgba(255,152,0,0.15)',
-                                color: u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800',
-                                border: `1px solid ${u.plano === 'premium' ? '#4CAF50' : u.plano === 'medio' ? '#2196F3' : '#FF9800'}`
+                          {/* STATUS DO ACESSO */}
+                          <td style={{padding: '16px 12px'}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                              <div style={{
+                                padding: '6px 12px', borderRadius: '8px', width: 'fit-content',
+                                backgroundColor: status.bg, border: `1px solid ${status.border}`
                               }}>
-                                {u.plano === 'premium' ? '⭐ PREMIUM' : u.plano === 'medio' ? '🥈 MÉDIO' : '🔒 BÁSICO'}
-                              </span>
-                              <div style={{display: 'flex', gap: '6px'}}>
-                                <button title="Premium" style={{...styles.smallButton, backgroundColor: '#4CAF50', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐</button>
-                                <button title="Médio" style={{...styles.smallButton, backgroundColor: '#2196F3', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈</button>
-                                <button title="Básico" style={{...styles.smallButton, backgroundColor: '#FF9800', padding: '4px 10px'}} onClick={() => atualizarPlano(u.id, 'basico')}>🔒</button>
+                                <div style={{ color: status.color, fontWeight: 'bold', fontSize: '12px' }}>
+                                  {status.label}
+                                </div>
+                                <div style={{ color: '#AAA', fontSize: '10px', marginTop: '2px' }}>
+                                  {status.sublabel}
+                                </div>
+                              </div>
+                              <div style={{display: 'flex', gap: '4px', marginTop: '4px'}}>
+                                <button title="Mudar para Premium" style={{...styles.smallButton, backgroundColor: u.plano === 'premium' ? '#4CAF50' : '#222', border: '1px solid #4CAF50', color: '#FFF', padding: '3px 8px', fontSize: '10px'}} onClick={() => atualizarPlano(u.id, 'premium')}>⭐ Premium</button>
+                                <button title="Mudar para Médio" style={{...styles.smallButton, backgroundColor: u.plano === 'medio' ? '#2196F3' : '#222', border: '1px solid #2196F3', color: '#FFF', padding: '3px 8px', fontSize: '10px'}} onClick={() => atualizarPlano(u.id, 'medio')}>🥈 Médio</button>
+                                <button title="Mudar para Básico" style={{...styles.smallButton, backgroundColor: u.plano === 'basico' ? '#FF9800' : '#222', border: '1px solid #FF9800', color: '#FFF', padding: '3px 8px', fontSize: '10px'}} onClick={() => atualizarPlano(u.id, 'basico')}>🔒 Básico</button>
                               </div>
                             </div>
                           </td>
 
-                          <td style={{padding: '20px 12px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px'}}>
-                              <div style={{
-                                fontSize: '13px', fontWeight: '600', 
-                                color: u.data_expiracao ? (new Date(u.data_expiracao) < new Date() ? '#E50914' : '#4CAF50') : '#FFD700',
-                                display: 'flex', alignItems: 'center', gap: '6px'
-                              }}>
-                                {u.data_expiracao ? `📅 Expira: ${new Date(u.data_expiracao).toLocaleString('pt-BR')}` : '✨ Acesso Vitalício'}
-                              </div>
+                          {/* VALIDADE DO ACESSO */}
+                          <td style={{padding: '16px 12px'}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '300px'}}>
                               <div style={{display: 'flex', gap: '4px', flexWrap: 'wrap'}}>
-                                <button onClick={() => atualizarExpiracao(u.id, 15, 'minutos')} style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#9C27B0', padding: '2px 6px'}}>⏱️ 15m</button>
-                                <button onClick={() => atualizarExpiracao(u.id, 1)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+1d</button>
-                                <button onClick={() => atualizarExpiracao(u.id, 7)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+7d</button>
-                                <button onClick={() => atualizarExpiracao(u.id, 30)} style={{...styles.smallButton, fontSize: '10px', padding: '2px 6px'}}>+30d</button>
-                                <button onClick={() => atualizarExpiracao(u.id, null)} style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#FFD700', color: '#000', padding: '2px 6px'}}>∞ Vitalício</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 30)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>30 dias (1 mês)</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 90)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>90 dias (3 meses)</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 180)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>180 dias (6 meses)</button>
+                                <button onClick={() => atualizarExpiracao(u.id, 365)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>1 ano</button>
+                                <button onClick={() => atualizarExpiracao(u.id, null)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#FFD700', color: '#000', fontWeight: 'bold'}}>∞ Vitalício</button>
                                 <button 
                                   onClick={() => {
                                     if(window.confirm(`Deseja realmente BLOQUEAR o acesso de ${u.email}?`)) {
                                       atualizarPlano(u.id, 'basico');
-                                      atualizarExpiracao(u.id, null);
+                                      atualizarExpiracao(u.id, 0);
                                     }
                                   }} 
-                                  style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#E53935', padding: '2px 6px'}}
+                                  style={{...styles.smallButton, fontSize: '10px', backgroundColor: '#c62828', padding: '3px 7px'}}
                                 >
                                   🚫 Bloquear
                                 </button>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                <span style={{ fontSize: '11px', color: '#888' }}>Data manual:</span>
                                 <input 
                                    type="date" 
-                                   style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 4px', borderRadius: '4px'}}
+                                   style={{backgroundColor: '#222', border: '1px solid #444', color: '#FFF', fontSize: '11px', padding: '2px 6px', borderRadius: '4px'}}
                                    onChange={(e) => {
                                      const val = e.target.value;
                                      if (val) {
@@ -3129,13 +3246,20 @@ function AdminPage() {
                             </div>
                           </td>
 
-                          <td style={{padding: '20px 12px'}}>
-                            <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                          {/* CURSOS E AÇÕES */}
+                          <td style={{padding: '16px 12px'}}>
+                            <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center'}}>
                               <button 
                                 onClick={() => abrirGerenciarAcesso(u)}
-                                style={{...styles.editButtonSmall, padding: '4px 8px', fontSize: '11px'}}
+                                style={{
+                                  ...styles.smallButton,
+                                  backgroundColor: qtdCursos > 0 ? 'rgba(33, 150, 243, 0.2)' : '#222',
+                                  border: `1px solid ${qtdCursos > 0 ? '#2196F3' : '#444'}`,
+                                  color: qtdCursos > 0 ? '#90CAF9' : '#FFF',
+                                  padding: '6px 12px', fontSize: '11px', fontWeight: 'bold'
+                                }}
                               >
-                                📂 Acessos
+                                📂 {qtdCursos > 0 ? `${qtdCursos} Curso(s) Liberado(s)` : 'Liberar Cursos'}
                               </button>
                               <button 
                                 onClick={() => {
@@ -3147,25 +3271,27 @@ function AdminPage() {
                                 }}
                                 style={{
                                   ...styles.editButtonSmall, 
-                                  backgroundColor: u.email === 'rodrigoalmeidja@gmail.com' ? '#FFD700' : '#444',
-                                  color: u.email === 'rodrigoalmeidja@gmail.com' ? '#000' : '#FFF',
-                                  padding: '4px 8px', 
+                                  backgroundColor: u.email === 'rodrigoalmeidja@gmail.com' ? '#FFD700' : '#333',
+                                  color: u.email === 'rodrigoalmeidja@gmail.com' ? '#000' : '#888',
+                                  padding: '6px 8px', 
                                   fontSize: '11px',
                                   border: 'none'
                                 }}
                               >
-                                {u.email === 'rodrigoalmeidja@gmail.com' ? '👑 Super Admin' : '👤 Usuário'}
+                                {u.email === 'rodrigoalmeidja@gmail.com' ? '👑 Admin' : '👤 Aluno'}
                               </button>
                               <button 
                                 onClick={() => excluirUsuario(u.id, u.email)}
-                                style={{...styles.deleteButton, padding: '4px 8px', fontSize: '11px'}}
+                                style={{...styles.deleteButton, padding: '6px 8px', fontSize: '11px'}}
+                                title="Excluir Usuário"
                               >
                                 🗑️
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -3369,136 +3495,157 @@ function AdminPage() {
       </div>
 
       {/* Modal global de acesso do usuário */}
-      {usuarioEditandoAcesso && (
+      {usuarioEditandoAcesso && (() => {
+        const liberados = usuarioEditandoAcesso.preparatorios_liberados || [];
+        const prepsFiltrados = preparatorios.filter(p =>
+          !buscaPrepAcesso || (p.nome || '').toLowerCase().includes(buscaPrepAcesso.toLowerCase())
+        );
+        const qtdLiberados = preparatorios.filter(p => 
+          liberados.includes(`*:${p.id}`) || liberados.some(k => k.endsWith(`:${p.id}`))
+        ).length;
+
+        return (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999,
+          backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '28px',
-            width: '100%', maxWidth: '560px', maxHeight: '80vh',
-            display: 'flex', flexDirection: 'column', gap: '16px',
-            border: '1px solid #333'
+            backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '24px',
+            width: '100%', maxWidth: '620px', maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column', gap: '14px',
+            border: '1px solid #333', boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
           }}>
-            <div>
-              <h3 style={{color: '#FFF', margin: 0, fontSize: '18px'}}>🔑 Gerenciar Acesso</h3>
-              <p style={{color: '#AAA', margin: '6px 0 0', fontSize: '13px'}}>{usuarioEditandoAcesso.email}</p>
+            {/* CABEÇALHO */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{color: '#FFF', margin: 0, fontSize: '18px'}}>🔑 Liberar Cursos para o Aluno</h3>
+                <p style={{color: '#90CAF9', margin: '4px 0 0', fontSize: '13px'}}>
+                  {usuarioEditandoAcesso.email}
+                  {(usuarioEditandoAcesso.nome || usuarioEditandoAcesso.display_name) && (
+                    <span style={{ color: '#AAA', marginLeft: '8px' }}>({usuarioEditandoAcesso.nome || usuarioEditandoAcesso.display_name})</span>
+                  )}
+                </p>
+              </div>
+              <button 
+                onClick={() => setUsuarioEditandoAcesso(null)}
+                style={{ background: 'transparent', border: 'none', color: '#AAA', fontSize: '20px', cursor: 'pointer', padding: '4px' }}
+              >✕</button>
             </div>
 
-            {/* Barra de status */}
+            {/* BUSCA DE PREPARATÓRIOS */}
+            <input
+              type="text"
+              placeholder="🔍 Buscar preparatório por nome..."
+              value={buscaPrepAcesso}
+              onChange={(e) => setBuscaPrepAcesso(e.target.value)}
+              style={{
+                padding: '10px 14px', borderRadius: '8px', border: '1px solid #444',
+                backgroundColor: '#111', color: '#FFF', fontSize: '13px', outline: 'none'
+              }}
+            />
+
+            {/* BARRA DE AÇÕES RÁPIDAS & CONTADOR */}
             <div style={{
-              backgroundColor: '#222', borderRadius: '8px', padding: '12px 16px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              backgroundColor: '#222', borderRadius: '8px', padding: '10px 14px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px'
             }}>
-              <span style={{color: '#CCC', fontSize: '13px'}}>
-                {(usuarioEditandoAcesso.preparatorios_liberados?.length || 0) === 0
-                  ? '🔓 Nenhum acesso liberado'
-                  : `${usuarioEditandoAcesso.preparatorios_liberados.length} acesso(s) liberado(s)`
-                }
+              <span style={{color: qtdLiberados > 0 ? '#4CAF50' : '#AAA', fontSize: '13px', fontWeight: 'bold'}}>
+                📌 {qtdLiberados} de {preparatorios.length} curso(s) liberado(s)
               </span>
-              <button
-                style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px'}}
-                onClick={() => setUsuarioEditandoAcesso(prev => ({...prev, preparatorios_liberados: []}))}
-              >
-                Limpar Tudo
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  style={{...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px', padding: '5px 10px'}}
+                  onClick={liberarTodosPrepsUsuario}
+                >
+                  ⚡ Liberar Todos
+                </button>
+                <button
+                  style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '5px 10px'}}
+                  onClick={bloquearTodosPrepsUsuario}
+                >
+                  🗑️ Bloquear Todos
+                </button>
+              </div>
             </div>
 
-            {/* Lista agrupada por preparatório */}
-            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px'}}>
-              {preparatorios.map(prep => {
-                const liberados = usuarioEditandoAcesso.preparatorios_liberados || [];
-                const globalKey = `*:${prep.id}`;
-                const isGlobal = liberados.includes(globalKey);
-
-                // Mostra TODAS as carreiras (o admin escolhe onde liberar)
-                // Não filtramos por vínculo pois isso causava lista vazia em bd legado
-                const carreirasDoPrep = carreiras;
+            {/* LISTA LIMPA E DIRETA DE PREPARATÓRIOS */}
+            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px'}}>
+              {prepsFiltrados.map(prep => {
+                const isLiberado = liberados.includes(`*:${prep.id}`) || liberados.some(k => k.endsWith(`:${prep.id}`));
 
                 return (
                   <div key={prep.id} style={{
-                    backgroundColor: (isGlobal || carreirasDoPrep.some(c => liberados.includes(`${c.id}:${prep.id}`)))
-                      ? 'rgba(21, 101, 192, 0.12)' : '#222',
+                    backgroundColor: isLiberado ? 'rgba(76, 175, 80, 0.12)' : '#222',
                     borderRadius: '10px',
-                    border: `1px solid ${isGlobal ? '#1565C0' : '#333'}`,
-                    overflow: 'hidden',
-                    flexShrink: 0
+                    border: `1px solid ${isLiberado ? 'rgba(76, 175, 80, 0.45)' : '#333'}`,
+                    padding: '12px 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                    transition: 'all 0.2s'
                   }}>
-                    {/* Cabeçalho do preparatório */}
-                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderBottom: '1px solid #333'}}>
-                      {renderIcon(prep.logo)}
-                      <span style={{color: '#FFF', fontWeight: 'bold', flex: 1, fontSize: '14px'}}>{prep.nome}</span>
-                    </div>
-
-                    {/* Sub-opções */}
-                    <div style={{padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
-
-                      {/* Opção: Todas as Carreiras (global) */}
-                      <label style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isGlobal ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${isGlobal ? '#4CAF50' : '#444'}`,
-                        transition: 'all 0.2s'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={isGlobal}
-                          onChange={() => toggleAcessoGlobal(prep.id)}
-                          style={{width: '15px', height: '15px', accentColor: '#4CAF50'}}
-                        />
-                        <span style={{fontSize: '14px'}}>🌐</span>
-                        <span style={{color: isGlobal ? '#4CAF50' : '#CCC', fontWeight: isGlobal ? 'bold' : 'normal', fontSize: '13px', flex: 1}}>
-                          Todas as Carreiras
+                    <div style={{display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0}}>
+                      <span style={{ fontSize: '24px' }}>{renderIcon(prep.logo)}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{color: '#FFF', fontWeight: 'bold', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                          {prep.nome}
+                        </div>
+                        <span style={{
+                          fontSize: '11px', fontWeight: '600',
+                          color: isLiberado ? '#4CAF50' : '#888'
+                        }}>
+                          {isLiberado ? '🟢 Acesso Concedido' : '⚪ Bloqueado'}
                         </span>
-                        {isGlobal && <span style={{color: '#4CAF50', fontSize: '11px', fontWeight: 'bold'}}>✓ GLOBAL</span>}
-                      </label>
-
-                      {/* Carreiras específicas (só mostra se não for global) */}
-                      {!isGlobal && carreirasDoPrep.map(car => {
-                        const comboKey = `${car.id}:${prep.id}`;
-                        const ativo = liberados.includes(comboKey);
-                        return (
-                          <label key={car.id} style={{
-                            display: 'flex', alignItems: 'center', gap: '10px',
-                            padding: '7px 12px', borderRadius: '7px', cursor: 'pointer',
-                            backgroundColor: ativo ? 'rgba(21,101,192,0.18)' : 'transparent',
-                            border: `1px solid ${ativo ? '#1565C0' : '#3a3a3a'}`,
-                            transition: 'all 0.2s'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={ativo}
-                              onChange={() => toggleAcessoCombo(comboKey)}
-                              style={{width: '14px', height: '14px', accentColor: '#1565C0'}}
-                            />
-                            <span style={{fontSize: '13px'}}>{car.icone || '📌'}</span>
-                            <span style={{color: ativo ? '#90CAF9' : '#AAA', fontSize: '13px', flex: 1}}>{car.nome}</span>
-                            {ativo && <span style={{color: '#1565C0', fontSize: '10px', fontWeight: 'bold'}}>✓ OK</span>}
-                          </label>
-                        );
-                      })}
-
-                      {!isGlobal && carreirasDoPrep.length === 0 && (
-                        <p style={{color: '#666', fontSize: '11px', margin: 0, padding: '4px 0'}}>
-                          Nenhuma carreira vinculada a este preparatório ainda.
-                        </p>
-                      )}
+                      </div>
                     </div>
+
+                    <button
+                      onClick={() => toggleAcessoPrepSimples(prep.id)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap',
+                        backgroundColor: isLiberado ? '#c62828' : '#2e7d32',
+                        color: '#FFF'
+                      }}
+                    >
+                      {isLiberado ? '✕ Bloquear Curso' : '⚡ Liberar Curso'}
+                    </button>
                   </div>
                 );
               })}
+
+              {prepsFiltrados.length === 0 && (
+                <div style={{ color: '#666', textAlign: 'center', padding: '30px', fontSize: '13px' }}>
+                  Nenhum preparatório encontrado com o termo digitado.
+                </div>
+              )}
             </div>
 
-            <div style={{display: 'flex', gap: '10px'}}>
-              <button style={{...styles.addButton, flex: 1, padding: '12px'}} onClick={salvarAcessoUsuario}>✅ Salvar Acesso</button>
-              <button style={{...styles.deleteButton, flex: 1, padding: '12px'}} onClick={() => setUsuarioEditandoAcesso(null)}>❌ Cancelar</button>
+            {/* RODAPÉ */}
+            <div style={{display: 'flex', gap: '10px', borderTop: '1px solid #333', paddingTop: '14px'}}>
+              <button 
+                style={{...styles.addButton, flex: 2, padding: '12px', fontSize: '14px', fontWeight: 'bold'}} 
+                onClick={salvarAcessoUsuario}
+              >
+                💾 Salvar Acessos do Aluno
+              </button>
+              <button 
+                style={{...styles.deleteButton, flex: 1, padding: '12px', fontSize: '14px', backgroundColor: '#333'}} 
+                onClick={() => setUsuarioEditandoAcesso(null)}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
