@@ -105,9 +105,9 @@ function CarreiraPage() {
         return [];
       }
 
-      // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (combos)
-      // Ativado se a categoria for 'restrito' OU se o plano for 'médio'.
-      if ((tipoAcesso === 'restrito' || planoUsuario === 'medio') && !isAdmin && planoUsuario !== 'premium') {
+      // LÓGICA DE ACESSO INDIVIDUAL POR CURSO (isolados / combos)
+      // Ativado se a categoria for 'restrito', plano for 'médio' OU se houver cursos liberados individualmente
+      if ((tipoAcesso === 'restrito' || planoUsuario === 'medio' || (Array.isArray(preparatoriosLiberados) && preparatoriosLiberados.length > 0)) && !isAdmin && planoUsuario !== 'premium') {
         const liberados = Array.isArray(preparatoriosLiberados) ? preparatoriosLiberados : [];
         return preparatorios
           .filter(p => liberados.includes(`${carreiraId}:${p.id}`) || liberados.includes(`*:${p.id}`))
@@ -225,13 +225,15 @@ function CarreiraPage() {
           {isBasico && !isModoRestrito && (
             <span style={styles.premiumBadge}>🔒 CONTEÚDO RESTRITO</span>
           )}
-          {isModoRestrito && (
+          {carreira?.nome && (
             <span style={{
-              fontSize: '11px', fontWeight: 'bold', color: '#4ade80',
-              backgroundColor: 'rgba(74,222,128,0.1)',
-              border: '1px solid rgba(74,222,128,0.3)',
-              padding: '3px 10px', borderRadius: '999px', letterSpacing: '1px'
-            }}>📋 EDITAL ABERTO</span>
+              fontSize: '11px', fontWeight: 'bold', color: '#60a5fa',
+              backgroundColor: 'rgba(96,165,250,0.1)',
+              border: '1px solid rgba(96,165,250,0.3)',
+              padding: '3px 10px', borderRadius: '999px', letterSpacing: '0.5px'
+            }}>
+              {carreira?.icone ? `${carreira.icone} ` : '📌 '}{carreira.nome}
+            </span>
           )}
         </div>
 

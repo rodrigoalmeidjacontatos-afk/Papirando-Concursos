@@ -1463,15 +1463,17 @@ function AulaPage() {
   }
 
 
-  // Verificação de bloqueio baseada no nível da aula
+  // Verificação de bloqueio baseada no nível da aula e acesso ao curso específico
   const nivelAula = aulaPlaying?.nivel || 'basico'; // Pega o nível da aula (basico, medio, premium)
+  const temCursoLiberado = 
+    Array.isArray(preparatoriosLiberados) && (
+      preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) ||
+      preparatoriosLiberados.includes(`*:${preparatorioId}`)
+    );
+
   const isBloqueada = 
     (nivelAula === 'premium' && planoUsuario !== 'premium') ||
-    (nivelAula === 'medio' && planoUsuario === 'basico') ||
-    (planoUsuario === 'medio' && 
-      !preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) &&
-      !preparatoriosLiberados.includes(`*:${preparatorioId}`)
-    );
+    (planoUsuario !== 'premium' && !temCursoLiberado);
 
   if (isBloqueada && !isAdmin) {
     return (

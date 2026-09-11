@@ -113,6 +113,7 @@ function AdminPage() {
   // ========== CONTROLE DE ACESSO DE USUÁRIOS ==========
   const [usuarioEditandoAcesso, setUsuarioEditandoAcesso] = useState(null); // {id, email, preparatorios_liberados: []}
   const [buscaPrepAcesso, setBuscaPrepAcesso] = useState('');
+  const [carreiraAcessoId, setCarreiraAcessoId] = useState('');
 
   // ========== FUNÇÕES DE USUÁRIOS ==========
   const buscarUsuarios = async () => {
@@ -134,10 +135,9 @@ function AdminPage() {
       const now = new Date();
       const processedData = data?.map(u => {
         if (u.data_expiracao && new Date(u.data_expiracao) < now) {
-          const fallback = u.plano_anterior || 'basico';
-          // Dispara atualização assíncrona no banco para limpar a expiração e voltar o plano
-          supabase.from('profiles').update({ plano: fallback, data_expiracao: null, plano_anterior: null }).eq('id', u.id).then(()=>console.log(`[Admin] Usuário ${u.email} expirado e revertido para ${fallback}`));
-          return { ...u, plano: fallback, data_expiracao: null, plano_anterior: null };
+          // Reverte sempre para 'basico' quando a validade temporária expirar
+          supabase.from('profiles').update({ plano: 'basico', data_expiracao: null, plano_anterior: null }).eq('id', u.id).then(()=>console.log(`[Admin] Usuário ${u.email} expirado e revertido para basico`));
+          return { ...u, plano: 'basico', data_expiracao: null, plano_anterior: null };
         }
         return u;
       }) || [];
@@ -325,8 +325,7 @@ function AdminPage() {
     if (tempo !== null) {
       const d = new Date();
       if (unidade === 'minutos') {
-        // Adiciona o tempo + 1 minuto de margem de erro para sincronia de relógios
-        d.setMinutes(d.getMinutes() + tempo + 1);
+        d.setMinutes(d.getMinutes() + tempo);
       } else {
         d.setDate(d.getDate() + tempo);
       }
@@ -338,8 +337,7 @@ function AdminPage() {
     
     // REGRA DE CONVERSÃO AUTOMÁTICA:
     // Se o usuário está no plano 'basico' (ou indefinido) e o admin está concedendo tempo de acesso
-    // (+1d, +7d, +30d, 15m, calendário) OU vitalício, ele DEVE ser promovido para PREMIUM!
-    // Não faz nenhum sentido dar validade temporária para um plano básico (gratuito).
+    // (+30m teste, +1d, +7d, +30d, etc.) OU vitalício, ele é promovido para PREMIUM!
     if (tempo !== null) {
       if (!usuarioAtual || usuarioAtual.plano === 'basico') {
         updates.plano_anterior = 'basico';
@@ -363,7 +361,7 @@ function AdminPage() {
     if (!error) {
       notificarUsuarioEmTempoReal(userId, usuarioAtual?.email, updates.plano || usuarioAtual?.plano);
       const msg = dataFinal 
-        ? `${unidade === 'minutos' ? 'Degustação PREMIUM' : 'Validade'} até: ${new Date(dataFinal).toLocaleString('pt-BR')}` 
+        ? `${unidade === 'minutos' ? 'Teste de 30 minutos liberado' : 'Validade concedida'} até: ${new Date(dataFinal).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${new Date(dataFinal).toLocaleDateString('pt-BR')})` 
         : 'Acesso Vitalício!';
       setTimeout(() => {
         alert(`✅ Sucesso! ${msg}`);
@@ -381,44 +379,57 @@ function AdminPage() {
     }
     if (!Array.isArray(liberados)) liberados = [];
     setBuscaPrepAcesso('');
+    if (!carreiraAcessoId && carreiras.length > 0) {
+      setCarreiraAcessoId(carreiras[0].id);
+    }
     setUsuarioEditandoAcesso({
       ...usuario,
       preparatorios_liberados: liberados
     });
   };
 
-  // Alterna o acesso de um preparatório inteiro para o aluno (simples, 1 clique)
-  const toggleAcessoPrepSimples = (prepId) => {
-    const globalKey = `*:${prepId}`;
+  // Alterna o acesso de um preparatório ESPECÍFICO para uma Carreira/Concurso (ex: PMPE)
+  const toggleAcessoCarreiraPrep = (carreiraId, prepId) => {
+    if (!carreiraId || !prepId) return;
+    const chaveAcesso = `${carreiraId}:${prepId}`;
     setUsuarioEditandoAcesso(prev => {
       const atual = prev.preparatorios_liberados || [];
-      const isLiberado = atual.includes(globalKey) || atual.some(k => k.endsWith(`:${prepId}`));
-      if (isLiberado) {
-        return {
-          ...prev,
-          preparatorios_liberados: atual.filter(k => !k.endsWith(`:${prepId}`) && k !== globalKey)
-        };
-      } else {
-        return {
-          ...prev,
-          preparatorios_liberados: [...atual.filter(k => !k.endsWith(`:${prepId}`)), globalKey]
-        };
-      }
+      const isLiberado = atual.includes(chaveAcesso);
+      let novo = isLiberado
+        ? atual.filter(k => k !== chaveAcesso)
+        : [...atual, chaveAcesso];
+      return { ...prev, preparatorios_liberados: novo };
     });
   };
 
-  const liberarTodosPrepsUsuario = () => {
-    const todos = preparatorios.map(p => `*:${p.id}`);
+  // Remove qualquer chave de acesso (usado no chip do resumo)
+  const removerAcessoChave = (chave) => {
     setUsuarioEditandoAcesso(prev => ({
       ...prev,
-      preparatorios_liberados: todos
+      preparatorios_liberados: (prev.preparatorios_liberados || []).filter(k => k !== chave)
     }));
   };
 
-  const bloquearTodosPrepsUsuario = () => {
+  // Liberar todos os preparatórios vinculados a esta carreira específica
+  const liberarTodosPrepsDoConcurso = (carreiraId) => {
+    if (!carreiraId) return;
+    const prepsDestaCarreira = preparatorios.filter(p => isPrepVinculado(carreiraId, p.id));
+    const lista = prepsDestaCarreira.length > 0 ? prepsDestaCarreira : preparatorios;
+    const novasChaves = lista.map(p => `${carreiraId}:${p.id}`);
+    
+    setUsuarioEditandoAcesso(prev => {
+      const atual = prev.preparatorios_liberados || [];
+      const unicos = Array.from(new Set([...atual, ...novasChaves]));
+      return { ...prev, preparatorios_liberados: unicos };
+    });
+  };
+
+  // Bloquear todos os preparatórios desta carreira específica
+  const bloquearTodosPrepsDoConcurso = (carreiraId) => {
+    if (!carreiraId) return;
     setUsuarioEditandoAcesso(prev => ({
       ...prev,
-      preparatorios_liberados: []
+      preparatorios_liberados: (prev.preparatorios_liberados || []).filter(k => !k.startsWith(`${carreiraId}:`))
     }));
   };
 
@@ -428,6 +439,8 @@ function AdminPage() {
     let novoPlano = usuarioEditandoAcesso.plano;
     if (liberados.length > 0 && (!novoPlano || novoPlano === 'basico')) {
       novoPlano = 'medio';
+    } else if (liberados.length === 0 && novoPlano === 'medio') {
+      novoPlano = 'basico';
     }
 
     const updates = { 
@@ -3050,30 +3063,39 @@ function AdminPage() {
               const qtdCursos = Array.isArray(u.preparatorios_liberados) ? u.preparatorios_liberados.length : 0;
 
               if (isExpirado) {
-                const diffDias = Math.max(1, Math.floor((agora - dataExp) / (1000 * 60 * 60 * 24)));
+                const diffMin = Math.round((agora - dataExp) / (1000 * 60));
+                const tempoExpStr = diffMin < 60 ? `${diffMin}m` : `${Math.max(1, Math.floor(diffMin / 1440))}d`;
                 return {
-                  label: `🔴 Expirado há ${diffDias}d`,
-                  sublabel: `venceu em ${dataExp.toLocaleDateString('pt-BR')}`,
+                  label: `🔴 Expirado há ${tempoExpStr}`,
+                  sublabel: `venceu às ${dataExp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${dataExp.toLocaleDateString('pt-BR')})`,
                   bg: 'rgba(229, 9, 20, 0.15)',
                   color: '#ff4d4f',
                   border: 'rgba(229, 9, 20, 0.4)'
                 };
               }
 
+              const diffMin = dataExp ? Math.round((dataExp - agora) / (1000 * 60)) : null;
+              const diasRestantes = dataExp ? Math.ceil((dataExp - agora) / (1000 * 60 * 60 * 24)) : null;
+              const tempoRestanteStr = diffMin !== null ? (diffMin < 60 ? `${diffMin}min restantes` : `${diasRestantes}d restantes`) : '';
+              const dataExpStr = diffMin !== null 
+                ? (diffMin < 60 
+                    ? `até às ${dataExp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` 
+                    : `até ${dataExp.toLocaleDateString('pt-BR')}`)
+                : '';
+
               if (plano === 'premium') {
                 if (!dataExp) {
                   return {
                     label: '🟢 ⭐ Premium Vitalício',
-                    sublabel: 'Acesso total ilimitado',
+                    sublabel: 'Acesso total ilimitado a todos os cursos',
                     bg: 'rgba(76, 175, 80, 0.15)',
                     color: '#4CAF50',
                     border: 'rgba(76, 175, 80, 0.4)'
                   };
                 } else {
-                  const diasRestantes = Math.ceil((dataExp - agora) / (1000 * 60 * 60 * 24));
                   return {
-                    label: `🟢 ⭐ Premium (${diasRestantes}d restantes)`,
-                    sublabel: `até ${dataExp.toLocaleDateString('pt-BR')}`,
+                    label: `🟢 ⭐ Premium (${tempoRestanteStr})`,
+                    sublabel: dataExpStr,
                     bg: 'rgba(76, 175, 80, 0.15)',
                     color: '#4CAF50',
                     border: 'rgba(76, 175, 80, 0.4)'
@@ -3085,16 +3107,15 @@ function AdminPage() {
                 if (!dataExp) {
                   return {
                     label: `🔵 🥈 Médio (${qtdCursos} cursos)`,
-                    sublabel: 'Acesso Vitalício',
+                    sublabel: 'Acesso aos cursos liberados',
                     bg: 'rgba(33, 150, 243, 0.15)',
                     color: '#2196F3',
                     border: 'rgba(33, 150, 243, 0.4)'
                   };
                 } else {
-                  const diasRestantes = Math.ceil((dataExp - agora) / (1000 * 60 * 60 * 24));
                   return {
-                    label: `🔵 🥈 Médio (${diasRestantes}d restantes)`,
-                    sublabel: `${qtdCursos} cursos até ${dataExp.toLocaleDateString('pt-BR')}`,
+                    label: `🔵 🥈 Médio (${tempoRestanteStr})`,
+                    sublabel: `${qtdCursos} cursos ${dataExpStr}`,
                     bg: 'rgba(33, 150, 243, 0.15)',
                     color: '#2196F3',
                     border: 'rgba(33, 150, 243, 0.4)'
@@ -3106,7 +3127,7 @@ function AdminPage() {
               if (qtdCursos > 0) {
                 return {
                   label: `🟡 🔒 Básico (${qtdCursos} cursos liberados)`,
-                  sublabel: 'Acesso individual aos cursos',
+                  sublabel: 'Acesso individual aos cursos liberados',
                   bg: 'rgba(255, 152, 0, 0.15)',
                   color: '#FF9800',
                   border: 'rgba(255, 152, 0, 0.4)'
@@ -3210,6 +3231,21 @@ function AdminPage() {
                           <td style={{padding: '16px 12px'}}>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '300px'}}>
                               <div style={{display: 'flex', gap: '4px', flexWrap: 'wrap'}}>
+                                <button 
+                                  onClick={() => atualizarExpiracao(u.id, 30, 'minutos')} 
+                                  style={{
+                                    ...styles.smallButton, 
+                                    fontSize: '10px', 
+                                    padding: '3px 8px', 
+                                    backgroundColor: 'rgba(255, 152, 0, 0.25)', 
+                                    border: '1px solid #FF9800', 
+                                    color: '#FFB74D',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Liberar 30 minutos de teste para o aluno conhecer a plataforma"
+                                >
+                                  ⏱️ 30 min (teste)
+                                </button>
                                 <button onClick={() => atualizarExpiracao(u.id, 30)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>30 dias (1 mês)</button>
                                 <button onClick={() => atualizarExpiracao(u.id, 90)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>90 dias (3 meses)</button>
                                 <button onClick={() => atualizarExpiracao(u.id, 180)} style={{...styles.smallButton, fontSize: '10px', padding: '3px 7px', backgroundColor: '#222', border: '1px solid #444'}}>180 dias (6 meses)</button>
@@ -3494,15 +3530,21 @@ function AdminPage() {
         </div>
       </div>
 
-      {/* Modal global de acesso do usuário */}
+      {/* Modal global de acesso do usuário — POR CONCURSO/CARREIRA */}
       {usuarioEditandoAcesso && (() => {
         const liberados = usuarioEditandoAcesso.preparatorios_liberados || [];
+        const carreiraAtual = carreiras.find(c => c.id === carreiraAcessoId);
+
+        // Preparatórios filtrados pela busca
         const prepsFiltrados = preparatorios.filter(p =>
           !buscaPrepAcesso || (p.nome || '').toLowerCase().includes(buscaPrepAcesso.toLowerCase())
         );
-        const qtdLiberados = preparatorios.filter(p => 
-          liberados.includes(`*:${p.id}`) || liberados.some(k => k.endsWith(`:${p.id}`))
-        ).length;
+
+        // Contagem de acessos ativos
+        const qtdTotal = liberados.length;
+
+        // Acessos da carreira selecionada
+        const acessosDestaCarreira = liberados.filter(k => k.startsWith(`${carreiraAcessoId}:`));
 
         return (
         <div style={{
@@ -3513,14 +3555,14 @@ function AdminPage() {
         }}>
           <div style={{
             backgroundColor: '#1A1A1A', borderRadius: '16px', padding: '24px',
-            width: '100%', maxWidth: '620px', maxHeight: '85vh',
-            display: 'flex', flexDirection: 'column', gap: '14px',
+            width: '100%', maxWidth: '720px', maxHeight: '90vh',
+            display: 'flex', flexDirection: 'column', gap: '12px',
             border: '1px solid #333', boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
           }}>
             {/* CABEÇALHO */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{color: '#FFF', margin: 0, fontSize: '18px'}}>🔑 Liberar Cursos para o Aluno</h3>
+                <h3 style={{color: '#FFF', margin: 0, fontSize: '18px'}}>🔑 Liberar Cursos por Concurso</h3>
                 <p style={{color: '#90CAF9', margin: '4px 0 0', fontSize: '13px'}}>
                   {usuarioEditandoAcesso.email}
                   {(usuarioEditandoAcesso.nome || usuarioEditandoAcesso.display_name) && (
@@ -3534,101 +3576,149 @@ function AdminPage() {
               >✕</button>
             </div>
 
-            {/* BUSCA DE PREPARATÓRIOS */}
-            <input
-              type="text"
-              placeholder="🔍 Buscar preparatório por nome..."
-              value={buscaPrepAcesso}
-              onChange={(e) => setBuscaPrepAcesso(e.target.value)}
-              style={{
-                padding: '10px 14px', borderRadius: '8px', border: '1px solid #444',
-                backgroundColor: '#111', color: '#FFF', fontSize: '13px', outline: 'none'
-              }}
-            />
-
-            {/* BARRA DE AÇÕES RÁPIDAS & CONTADOR */}
-            <div style={{
-              backgroundColor: '#222', borderRadius: '8px', padding: '10px 14px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px'
-            }}>
-              <span style={{color: qtdLiberados > 0 ? '#4CAF50' : '#AAA', fontSize: '13px', fontWeight: 'bold'}}>
-                📌 {qtdLiberados} de {preparatorios.length} curso(s) liberado(s)
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  style={{...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px', padding: '5px 10px'}}
-                  onClick={liberarTodosPrepsUsuario}
-                >
-                  ⚡ Liberar Todos
-                </button>
-                <button
-                  style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '5px 10px'}}
-                  onClick={bloquearTodosPrepsUsuario}
-                >
-                  🗑️ Bloquear Todos
-                </button>
-              </div>
+            {/* SELETOR DE CONCURSO / CARREIRA */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <label style={{ color: '#AAA', fontSize: '12px', whiteSpace: 'nowrap' }}>Concurso / Carreira:</label>
+              <select
+                value={carreiraAcessoId}
+                onChange={e => setCarreiraAcessoId(e.target.value)}
+                style={{
+                  flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '8px',
+                  border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '13px', outline: 'none'
+                }}
+              >
+                {carreiras.map(c => {
+                  const qtdAqui = liberados.filter(k => k.startsWith(`${c.id}:`)).length;
+                  return <option key={c.id} value={c.id}>{c.icone} {c.nome}{qtdAqui > 0 ? ` (${qtdAqui} liberados)` : ''}</option>;
+                })}
+              </select>
             </div>
 
-            {/* LISTA LIMPA E DIRETA DE PREPARATÓRIOS */}
-            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px'}}>
-              {prepsFiltrados.map(prep => {
-                const isLiberado = liberados.includes(`*:${prep.id}`) || liberados.some(k => k.endsWith(`:${prep.id}`));
+            {/* BUSCA + AÇÕES RÁPIDAS POR CARREIRA */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '220px' }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar preparatório..."
+                  value={buscaPrepAcesso}
+                  onChange={(e) => setBuscaPrepAcesso(e.target.value)}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: '8px',
+                    border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '12px', outline: 'none'
+                  }}
+                />
+                <span style={{ color: acessosDestaCarreira.length > 0 ? '#4CAF50' : '#888', fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {acessosDestaCarreira.length} liberado(s)
+                </span>
+              </div>
+              <button
+                style={{...styles.smallButton, backgroundColor: '#2e7d32', fontSize: '11px', padding: '6px 12px'}}
+                onClick={() => liberarTodosPrepsDoConcurso(carreiraAcessoId)}
+                title={`Liberar todos os cursos para ${carreiraAtual?.nome || 'este concurso'}`}
+              >
+                ⚡ Liberar Todos p/ {carreiraAtual?.nome || 'Concurso'}
+              </button>
+              <button
+                style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '6px 12px'}}
+                onClick={() => bloquearTodosPrepsDoConcurso(carreiraAcessoId)}
+              >
+                🗑️ Limpar
+              </button>
+            </div>
+
+            {/* LISTA DE PREPARATÓRIOS — 1 CLIQUE POR CURSO */}
+            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px'}}>
+              {carreiraAcessoId && prepsFiltrados.map(prep => {
+                const chaveAcesso = `${carreiraAcessoId}:${prep.id}`;
+                const isLiberado = liberados.includes(chaveAcesso);
 
                 return (
                   <div key={prep.id} style={{
                     backgroundColor: isLiberado ? 'rgba(76, 175, 80, 0.12)' : '#222',
                     borderRadius: '10px',
                     border: `1px solid ${isLiberado ? 'rgba(76, 175, 80, 0.45)' : '#333'}`,
-                    padding: '12px 16px',
+                    padding: '10px 14px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.15s'
                   }}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0}}>
-                      <span style={{ fontSize: '24px' }}>{renderIcon(prep.logo)}</span>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0}}>
+                      <span style={{ fontSize: '22px' }}>{renderIcon(prep.logo)}</span>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{color: '#FFF', fontWeight: 'bold', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                        <div style={{color: '#FFF', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
                           {prep.nome}
                         </div>
                         <span style={{
-                          fontSize: '11px', fontWeight: '600',
-                          color: isLiberado ? '#4CAF50' : '#888'
+                          fontSize: '10px', fontWeight: '600',
+                          color: isLiberado ? '#4CAF50' : '#666'
                         }}>
-                          {isLiberado ? '🟢 Acesso Concedido' : '⚪ Bloqueado'}
+                          {isLiberado ? `🟢 Liberado para ${carreiraAtual?.nome || 'este concurso'}` : '⚪ Bloqueado'}
                         </span>
                       </div>
                     </div>
 
                     <button
-                      onClick={() => toggleAcessoPrepSimples(prep.id)}
+                      onClick={() => toggleAcessoCarreiraPrep(carreiraAcessoId, prep.id)}
                       style={{
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
+                        padding: '7px 14px', borderRadius: '8px', border: 'none',
+                        cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+                        transition: 'all 0.15s', whiteSpace: 'nowrap',
                         backgroundColor: isLiberado ? '#c62828' : '#2e7d32',
                         color: '#FFF'
                       }}
                     >
-                      {isLiberado ? '✕ Bloquear Curso' : '⚡ Liberar Curso'}
+                      {isLiberado ? '✕ Bloquear' : '⚡ Liberar'}
                     </button>
                   </div>
                 );
               })}
 
               {prepsFiltrados.length === 0 && (
-                <div style={{ color: '#666', textAlign: 'center', padding: '30px', fontSize: '13px' }}>
-                  Nenhum preparatório encontrado com o termo digitado.
+                <div style={{ color: '#666', textAlign: 'center', padding: '24px', fontSize: '13px' }}>
+                  Nenhum preparatório encontrado.
                 </div>
               )}
             </div>
 
+            {/* RESUMO DE ACESSOS CONCEDIDOS (CHIPS) */}
+            {qtdTotal > 0 && (
+              <div style={{
+                backgroundColor: '#111', borderRadius: '10px', padding: '10px 14px',
+                border: '1px solid #2a2a2a', maxHeight: '120px', overflowY: 'auto'
+              }}>
+                <div style={{ fontSize: '11px', color: '#AAA', fontWeight: 'bold', marginBottom: '6px' }}>
+                  📋 Resumo de Acessos Ativos ({qtdTotal}):
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {liberados.map(chave => {
+                    const parts = chave.split(':');
+                    const cId = parts[0];
+                    const pId = parts.slice(1).join(':');
+                    const carr = carreiras.find(c => c.id === cId);
+                    const prep = preparatorios.find(p => p.id === pId);
+                    return (
+                      <span key={chave} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        backgroundColor: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.35)',
+                        borderRadius: '999px', padding: '3px 10px', fontSize: '11px', color: '#81C784'
+                      }}>
+                        {carr?.icone || '📌'} {carr?.nome || cId} • {prep?.nome || pId}
+                        <button
+                          onClick={() => removerAcessoChave(chave)}
+                          style={{
+                            background: 'transparent', border: 'none', color: '#ff6b6b',
+                            cursor: 'pointer', fontSize: '12px', padding: '0 2px', fontWeight: 'bold'
+                          }}
+                          title="Remover este acesso"
+                        >✕</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* RODAPÉ */}
-            <div style={{display: 'flex', gap: '10px', borderTop: '1px solid #333', paddingTop: '14px'}}>
+            <div style={{display: 'flex', gap: '10px', borderTop: '1px solid #333', paddingTop: '12px'}}>
               <button 
                 style={{...styles.addButton, flex: 2, padding: '12px', fontSize: '14px', fontWeight: 'bold'}} 
                 onClick={salvarAcessoUsuario}

@@ -100,30 +100,14 @@ export function AuthProvider({ children }) {
     let dataExp = profile.data_expiracao || null;
     if (dataExp) {
       const expirou = new Date(dataExp) < new Date();
-      const gracePeriodMs = 5 * 60 * 1000;
-      const dentroDaTolerancia = (new Date() - new Date(dataExp)) < gracePeriodMs;
-      if (expirou && !dentroDaTolerancia) {
+      if (expirou) {
         const targetId = profile.id || userObj.id;
-        
-        // REGRA DE SEGURANÇA CRÍTICA:
-        // A expiração de data só pode REBAIXAR um plano pago (premium/medio) para basico.
-        // NUNCA pode transformar um plano basico em premium!
-        if (planoNormalizado !== 'basico') {
-          const planoRevertido = (profile.plano_anterior && profile.plano_anterior !== 'premium') 
-            ? profile.plano_anterior 
-            : 'basico';
-          planoNormalizado = planoRevertido;
-          dataExp = null;
-          supabase.from('profiles')
-            .update({ plano: planoRevertido, data_expiracao: null, plano_anterior: null })
-            .eq('id', targetId);
-        } else {
-          // Se o plano já é basico, apenas limpa a data expirada e o histórico para não haver conflitos
-          dataExp = null;
-          supabase.from('profiles')
-            .update({ data_expiracao: null, plano_anterior: null })
-            .eq('id', targetId);
-        }
+        console.log(`[AuthContext] ⏱️ Validade de ${userEmail} expirou (${dataExp}). Revertendo para básico.`);
+        planoNormalizado = 'basico';
+        dataExp = null;
+        supabase.from('profiles')
+          .update({ plano: 'basico', data_expiracao: null, plano_anterior: null })
+          .eq('id', targetId);
       }
     }
 
@@ -433,6 +417,27 @@ export function AuthProvider({ children }) {
       clearInterval(interval);
     };
   }, [user, carregarPerfil, aplicarPerfil]);
+
+  // =========================================================================
+  // 3. EXPIRAÇÃO EM TEMPO REAL (ex: teste de 30 minutos ou validade por dias)
+  // Reverte automaticamente o usuário para 'basico' no segundo exato do fim do prazo
+  // =========================================================================
+  useEffect(() => {
+    if (!dataExpiracao || !user?.id) return;
+
+    const msRestantes = new Date(dataExpiracao).getTime() - Date.now();
+    if (msRestantes <= 0) {
+      carregarPerfil(user);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      console.log('[AuthContext] ⏱️ Validade expirou em tempo real! Rebaixando automaticamente para básico...');
+      carregarPerfil(user);
+    }, msRestantes);
+
+    return () => clearTimeout(timer);
+  }, [dataExpiracao, user, carregarPerfil]);
 
   const handleLogout = async () => {
     console.log('[AuthContext] Executando logout completo...');

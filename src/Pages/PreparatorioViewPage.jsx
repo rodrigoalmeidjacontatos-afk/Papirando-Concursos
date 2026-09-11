@@ -271,13 +271,13 @@ function PreparatorioViewPage() {
   // Imagem de fundo fixa (soldado SWAT - Pinterest)
   const bgImage = '/images/bg-swat.jpg';
 
-  const temAcessoBloqueadoAoCurso = !isAdmin && (
-    planoUsuario === 'basico' ||
-    (planoUsuario === 'medio' && 
-      !preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) &&
-      !preparatoriosLiberados.includes(`*:${preparatorioId}`)
-    )
-  );
+  const temCursoLiberado = 
+    Array.isArray(preparatoriosLiberados) && (
+      preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) ||
+      preparatoriosLiberados.includes(`*:${preparatorioId}`)
+    );
+
+  const temAcessoBloqueadoAoCurso = !isAdmin && planoUsuario !== 'premium' && !temCursoLiberado;
 
   return (
     <div style={styles.container}>
