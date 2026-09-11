@@ -114,6 +114,8 @@ function AdminPage() {
   const [usuarioEditandoAcesso, setUsuarioEditandoAcesso] = useState(null); // {id, email, preparatorios_liberados: []}
   const [buscaPrepAcesso, setBuscaPrepAcesso] = useState('');
   const [carreiraAcessoId, setCarreiraAcessoId] = useState('');
+  const [abaModalAcesso, setAbaModalAcesso] = useState('combo'); // 'combo' | 'individual'
+  const [carreirasSelecionadasCombo, setCarreirasSelecionadasCombo] = useState([]);
 
   // ========== FUNÇÕES DE USUÁRIOS ==========
   const buscarUsuarios = async () => {
@@ -382,6 +384,9 @@ function AdminPage() {
     if (!carreiraAcessoId && carreiras.length > 0) {
       setCarreiraAcessoId(carreiras[0].id);
     }
+    const carreirasComAcesso = Array.from(new Set(liberados.map(k => k.split(':')[0]).filter(id => id && id !== '*')));
+    setCarreirasSelecionadasCombo(carreirasComAcesso.length > 0 ? carreirasComAcesso : (carreiras.length > 0 ? [carreiras[0].id] : []));
+    setAbaModalAcesso('combo');
     setUsuarioEditandoAcesso({
       ...usuario,
       preparatorios_liberados: liberados
@@ -430,6 +435,79 @@ function AdminPage() {
     setUsuarioEditandoAcesso(prev => ({
       ...prev,
       preparatorios_liberados: (prev.preparatorios_liberados || []).filter(k => !k.startsWith(`${carreiraId}:`))
+    }));
+  };
+
+  // Alternar carreira na seleção múltipla do combo
+  const toggleCarreiraNoCombo = (cId) => {
+    setCarreirasSelecionadasCombo(prev => 
+      prev.includes(cId) ? prev.filter(id => id !== cId) : [...prev, cId]
+    );
+  };
+
+  // Marcar todos os concursos no combo
+  const selecionarTodasCarreirasCombo = () => {
+    setCarreirasSelecionadasCombo(carreiras.map(c => c.id));
+  };
+
+  // Limpar seleção de concursos do combo
+  const limparCarreirasCombo = () => {
+    setCarreirasSelecionadasCombo([]);
+  };
+
+  // Liberar preparatório para TODOS os concursos marcados no combo
+  const liberarPrepParaCombo = (prepId) => {
+    if (!carreirasSelecionadasCombo.length) {
+      alert('Selecione ao menos um concurso para aplicar o combo!');
+      return;
+    }
+    const novasChaves = carreirasSelecionadasCombo.map(cId => `${cId}:${prepId}`);
+    setUsuarioEditandoAcesso(prev => {
+      const atual = prev.preparatorios_liberados || [];
+      const unicos = Array.from(new Set([...atual, ...novasChaves]));
+      return { ...prev, preparatorios_liberados: unicos };
+    });
+  };
+
+  // Bloquear preparatório de TODOS os concursos marcados no combo
+  const bloquearPrepDoCombo = (prepId) => {
+    if (!carreirasSelecionadasCombo.length) return;
+    const chavesParaRemover = new Set(carreirasSelecionadasCombo.map(cId => `${cId}:${prepId}`));
+    setUsuarioEditandoAcesso(prev => ({
+      ...prev,
+      preparatorios_liberados: (prev.preparatorios_liberados || []).filter(k => !chavesParaRemover.has(k))
+    }));
+  };
+
+  // Liberar TODOS os preparatórios para TODOS os concursos marcados no combo
+  const liberarTudoParaCombo = () => {
+    if (!carreirasSelecionadasCombo.length) {
+      alert('Selecione ao menos um concurso para aplicar o combo!');
+      return;
+    }
+    const novasChaves = [];
+    carreirasSelecionadasCombo.forEach(cId => {
+      preparatorios.forEach(p => {
+        novasChaves.push(`${cId}:${p.id}`);
+      });
+    });
+    setUsuarioEditandoAcesso(prev => {
+      const atual = prev.preparatorios_liberados || [];
+      const unicos = Array.from(new Set([...atual, ...novasChaves]));
+      return { ...prev, preparatorios_liberados: unicos };
+    });
+  };
+
+  // Bloquear TODOS os preparatórios dos concursos marcados no combo
+  const bloquearTudoDoCombo = () => {
+    if (!carreirasSelecionadasCombo.length) return;
+    const setCarreiras = new Set(carreirasSelecionadasCombo);
+    setUsuarioEditandoAcesso(prev => ({
+      ...prev,
+      preparatorios_liberados: (prev.preparatorios_liberados || []).filter(k => {
+        const [cId] = k.split(':');
+        return !setCarreiras.has(cId);
+      })
     }));
   };
 
@@ -3576,108 +3654,354 @@ function AdminPage() {
               >✕</button>
             </div>
 
-            {/* SELETOR DE CONCURSO / CARREIRA */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <label style={{ color: '#AAA', fontSize: '12px', whiteSpace: 'nowrap' }}>Concurso / Carreira:</label>
-              <select
-                value={carreiraAcessoId}
-                onChange={e => setCarreiraAcessoId(e.target.value)}
+            {/* ABAS DE NAVEGAÇÃO DO MODAL */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setAbaModalAcesso('combo')}
                 style={{
-                  flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '8px',
-                  border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '13px', outline: 'none'
+                  padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: abaModalAcesso === 'combo' ? '#2196F3' : '#222',
+                  color: abaModalAcesso === 'combo' ? '#FFF' : '#AAA',
+                  transition: 'all 0.15s'
                 }}
               >
-                {carreiras.map(c => {
-                  const qtdAqui = liberados.filter(k => k.startsWith(`${c.id}:`)).length;
-                  return <option key={c.id} value={c.id}>{c.icone} {c.nome}{qtdAqui > 0 ? ` (${qtdAqui} liberados)` : ''}</option>;
-                })}
-              </select>
-            </div>
-
-            {/* BUSCA + AÇÕES RÁPIDAS POR CARREIRA */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '220px' }}>
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar preparatório..."
-                  value={buscaPrepAcesso}
-                  onChange={(e) => setBuscaPrepAcesso(e.target.value)}
-                  style={{
-                    flex: 1, padding: '8px 12px', borderRadius: '8px',
-                    border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '12px', outline: 'none'
-                  }}
-                />
-                <span style={{ color: acessosDestaCarreira.length > 0 ? '#4CAF50' : '#888', fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                  {acessosDestaCarreira.length} liberado(s)
-                </span>
-              </div>
-              <button
-                style={{...styles.smallButton, backgroundColor: '#2e7d32', fontSize: '11px', padding: '6px 12px'}}
-                onClick={() => liberarTodosPrepsDoConcurso(carreiraAcessoId)}
-                title={`Liberar todos os cursos para ${carreiraAtual?.nome || 'este concurso'}`}
-              >
-                ⚡ Liberar Todos p/ {carreiraAtual?.nome || 'Concurso'}
+                🎁 Modo Promoção / Combo (Vários Concursos)
               </button>
               <button
-                style={{...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '6px 12px'}}
-                onClick={() => bloquearTodosPrepsDoConcurso(carreiraAcessoId)}
+                type="button"
+                onClick={() => setAbaModalAcesso('individual')}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: abaModalAcesso === 'individual' ? '#2196F3' : '#222',
+                  color: abaModalAcesso === 'individual' ? '#FFF' : '#AAA',
+                  transition: 'all 0.15s'
+                }}
               >
-                🗑️ Limpar
+                🏛️ Concurso Único (1 Edital por vez)
               </button>
             </div>
 
-            {/* LISTA DE PREPARATÓRIOS — 1 CLIQUE POR CURSO */}
-            <div style={{overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px'}}>
-              {carreiraAcessoId && prepsFiltrados.map(prep => {
-                const chaveAcesso = `${carreiraAcessoId}:${prep.id}`;
-                const isLiberado = liberados.includes(chaveAcesso);
-
-                return (
-                  <div key={prep.id} style={{
-                    backgroundColor: isLiberado ? 'rgba(76, 175, 80, 0.12)' : '#222',
-                    borderRadius: '10px',
-                    border: `1px solid ${isLiberado ? 'rgba(76, 175, 80, 0.45)' : '#333'}`,
-                    padding: '10px 14px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                    transition: 'all 0.15s'
-                  }}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0}}>
-                      <span style={{ fontSize: '22px' }}>{renderIcon(prep.logo)}</span>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{color: '#FFF', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                          {prep.nome}
-                        </div>
-                        <span style={{
-                          fontSize: '10px', fontWeight: '600',
-                          color: isLiberado ? '#4CAF50' : '#666'
-                        }}>
-                          {isLiberado ? `🟢 Liberado para ${carreiraAtual?.nome || 'este concurso'}` : '⚪ Bloqueado'}
-                        </span>
-                      </div>
+            {abaModalAcesso === 'combo' ? (
+              <>
+                {/* 1. SELETOR DE CONCURSOS DO COMBO */}
+                <div style={{ backgroundColor: '#141414', border: '1px solid #2e2e2e', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '14px' }}>🎯</span>
+                      <span style={{ color: '#FFF', fontSize: '12px', fontWeight: 'bold' }}>
+                        1. Selecione os Concursos do Combo / Promoção:
+                      </span>
+                      <span style={{ color: carreirasSelecionadasCombo.length > 0 ? '#4CAF50' : '#FF9800', fontSize: '11px', fontWeight: 'bold' }}>
+                        ({carreirasSelecionadasCombo.length} selecionado{carreirasSelecionadasCombo.length === 1 ? '' : 's'})
+                      </span>
                     </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={selecionarTodasCarreirasCombo}
+                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #444', backgroundColor: '#222', color: '#FFF', fontSize: '10px', cursor: 'pointer' }}
+                      >
+                        ☑️ Marcar Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={limparCarreirasCombo}
+                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #444', backgroundColor: '#222', color: '#AAA', fontSize: '10px', cursor: 'pointer' }}
+                      >
+                        ✕ Limpar
+                      </button>
+                    </div>
+                  </div>
 
+                  {/* CHIPS CLICÁVEIS DE CONCURSOS */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '110px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {carreiras.map(c => {
+                      const isSel = carreirasSelecionadasCombo.includes(c.id);
+                      const qtdLib = liberados.filter(k => k.startsWith(`${c.id}:`)).length;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => toggleCarreiraNoCombo(c.id)}
+                          style={{
+                            padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+                            backgroundColor: isSel ? 'rgba(33, 150, 243, 0.25)' : '#1f1f1f',
+                            border: `1px solid ${isSel ? '#2196F3' : '#333'}`,
+                            color: isSel ? '#90CAF9' : '#888',
+                            display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s'
+                          }}
+                        >
+                          <span>{isSel ? '✅' : '◻️'}</span>
+                          <span>{c.icone || '📌'} {c.nome}</span>
+                          {qtdLib > 0 && (
+                            <span style={{ fontSize: '9px', backgroundColor: '#2e7d32', color: '#FFF', padding: '1px 5px', borderRadius: '999px' }}>
+                              {qtdLib}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. BARRA DE BUSCA + AÇÕES EM LOTE NO COMBO */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Filtrar cursos..."
+                    value={buscaPrepAcesso}
+                    onChange={(e) => setBuscaPrepAcesso(e.target.value)}
+                    style={{
+                      flex: 1, minWidth: '180px', padding: '8px 12px', borderRadius: '8px',
+                      border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '12px', outline: 'none'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <button
-                      onClick={() => toggleAcessoCarreiraPrep(carreiraAcessoId, prep.id)}
-                      style={{
-                        padding: '7px 14px', borderRadius: '8px', border: 'none',
-                        cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
-                        transition: 'all 0.15s', whiteSpace: 'nowrap',
-                        backgroundColor: isLiberado ? '#c62828' : '#2e7d32',
-                        color: '#FFF'
-                      }}
+                      type="button"
+                      style={{ ...styles.smallButton, backgroundColor: '#2e7d32', fontSize: '11px', padding: '6px 12px' }}
+                      onClick={liberarTudoParaCombo}
+                      title="Liberar todos os preparatórios para os concursos selecionados no combo"
+                      disabled={carreirasSelecionadasCombo.length === 0}
                     >
-                      {isLiberado ? '✕ Bloquear' : '⚡ Liberar'}
+                      ⚡ Liberar TUDO no Combo ({carreirasSelecionadasCombo.length})
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '6px 12px' }}
+                      onClick={bloquearTudoDoCombo}
+                      title="Bloquear todos os preparatórios dos concursos selecionados no combo"
+                      disabled={carreirasSelecionadasCombo.length === 0}
+                    >
+                      🗑️ Limpar Combo
                     </button>
                   </div>
-                );
-              })}
-
-              {prepsFiltrados.length === 0 && (
-                <div style={{ color: '#666', textAlign: 'center', padding: '24px', fontSize: '13px' }}>
-                  Nenhum preparatório encontrado.
                 </div>
-              )}
-            </div>
+
+                {/* 3. LISTA DE CURSOS COM CONTROLE POR CONCURSO SELECIONADO */}
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
+                  {prepsFiltrados.map(prep => {
+                    const concursosComAcesso = carreirasSelecionadasCombo.filter(cId => liberados.includes(`${cId}:${prep.id}`));
+                    const totalSelecionados = carreirasSelecionadasCombo.length;
+                    const todosLiberados = totalSelecionados > 0 && concursosComAcesso.length === totalSelecionados;
+                    const parcialmenteLiberado = concursosComAcesso.length > 0 && !todosLiberados;
+
+                    return (
+                      <div key={prep.id} style={{
+                        backgroundColor: todosLiberados ? 'rgba(76, 175, 80, 0.12)' : parcialmenteLiberado ? 'rgba(255, 152, 0, 0.1)' : '#222',
+                        borderRadius: '10px',
+                        border: `1px solid ${todosLiberados ? 'rgba(76, 175, 80, 0.45)' : parcialmenteLiberado ? 'rgba(255, 152, 0, 0.4)' : '#333'}`,
+                        padding: '10px 14px',
+                        display: 'flex', flexDirection: 'column', gap: '8px',
+                        transition: 'all 0.15s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: '22px' }}>{renderIcon(prep.logo)}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {prep.nome}
+                              </div>
+                              <span style={{
+                                fontSize: '11px', fontWeight: '600',
+                                color: todosLiberados ? '#4CAF50' : parcialmenteLiberado ? '#FFB74D' : '#888'
+                              }}>
+                                {totalSelecionados === 0 
+                                  ? '⚠️ Selecione ao menos 1 concurso acima' 
+                                  : todosLiberados 
+                                  ? `🟢 Liberado em todos os ${totalSelecionados} concursos do combo` 
+                                  : parcialmenteLiberado 
+                                  ? `🟡 Liberado em ${concursosComAcesso.length} de ${totalSelecionados} concursos do combo` 
+                                  : '⚪ Bloqueado nos concursos do combo'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => liberarPrepParaCombo(prep.id)}
+                              disabled={totalSelecionados === 0}
+                              style={{
+                                padding: '6px 12px', borderRadius: '6px', border: 'none',
+                                cursor: totalSelecionados === 0 ? 'not-allowed' : 'pointer',
+                                fontSize: '11px', fontWeight: 'bold',
+                                backgroundColor: '#2e7d32', color: '#FFF', opacity: totalSelecionados === 0 ? 0.5 : 1
+                              }}
+                              title="Liberar para todos os concursos selecionados no combo"
+                            >
+                              ⚡ Liberar no Combo ({totalSelecionados})
+                            </button>
+                            {concursosComAcesso.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => bloquearPrepDoCombo(prep.id)}
+                                style={{
+                                  padding: '6px 10px', borderRadius: '6px', border: 'none',
+                                  cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+                                  backgroundColor: '#c62828', color: '#FFF'
+                                }}
+                                title="Bloquear dos concursos selecionados no combo"
+                              >
+                                ✕ Bloquear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* MINI-CHIPS PARA CONTROLE CIRÚRGICO POR CONCURSO DENTRO DO CURSO */}
+                        {totalSelecionados > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <span style={{ fontSize: '10px', color: '#777', alignSelf: 'center', marginRight: '4px' }}>Ajuste individual:</span>
+                            {carreirasSelecionadasCombo.map(cId => {
+                              const carr = carreiras.find(c => c.id === cId);
+                              const chave = `${cId}:${prep.id}`;
+                              const temAcesso = liberados.includes(chave);
+                              return (
+                                <button
+                                  key={cId}
+                                  type="button"
+                                  onClick={() => toggleAcessoCarreiraPrep(cId, prep.id)}
+                                  style={{
+                                    padding: '2px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '10px',
+                                    backgroundColor: temAcesso ? 'rgba(76, 175, 80, 0.2)' : '#181818',
+                                    border: `1px solid ${temAcesso ? '#4CAF50' : '#333'}`,
+                                    color: temAcesso ? '#81C784' : '#666',
+                                    display: 'flex', alignItems: 'center', gap: '4px'
+                                  }}
+                                  title={`Clique para ${temAcesso ? 'bloquear' : 'liberar'} ${prep.nome} especificamente na ${carr?.nome || cId}`}
+                                >
+                                  <span>{temAcesso ? '✓' : '＋'}</span>
+                                  <span>{carr?.icone || '📌'} {carr?.nome || cId}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {prepsFiltrados.length === 0 && (
+                    <div style={{ color: '#666', textAlign: 'center', padding: '24px', fontSize: '13px' }}>
+                      Nenhum preparatório encontrado com o termo digitado.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ABA CONCURSO ÚNICO */
+              <>
+                {/* SELETOR DE CONCURSO / CARREIRA */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ color: '#AAA', fontSize: '12px', whiteSpace: 'nowrap' }}>Concurso / Carreira:</label>
+                  <select
+                    value={carreiraAcessoId}
+                    onChange={e => setCarreiraAcessoId(e.target.value)}
+                    style={{
+                      flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '8px',
+                      border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '13px', outline: 'none'
+                    }}
+                  >
+                    {carreiras.map(c => {
+                      const qtdAqui = liberados.filter(k => k.startsWith(`${c.id}:`)).length;
+                      return <option key={c.id} value={c.id}>{c.icone} {c.nome}{qtdAqui > 0 ? ` (${qtdAqui} liberados)` : ''}</option>;
+                    })}
+                  </select>
+                </div>
+
+                {/* BUSCA + AÇÕES RÁPIDAS POR CARREIRA */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '220px' }}>
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar preparatório..."
+                      value={buscaPrepAcesso}
+                      onChange={(e) => setBuscaPrepAcesso(e.target.value)}
+                      style={{
+                        flex: 1, padding: '8px 12px', borderRadius: '8px',
+                        border: '1px solid #444', backgroundColor: '#111', color: '#FFF', fontSize: '12px', outline: 'none'
+                      }}
+                    />
+                    <span style={{ color: acessosDestaCarreira.length > 0 ? '#4CAF50' : '#888', fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                      {acessosDestaCarreira.length} liberado(s)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    style={{ ...styles.smallButton, backgroundColor: '#2e7d32', fontSize: '11px', padding: '6px 12px' }}
+                    onClick={() => liberarTodosPrepsDoConcurso(carreiraAcessoId)}
+                    title={`Liberar todos os cursos para ${carreiraAtual?.nome || 'este concurso'}`}
+                  >
+                    ⚡ Liberar Todos p/ {carreiraAtual?.nome || 'Concurso'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.smallButton, backgroundColor: '#555', fontSize: '11px', padding: '6px 12px' }}
+                    onClick={() => bloquearTodosPrepsDoConcurso(carreiraAcessoId)}
+                  >
+                    🗑️ Limpar
+                  </button>
+                </div>
+
+                {/* LISTA DE PREPARATÓRIOS */}
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
+                  {carreiraAcessoId && prepsFiltrados.map(prep => {
+                    const chaveAcesso = `${carreiraAcessoId}:${prep.id}`;
+                    const isLiberado = liberados.includes(chaveAcesso);
+
+                    return (
+                      <div key={prep.id} style={{
+                        backgroundColor: isLiberado ? 'rgba(76, 175, 80, 0.12)' : '#222',
+                        borderRadius: '10px',
+                        border: `1px solid ${isLiberado ? 'rgba(76, 175, 80, 0.45)' : '#333'}`,
+                        padding: '10px 14px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                        transition: 'all 0.15s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: '22px' }}>{renderIcon(prep.logo)}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {prep.nome}
+                            </div>
+                            <span style={{
+                              fontSize: '10px', fontWeight: '600',
+                              color: isLiberado ? '#4CAF50' : '#666'
+                            }}>
+                              {isLiberado ? `🟢 Liberado para ${carreiraAtual?.nome || 'este concurso'}` : '⚪ Bloqueado'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleAcessoCarreiraPrep(carreiraAcessoId, prep.id)}
+                          style={{
+                            padding: '7px 14px', borderRadius: '8px', border: 'none',
+                            cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+                            transition: 'all 0.15s', whiteSpace: 'nowrap',
+                            backgroundColor: isLiberado ? '#c62828' : '#2e7d32',
+                            color: '#FFF'
+                          }}
+                        >
+                          {isLiberado ? '✕ Bloquear' : '⚡ Liberar'}
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {prepsFiltrados.length === 0 && (
+                    <div style={{ color: '#666', textAlign: 'center', padding: '24px', fontSize: '13px' }}>
+                      Nenhum preparatório encontrado.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* RESUMO DE ACESSOS CONCEDIDOS (CHIPS) */}
             {qtdTotal > 0 && (
