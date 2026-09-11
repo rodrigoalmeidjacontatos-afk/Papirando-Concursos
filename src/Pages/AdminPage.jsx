@@ -83,6 +83,8 @@ function AdminPage() {
   const [dragOverAulaId, setDragOverAulaId] = useState(null);
   const [editandoCarreira, setEditandoCarreira] = useState(null);
   const [draggedCarreira, setDraggedCarreira] = useState(null);
+  const [filtroCategoriaCarreira, setFiltroCategoriaCarreira] = useState('todas');
+  const [buscaCarreira, setBuscaCarreira] = useState('');
   const [draggedDisciplina, setDraggedDisciplina] = useState(null);
   const [draggedModulo, setDraggedModulo] = useState(null);
   const [editandoCategoria, setEditandoCategoria] = useState(null);
@@ -944,6 +946,23 @@ function AdminPage() {
       console.error("Erro ao salvar ordem das carreiras:", error);
       alert("Erro ao salvar ordem das carreiras no banco: " + error.message);
     }
+  };
+
+  const moverCarreira = async (carreiraId, direcao) => {
+    const index = carreiras.findIndex(c => c.id === carreiraId);
+    if (index === -1) return;
+    const novoIndex = direcao === 'cima' ? index - 1 : index + 1;
+    if (novoIndex < 0 || novoIndex >= carreiras.length) return;
+    
+    const novas = [...carreiras];
+    const item = novas.splice(index, 1)[0];
+    novas.splice(novoIndex, 0, item);
+    setCarreiras(novas);
+    
+    const updates = novas.map((c, i) => ({ 
+      id: c.id, nome: c.nome, icone: c.icone, capa: c.capa, categoriaId: c.categoriaId || c.categoria_id, ordem: i + 1 
+    }));
+    await supabase.from('carreiras').upsert(updates);
   };
 
 
@@ -2201,76 +2220,364 @@ function AdminPage() {
             <AdminQuestoes />
           )}
 
-          {activeMenu === 'carreiras' && (
+          {activeMenu === 'carreiras' && (() => {
+            const carreirasFiltradas = carreiras.filter(c =>
+              !buscaCarreira || (c.nome || '').toLowerCase().includes(buscaCarreira.toLowerCase())
+            );
+
+            // Categorias que devem ser mostradas com base no filtro
+            const categoriasExibir = categorias.filter(cat =>
+              filtroCategoriaCarreira === 'todas' || filtroCategoriaCarreira === cat.id
+            );
+
+            // Carreiras sem categoria válida
+            const carreirasSemCat = carreirasFiltradas.filter(c =>
+              !categorias.some(cat => cat.id === (c.categoriaId || c.categoria_id))
+            );
+
+            return (
             <div>
-              <h2 style={{color: '#fff', marginBottom: 20}}>Gerenciar Carreiras</h2>
-              <div style={styles.formCard}>
-                <h3 style={{color: '#F5F5F5', marginBottom: '12px'}}>Nova Carreira</h3>
-                <div style={styles.addForm}>
-                  <input style={styles.input} placeholder="Nome" value={novaCarreira.nome} onChange={e => setNovaCarreira({...novaCarreira, nome: e.target.value})} />
-                  <input style={styles.inputSmall} placeholder="Ícone" value={novaCarreira.icone} onChange={e => setNovaCarreira({...novaCarreira, icone: e.target.value})} />
-                  <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                    <input style={styles.input} placeholder="URL da Capa" value={novaCarreira.capa} onChange={e => setNovaCarreira({...novaCarreira, capa: e.target.value})} />
-                    <label style={{ ...styles.addButton, padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: 20 }}>
+                <div>
+                  <h2 style={{color: '#fff', margin: 0}}>Gerenciar Carreiras por Categoria</h2>
+                  <p style={{color: '#888', margin: '4px 0 0', fontSize: '13px'}}>
+                    Organize, edite e crie as carreiras agrupadas dentro do seu próprio grupo de categoria.
+                  </p>
+                </div>
+              </div>
+
+              {/* CARD DE NOVA CARREIRA */}
+              <div style={{ ...styles.formCard, padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{color: '#F5F5F5', margin: '0 0 14px 0', fontSize: '16px'}}>➕ Nova Carreira</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <input
+                      style={{ ...styles.input, flex: 2, minWidth: '200px' }}
+                      placeholder="Nome da Carreira (ex: PMPE, PMAL, PCPE...)"
+                      value={novaCarreira.nome}
+                      onChange={e => setNovaCarreira({...novaCarreira, nome: e.target.value})}
+                    />
+                    <input
+                      style={{ ...styles.inputSmall, width: '65px', textAlign: 'center', fontSize: '16px' }}
+                      placeholder="Ícone"
+                      value={novaCarreira.icone}
+                      onChange={e => setNovaCarreira({...novaCarreira, icone: e.target.value})}
+                      title="Emoji ou ícone"
+                    />
+                    <select
+                      style={{ ...styles.select, flex: 1.5, minWidth: '180px' }}
+                      value={novaCarreira.categoriaId}
+                      onChange={e => setNovaCarreira({...novaCarreira, categoriaId: e.target.value})}
+                    >
+                      <option value="">Selecione a Categoria *</option>
+                      {categorias.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.icone} {cat.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* CAPA DA CARREIRA */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{
+                      backgroundColor: '#2e7d32', color: '#FFF', padding: '9px 16px',
+                      borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                      display: 'inline-flex', alignItems: 'center', gap: '6px'
+                    }}>
                       📁 Desktop
                       <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleFileUpload(e, 'carreira_nova')} />
                     </label>
+                    <input
+                      style={{ ...styles.input, flex: 1, minWidth: '200px' }}
+                      placeholder="URL da Capa da Carreira (opcional)"
+                      value={novaCarreira.capa}
+                      onChange={e => setNovaCarreira({...novaCarreira, capa: e.target.value})}
+                    />
+                    {novaCarreira.capa && (
+                      <button
+                        type="button"
+                        onClick={() => setNovaCarreira({ ...novaCarreira, capa: '' })}
+                        style={{ background: 'transparent', border: '1px solid #c62828', color: '#ff6b6b', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                      >
+                        ✕ Limpar
+                      </button>
+                    )}
+                    <button style={{ ...styles.addButton, padding: '10px 24px', fontSize: '13px', fontWeight: 'bold' }} onClick={addCarreira}>
+                      Adicionar Carreira
+                    </button>
                   </div>
-                  <select style={styles.select} value={novaCarreira.categoriaId} onChange={e => setNovaCarreira({...novaCarreira, categoriaId: e.target.value})}>
-                    <option value="">Selecione a Categoria</option>
-                    {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                  </select>
-                  <button style={styles.addButton} onClick={addCarreira}>Adicionar</button>
                 </div>
               </div>
-              
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {carreiras.map((carr, index) => (
-                  <div 
-                    key={carr.id} 
-                    style={{...styles.item, cursor: 'grab', opacity: draggedCarreira === index ? 0.5 : 1}}
-                    draggable
-                    onDragStart={(e) => handleDragStartCarreira(e, index)}
-                    onDragEnter={(e) => handleDragEnterCarreira(e, index)}
-                    onDragEnd={handleDragEndCarreira}
-                    onDragOver={(e) => e.preventDefault()}
+
+              {/* BARRA DE FILTROS POR CATEGORIA + BUSCA */}
+              <div style={{
+                backgroundColor: '#161616', border: '1px solid #2a2a2a', borderRadius: '12px',
+                padding: '14px 16px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <span style={{ color: '#AAA', fontSize: '12px', fontWeight: 'bold' }}>
+                    📂 Filtrar por Grupo de Categoria:
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar carreira por nome..."
+                    value={buscaCarreira}
+                    onChange={e => setBuscaCarreira(e.target.value)}
+                    style={{
+                      padding: '7px 12px', borderRadius: '8px', border: '1px solid #444',
+                      backgroundColor: '#111', color: '#FFF', fontSize: '12px', minWidth: '220px', outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroCategoriaCarreira('todas')}
+                    style={{
+                      padding: '6px 14px', borderRadius: '999px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                      border: 'none', transition: 'all 0.15s',
+                      backgroundColor: filtroCategoriaCarreira === 'todas' ? '#2196F3' : '#222',
+                      color: filtroCategoriaCarreira === 'todas' ? '#FFF' : '#AAA'
+                    }}
                   >
-                    {editandoCarreira?.id === carr.id ? (
-                      <div style={styles.editForm}>
-                        <input style={styles.inputSmall} value={editandoCarreira.icone} onChange={e => setEditandoCarreira({...editandoCarreira, icone: e.target.value})} />
-                        <input style={styles.input} value={editandoCarreira.nome} onChange={e => setEditandoCarreira({...editandoCarreira, nome: e.target.value})} />
-                        <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                          <input style={styles.input} value={editandoCarreira.capa} placeholder="URL da Capa" onChange={e => setEditandoCarreira({...editandoCarreira, capa: e.target.value})} />
-                          <label style={{ ...styles.addButton, padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                            📁 Desktop
-                            <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleFileUpload(e, 'carreira_edit')} />
-                          </label>
+                    🌟 Todas as Categorias ({carreiras.length})
+                  </button>
+                  {categorias.map(cat => {
+                    const qtd = carreiras.filter(c => (c.categoriaId || c.categoria_id) === cat.id).length;
+                    const isAtivo = filtroCategoriaCarreira === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFiltroCategoriaCarreira(cat.id)}
+                        style={{
+                          padding: '6px 14px', borderRadius: '999px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                          border: `1px solid ${isAtivo ? '#2196F3' : '#333'}`, transition: 'all 0.15s',
+                          backgroundColor: isAtivo ? 'rgba(33, 150, 243, 0.25)' : '#1e1e1e',
+                          color: isAtivo ? '#90CAF9' : '#AAA',
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                      >
+                        <span>{cat.icone || '📁'}</span>
+                        <span>{cat.nome}</span>
+                        <span style={{ fontSize: '10px', backgroundColor: isAtivo ? '#2196F3' : '#333', color: '#FFF', padding: '1px 6px', borderRadius: '999px' }}>
+                          {qtd}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {carreirasSemCat.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFiltroCategoriaCarreira('sem_categoria')}
+                      style={{
+                        padding: '6px 14px', borderRadius: '999px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                        border: '1px solid #f57c00', transition: 'all 0.15s',
+                        backgroundColor: filtroCategoriaCarreira === 'sem_categoria' ? '#f57c00' : 'rgba(245,124,0,0.15)',
+                        color: filtroCategoriaCarreira === 'sem_categoria' ? '#FFF' : '#ffb74d'
+                      }}
+                    >
+                      ⚠️ Sem Categoria ({carreirasSemCat.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* LISTA DAS CARREIRAS AGRUPADAS POR CATEGORIA */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {categoriasExibir.map(cat => {
+                  const carreirasDesteGrupo = carreirasFiltradas.filter(c =>
+                    (c.categoriaId || c.categoria_id) === cat.id
+                  );
+
+                  return (
+                    <div
+                      key={cat.id}
+                      style={{
+                        backgroundColor: '#181818', borderRadius: '14px', border: '1px solid #2e2e2e',
+                        overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                      }}
+                    >
+                      {/* CABEÇALHO DO GRUPO DA CATEGORIA */}
+                      <div style={{
+                        padding: '14px 18px', backgroundColor: '#202020', borderBottom: '1px solid #333',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '22px' }}>{cat.icone || '📁'}</span>
+                          <div>
+                            <span style={{ color: '#FFF', fontWeight: 'bold', fontSize: '15px' }}>{cat.nome}</span>
+                            <span style={{ color: '#888', fontSize: '12px', marginLeft: '8px' }}>
+                              ({carreirasDesteGrupo.length} carreira{carreirasDesteGrupo.length === 1 ? '' : 's'})
+                            </span>
+                          </div>
                         </div>
-                        <select style={styles.select} value={editandoCarreira.categoriaId} onChange={e => setEditandoCarreira({...editandoCarreira, categoriaId: e.target.value})}>
-                           {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                        </select>
-                        <button style={styles.saveButtonSmall} onClick={saveEditCarreira}>Salvar</button>
-                        <button style={styles.cancelButtonSmall} onClick={cancelEditCarreira}>Cancelar</button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNovaCarreira(prev => ({ ...prev, categoriaId: cat.id }));
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          style={{
+                            padding: '6px 12px', borderRadius: '6px', border: '1px solid #444',
+                            backgroundColor: '#2a2a2a', color: '#90CAF9', fontSize: '11px', fontWeight: 'bold',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                          }}
+                        >
+                          ➕ Adicionar nesta categoria
+                        </button>
                       </div>
-                    ) : (
-                      <>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                          <span style={{cursor: 'grab', fontSize: '18px', color: '#888'}}>☰</span>
-                          {renderIcon(carr.icone)}
-                          <span style={{color: '#fff', fontWeight: 'bold'}}>{carr.nome}</span>
-                          <span style={styles.itemDetail}>({categorias.find(cat => cat.id === carr.categoriaId)?.nome})</span>
+
+                      {/* LISTA DE CARREIRAS PERTENCENTES A ESTA CATEGORIA */}
+                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {carreirasDesteGrupo.map((carr) => (
+                          <div
+                            key={carr.id}
+                            style={{
+                              backgroundColor: '#222', borderRadius: '10px', border: '1px solid #333',
+                              padding: '12px 16px', transition: 'all 0.15s'
+                            }}
+                          >
+                            {editandoCarreira?.id === carr.id ? (
+                              /* FORMULÁRIO DE EDIÇÃO DA CARREIRA */
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  <input
+                                    style={{ ...styles.inputSmall, width: '55px', textAlign: 'center' }}
+                                    value={editandoCarreira.icone}
+                                    onChange={e => setEditandoCarreira({...editandoCarreira, icone: e.target.value})}
+                                    placeholder="Ícone"
+                                  />
+                                  <input
+                                    style={{ ...styles.input, flex: 2, minWidth: '180px' }}
+                                    value={editandoCarreira.nome}
+                                    onChange={e => setEditandoCarreira({...editandoCarreira, nome: e.target.value})}
+                                    placeholder="Nome da Carreira"
+                                  />
+                                  <select
+                                    style={{ ...styles.select, flex: 1.5, minWidth: '160px' }}
+                                    value={editandoCarreira.categoriaId}
+                                    onChange={e => setEditandoCarreira({...editandoCarreira, categoriaId: e.target.value})}
+                                  >
+                                    {categorias.map(c => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
+                                  </select>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <label style={{ ...styles.addButton, padding: '8px 14px', fontSize: '11px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                    📁 Desktop
+                                    <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleFileUpload(e, 'carreira_edit')} />
+                                  </label>
+                                  <input
+                                    style={{ ...styles.input, flex: 1, minWidth: '200px' }}
+                                    value={editandoCarreira.capa || ''}
+                                    placeholder="URL da Capa"
+                                    onChange={e => setEditandoCarreira({...editandoCarreira, capa: e.target.value})}
+                                  />
+                                  <button style={styles.saveButtonSmall} onClick={saveEditCarreira}>💾 Salvar</button>
+                                  <button style={styles.cancelButtonSmall} onClick={cancelEditCarreira}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* VISUALIZAÇÃO NORMAL DA CARREIRA */
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  {/* BOTÕES DE REORDENAR */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => moverCarreira(carr.id, 'cima')}
+                                      style={{ background: 'transparent', border: 'none', color: '#777', cursor: 'pointer', fontSize: '11px', padding: '0 2px' }}
+                                      title="Mover para cima"
+                                    >▲</button>
+                                    <button
+                                      type="button"
+                                      onClick={() => moverCarreira(carr.id, 'baixo')}
+                                      style={{ background: 'transparent', border: 'none', color: '#777', cursor: 'pointer', fontSize: '11px', padding: '0 2px' }}
+                                      title="Mover para baixo"
+                                    >▼</button>
+                                  </div>
+
+                                  {/* MINI CAPA OU ÍCONE */}
+                                  {carr.capa ? (
+                                    <img src={carr.capa} alt="" style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #444' }} />
+                                  ) : (
+                                    <span style={{ fontSize: '24px' }}>{renderIcon(carr.icone)}</span>
+                                  )}
+
+                                  <div>
+                                    <div style={{ color: '#FFF', fontWeight: 'bold', fontSize: '14px' }}>
+                                      {carr.nome}
+                                    </div>
+                                    <div style={{ color: '#777', fontSize: '11px', marginTop: '2px' }}>
+                                      ID: <code>{carr.id}</code>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button style={styles.editButton} onClick={() => editCarreira(carr)}>✏️ Editar</button>
+                                  <button style={styles.deleteButton} onClick={() => removeCarreira(carr.id)}>🗑️ Excluir</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {carreirasDesteGrupo.length === 0 && (
+                          <div style={{ color: '#666', textAlign: 'center', padding: '20px', fontSize: '12px' }}>
+                            Nenhuma carreira encontrada nesta categoria com os filtros aplicados.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* SEÇÃO ESPECIAL DE CARREIRAS SEM CATEGORIA (SE HOUVER) */}
+                {carreirasSemCat.length > 0 && (filtroCategoriaCarreira === 'todas' || filtroCategoriaCarreira === 'sem_categoria') && (
+                  <div style={{
+                    backgroundColor: '#181818', borderRadius: '14px', border: '1px solid #f57c00',
+                    overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                  }}>
+                    <div style={{
+                      padding: '14px 18px', backgroundColor: 'rgba(245,124,0,0.15)', borderBottom: '1px solid rgba(245,124,0,0.3)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>⚠️</span>
+                        <span style={{ color: '#ffb74d', fontWeight: 'bold', fontSize: '14px' }}>
+                          Carreiras Sem Categoria Definida ({carreirasSemCat.length})
+                        </span>
+                      </div>
+                      <span style={{ color: '#aaa', fontSize: '11px' }}>Clique em Editar para associar a uma categoria</span>
+                    </div>
+
+                    <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {carreirasSemCat.map(carr => (
+                        <div key={carr.id} style={{ backgroundColor: '#222', borderRadius: '10px', border: '1px solid #444', padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '22px' }}>{renderIcon(carr.icone)}</span>
+                              <div>
+                                <span style={{ color: '#FFF', fontWeight: 'bold', fontSize: '14px' }}>{carr.nome}</span>
+                                <div style={{ color: '#ff9800', fontSize: '11px' }}>Categoria não vinculada</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button style={styles.editButton} onClick={() => editCarreira(carr)}>✏️ Associar Categoria</button>
+                              <button style={styles.deleteButton} onClick={() => removeCarreira(carr.id)}>🗑️ Excluir</button>
+                            </div>
+                          </div>
                         </div>
-                        <div style={styles.actionButtons}>
-                          <button style={styles.editButton} onClick={() => editCarreira(carr)}>Editar</button>
-                          <button style={styles.deleteButton} onClick={() => removeCarreira(carr.id)}>Excluir</button>
-                        </div>
-                      </>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {activeMenu === 'preparatorios' && (
             <div>
