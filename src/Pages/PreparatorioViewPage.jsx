@@ -40,12 +40,44 @@ function PreparatorioViewPage() {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Busca em paralelo: preparatório, disciplinas, vínculos modernos e blob legado
-        const [prepRes, discRes, vRes, vLegRes] = await Promise.all([
+        // Helper para contornar o limite rígido de 1000 linhas do PostgREST/Supabase
+        const fetchPaginado = async (queryFn) => {
+          let allRows = [];
+          let from = 0;
+          while (true) {
+            const { data, error } = await queryFn(from, from + 999);
+            if (error) {
+              console.error('[PreparatorioViewPage] Erro na busca paginada:', error);
+              break;
+            }
+            allRows = allRows.concat(data || []);
+            if (!data || data.length < 1000) break;
+            from += 1000;
+          }
+          return allRows;
+        };
+
+        // 1. Busca em paralelo: preparatório, disciplinas, vínculos da carreira (paginados) e progresso
+        const [prepRes, discRes, vData, progressoData] = await Promise.all([
           supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle(),
           supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId),
-          supabase.from('vinculos').select('modulo_id, aula_id').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId),
-          supabase.from('vinculos').select('data').eq('id', 1).maybeSingle()
+          fetchPaginado((from, to) =>
+            supabase
+              .from('vinculos')
+              .select('modulo_id, aula_id')
+              .eq('carreira_id', carreiraId)
+              .eq('preparatorio_id', preparatorioId)
+              .range(from, to)
+          ),
+          user?.id
+            ? fetchPaginado((from, to) =>
+                supabase
+                  .from('progresso')
+                  .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
+                  .eq('user_id', user.id)
+                  .range(from, to)
+              )
+            : Promise.resolve([])
         ]);
 
         let prepData = prepRes?.data;
@@ -61,106 +93,77 @@ function PreparatorioViewPage() {
         const disciplinasData = discRes?.data || [];
         setDisciplinas(disciplinasData);
 
-        // 2. Combinar vínculos modernos (linhas individuais) + legados (blob JSON id=1)
-        //    O admin lê os dois (AdminPage linhas 628-647); o frontend agora também.
-        let vData = [...(vRes?.data || [])];
-        const legadoBlob = vLegRes?.data?.data;
-        if (legadoBlob) {
-          const legadoModulos = legadoBlob?.[carreiraId]?.[preparatorioId]?.modulos || {};
-          // IDs já presentes nas linhas modernas (para não duplicar)
-          const modernModIds = new Set(vData.filter(v => v.modulo_id && !v.aula_id).map(v => String(v.modulo_id)));
-          const modernAulaIds = new Set(vData.filter(v => v.aula_id).map(v => String(v.aula_id)));
-          Object.entries(legadoModulos).forEach(([moduloId, moduloObj]) => {
-            const aulasLegado = Object.keys(moduloObj?.aulas || {});
-            if (aulasLegado.length === 0) {
-              // Módulo inteiro vinculado
-              if (!modernModIds.has(String(moduloId))) {
-                vData.push({ modulo_id: moduloId, aula_id: null });
-              }
-            } else {
-              // Aulas individuais vinculadas
-              aulasLegado.forEach(aulaId => {
-                if (!modernAulaIds.has(String(aulaId))) {
-                  vData.push({ modulo_id: moduloId, aula_id: aulaId });
-                }
-              });
-            }
-          });
-        }
-
         const discIds = disciplinasData.map(d => d.id).filter(Boolean);
 
-        // 3. Buscar todos os módulos das disciplinas deste preparatório
+        // 2. Buscar módulos de todas as disciplinas deste preparatório
         let modulosCarregados = [];
         if (discIds.length > 0) {
           const { data: mods } = await supabase.from('modulos').select('*').in('disciplina_id', discIds);
           modulosCarregados = mods || [];
         }
 
-        // 4. Filtrar módulos pelos vínculos
+        // 3. Filtrar módulos de acordo com os vínculos da carreira
         const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => String(v.modulo_id));
-        const modulosCompletos  = vData.filter(v => v.modulo_id && !v.aula_id).map(v => String(v.modulo_id));
+        const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => String(v.modulo_id));
         const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => String(v.aula_id));
-        const temVinculos = modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0;
 
         let modulosFiltrados = modulosCarregados;
-        if (temVinculos) {
+        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
           modulosFiltrados = modulosCarregados.filter(m => modulosPermitidos.includes(String(m.id)));
         }
 
-        // 5. Buscar aulas e progresso em paralelo
+        // 4. Buscar aulas COM PAGINAÇÃO em lotes paralelos (evita limite de URL e limite de 1000 rows)
         const targetModIds = modulosFiltrados.map(m => m.id).filter(Boolean);
-
-        const [aulasRes, progressoRes] = await Promise.all([
-          targetModIds.length > 0
-            ? supabase
-                .from('aulas')
-                .select('*')
-                .in('modulo_id', targetModIds)
-                .order('ordem', { ascending: true })
-            : Promise.resolve({ data: [] }),
-          user?.id
-            ? supabase
-                .from('progresso')
-                .select('aula_id, tempo_assistido, concluida, ultimo_acesso')
-                .eq('user_id', user.id)
-            : Promise.resolve({ data: [] })
-        ]);
+        let aulasCarregadas = [];
+        if (targetModIds.length > 0) {
+          const CHUNK_SIZE = 70;
+          const chunkPromises = [];
+          for (let i = 0; i < targetModIds.length; i += CHUNK_SIZE) {
+            const chunkIds = targetModIds.slice(i, i + CHUNK_SIZE);
+            chunkPromises.push(
+              fetchPaginado((from, to) =>
+                supabase
+                  .from('aulas')
+                  .select('*')
+                  .in('modulo_id', chunkIds)
+                  .order('ordem', { ascending: true })
+                  .range(from, to)
+              )
+            );
+          }
+          const chunksResults = await Promise.all(chunkPromises);
+          aulasCarregadas = chunksResults.flat();
+        }
 
         if (!mounted) return;
 
-        if (aulasRes?.error) {
-          console.error('[PreparatorioViewPage] Erro ao buscar aulas:', aulasRes.error);
-        }
-
-        let aulasCarregadas = (aulasRes?.data || []).map(a => ({
+        let aulasMapeadas = aulasCarregadas.map(a => ({
           ...a,
           modulo_id: a.modulo_id || a.moduloId,
           moduloId: a.moduloId || a.modulo_id,
         }));
 
-        // 6. Filtrar aulas pelos vínculos (se houver restrição por aula individual)
-        if (temVinculos && aulasPermitidasIds.length > 0) {
-          aulasCarregadas = aulasCarregadas.filter(a =>
+        // 5. Filtrar aulas pelos vínculos vinculados na carreira
+        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
+          aulasMapeadas = aulasMapeadas.filter(a =>
             modulosCompletos.includes(String(a.modulo_id || a.moduloId)) ||
             aulasPermitidasIds.includes(String(a.id))
           );
         }
 
-        aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+        aulasMapeadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
 
-        // 7. Remover módulos que ficaram sem aulas
-        const modIdsComAulas = new Set(aulasCarregadas.map(a => String(a.modulo_id || a.moduloId)));
+        // 6. Manter apenas módulos que possuam aulas liberadas/vinculadas
+        const modIdsComAulas = new Set(aulasMapeadas.map(a => String(a.modulo_id || a.moduloId)));
         const modulosFinais = modulosFiltrados.filter(m => modIdsComAulas.has(String(m.id)));
 
         setModulos(modulosFinais);
-        setAulas(aulasCarregadas);
+        setAulas(aulasMapeadas);
 
-
-        // 5. Mapear progresso
+        // 7. Mapear progresso do aluno
         let progressoMap = {};
-        if (progressoRes?.data) {
-          progressoRes.data.forEach(p => {
+        if (progressoData && progressoData.length > 0) {
+          progressoData.forEach(p => {
             progressoMap[p.aula_id] = p;
           });
         }
