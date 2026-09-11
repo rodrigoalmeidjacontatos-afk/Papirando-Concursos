@@ -40,11 +40,12 @@ function PreparatorioViewPage() {
       if (!mounted) return;
       setCarregando(true);
       try {
-        // 1. Executa em PARALELO as 3 buscas iniciais específicas para este preparatório
-        const [prepRes, discRes, vRes] = await Promise.all([
+        // 1. Busca em paralelo: preparatório, disciplinas, vínculos modernos e blob legado
+        const [prepRes, discRes, vRes, vLegRes] = await Promise.all([
           supabase.from('preparatorios').select('*').eq('id', preparatorioId).maybeSingle(),
           supabase.from('disciplinas').select('*').eq('preparatorio_id', preparatorioId),
-          supabase.from('vinculos').select('modulo_id, aula_id').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId)
+          supabase.from('vinculos').select('modulo_id, aula_id').eq('carreira_id', carreiraId).eq('preparatorio_id', preparatorioId),
+          supabase.from('vinculos').select('data').eq('id', 1).maybeSingle()
         ]);
 
         let prepData = prepRes?.data;
@@ -60,18 +61,55 @@ function PreparatorioViewPage() {
         const disciplinasData = discRes?.data || [];
         setDisciplinas(disciplinasData);
 
-        const vData = vRes?.data || [];
+        // 2. Combinar vínculos modernos (linhas individuais) + legados (blob JSON id=1)
+        //    O admin lê os dois (AdminPage linhas 628-647); o frontend agora também.
+        let vData = [...(vRes?.data || [])];
+        const legadoBlob = vLegRes?.data?.data;
+        if (legadoBlob) {
+          const legadoModulos = legadoBlob?.[carreiraId]?.[preparatorioId]?.modulos || {};
+          // IDs já presentes nas linhas modernas (para não duplicar)
+          const modernModIds = new Set(vData.filter(v => v.modulo_id && !v.aula_id).map(v => String(v.modulo_id)));
+          const modernAulaIds = new Set(vData.filter(v => v.aula_id).map(v => String(v.aula_id)));
+          Object.entries(legadoModulos).forEach(([moduloId, moduloObj]) => {
+            const aulasLegado = Object.keys(moduloObj?.aulas || {});
+            if (aulasLegado.length === 0) {
+              // Módulo inteiro vinculado
+              if (!modernModIds.has(String(moduloId))) {
+                vData.push({ modulo_id: moduloId, aula_id: null });
+              }
+            } else {
+              // Aulas individuais vinculadas
+              aulasLegado.forEach(aulaId => {
+                if (!modernAulaIds.has(String(aulaId))) {
+                  vData.push({ modulo_id: moduloId, aula_id: aulaId });
+                }
+              });
+            }
+          });
+        }
+
         const discIds = disciplinasData.map(d => d.id).filter(Boolean);
 
-        // 2. Buscar APENAS os módulos dessas disciplinas específicas
+        // 3. Buscar todos os módulos das disciplinas deste preparatório
         let modulosCarregados = [];
         if (discIds.length > 0) {
           const { data: mods } = await supabase.from('modulos').select('*').in('disciplina_id', discIds);
           modulosCarregados = mods || [];
         }
 
-        // 3. Buscar aulas de TODOS os módulos — controle de acesso é por aula via campo `nivel`
-        const targetModIds = modulosCarregados.map(m => m.id).filter(Boolean);
+        // 4. Filtrar módulos pelos vínculos
+        const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => String(v.modulo_id));
+        const modulosCompletos  = vData.filter(v => v.modulo_id && !v.aula_id).map(v => String(v.modulo_id));
+        const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => String(v.aula_id));
+        const temVinculos = modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0;
+
+        let modulosFiltrados = modulosCarregados;
+        if (temVinculos) {
+          modulosFiltrados = modulosCarregados.filter(m => modulosPermitidos.includes(String(m.id)));
+        }
+
+        // 5. Buscar aulas e progresso em paralelo
+        const targetModIds = modulosFiltrados.map(m => m.id).filter(Boolean);
 
         const [aulasRes, progressoRes] = await Promise.all([
           targetModIds.length > 0
@@ -101,14 +139,23 @@ function PreparatorioViewPage() {
           moduloId: a.moduloId || a.modulo_id,
         }));
 
+        // 6. Filtrar aulas pelos vínculos (se houver restrição por aula individual)
+        if (temVinculos && aulasPermitidasIds.length > 0) {
+          aulasCarregadas = aulasCarregadas.filter(a =>
+            modulosCompletos.includes(String(a.modulo_id || a.moduloId)) ||
+            aulasPermitidasIds.includes(String(a.id))
+          );
+        }
+
         aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
 
-        // Remover módulos sem nenhuma aula cadastrada
-        const modIdsComAulas = new Set(aulasCarregadas.map(a => a.modulo_id || a.moduloId));
-        const modulosFiltrados = modulosCarregados.filter(m => modIdsComAulas.has(m.id));
+        // 7. Remover módulos que ficaram sem aulas
+        const modIdsComAulas = new Set(aulasCarregadas.map(a => String(a.modulo_id || a.moduloId)));
+        const modulosFinais = modulosFiltrados.filter(m => modIdsComAulas.has(String(m.id)));
 
-        setModulos(modulosFiltrados);
+        setModulos(modulosFinais);
         setAulas(aulasCarregadas);
+
 
         // 5. Mapear progresso
         let progressoMap = {};
