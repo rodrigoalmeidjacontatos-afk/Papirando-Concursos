@@ -947,18 +947,55 @@ function AdminPage() {
   };
 
 
-  const handleFileUpload = (e, target) => {
-    const file = e.target.files[0];
-    if (file) {
+  const compressImage = (file, maxWidth = 1200, maxHeight = 675, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (target === 'novo') {
-          setNovoPreparatorio({ ...novoPreparatorio, logo: reader.result });
-        } else {
-          setEditandoPreparatorio({ ...editandoPreparatorio, logo: reader.result });
-        }
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = reject;
+        img.src = event.target.result;
       };
+      reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (e, target) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      if (target === 'novo') {
+        setNovoPreparatorio(prev => ({ ...prev, logo: dataUrl }));
+      } else if (target === 'edit') {
+        setEditandoPreparatorio(prev => ({ ...prev, logo: dataUrl }));
+      } else if (target === 'carreira_nova') {
+        setNovaCarreira(prev => ({ ...prev, capa: dataUrl }));
+      } else if (target === 'carreira_edit') {
+        setEditandoCarreira(prev => ({ ...prev, capa: dataUrl }));
+      }
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+      alert('Erro ao carregar imagem do computador. Tente outra imagem.');
     }
   };
 
@@ -2172,7 +2209,13 @@ function AdminPage() {
                 <div style={styles.addForm}>
                   <input style={styles.input} placeholder="Nome" value={novaCarreira.nome} onChange={e => setNovaCarreira({...novaCarreira, nome: e.target.value})} />
                   <input style={styles.inputSmall} placeholder="Ícone" value={novaCarreira.icone} onChange={e => setNovaCarreira({...novaCarreira, icone: e.target.value})} />
-                  <input style={styles.input} placeholder="URL da Capa" value={novaCarreira.capa} onChange={e => setNovaCarreira({...novaCarreira, capa: e.target.value})} />
+                  <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                    <input style={styles.input} placeholder="URL da Capa" value={novaCarreira.capa} onChange={e => setNovaCarreira({...novaCarreira, capa: e.target.value})} />
+                    <label style={{ ...styles.addButton, padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      📁 Desktop
+                      <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleFileUpload(e, 'carreira_nova')} />
+                    </label>
+                  </div>
                   <select style={styles.select} value={novaCarreira.categoriaId} onChange={e => setNovaCarreira({...novaCarreira, categoriaId: e.target.value})}>
                     <option value="">Selecione a Categoria</option>
                     {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
@@ -2196,7 +2239,13 @@ function AdminPage() {
                       <div style={styles.editForm}>
                         <input style={styles.inputSmall} value={editandoCarreira.icone} onChange={e => setEditandoCarreira({...editandoCarreira, icone: e.target.value})} />
                         <input style={styles.input} value={editandoCarreira.nome} onChange={e => setEditandoCarreira({...editandoCarreira, nome: e.target.value})} />
-                        <input style={styles.input} value={editandoCarreira.capa} placeholder="URL da Capa" onChange={e => setEditandoCarreira({...editandoCarreira, capa: e.target.value})} />
+                        <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                          <input style={styles.input} value={editandoCarreira.capa} placeholder="URL da Capa" onChange={e => setEditandoCarreira({...editandoCarreira, capa: e.target.value})} />
+                          <label style={{ ...styles.addButton, padding: '8px 12px', fontSize: '11px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            📁 Desktop
+                            <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleFileUpload(e, 'carreira_edit')} />
+                          </label>
+                        </div>
                         <select style={styles.select} value={editandoCarreira.categoriaId} onChange={e => setEditandoCarreira({...editandoCarreira, categoriaId: e.target.value})}>
                            {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                         </select>
@@ -2228,19 +2277,85 @@ function AdminPage() {
               {!selectedPrepId ? (
                 <>
                   <h2 style={{color: '#fff', marginBottom: 20}}>Gerenciar Cursos (Preparatórios)</h2>
-                  <div style={styles.formCard}>
-                    <h3 style={{color: '#F5F5F5', marginBottom: '12px'}}>Novo Curso</h3>
-                    <div style={styles.addForm}>
-                      <input style={styles.input} placeholder="Nome do Curso" value={novoPreparatorio.nome} onChange={e => setNovoPreparatorio({...novoPreparatorio, nome: e.target.value})} />
-                      <div style={{display: 'flex', gap: '8px', flex: 1}}>
-                        <input style={styles.input} placeholder="URL da Imagem ou Emoji" value={novoPreparatorio.logo} onChange={e => setNovoPreparatorio({...novoPreparatorio, logo: e.target.value})} />
-                        <label style={{...styles.addButton, padding: '8px', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer'}}>
-                          📁 Desktop
-                          <input type="file" style={{display: 'none'}} accept="image/*" onChange={(e) => handleFileUpload(e, 'novo')} />
-                        </label>
+                  <div style={{ ...styles.formCard, padding: '20px' }}>
+                    <h3 style={{color: '#F5F5F5', margin: '0 0 16px 0', fontSize: '16px'}}>➕ Adicionar Novo Curso (Preparatório)</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <input
+                          style={{ ...styles.input, flex: 2, minWidth: '220px' }}
+                          placeholder="Nome do Curso (ex: Reta Final PMPE, Gramatique...)"
+                          value={novoPreparatorio.nome}
+                          onChange={e => setNovoPreparatorio({ ...novoPreparatorio, nome: e.target.value })}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ color: '#AAA', fontSize: '12px' }}>Cor tema:</label>
+                          <input
+                            style={{ ...styles.inputSmall, width: '40px', height: '40px', padding: '2px', cursor: 'pointer' }}
+                            type="color"
+                            value={novoPreparatorio.cor}
+                            onChange={e => setNovoPreparatorio({ ...novoPreparatorio, cor: e.target.value })}
+                            title="Cor do Card"
+                          />
+                        </div>
                       </div>
-                      <input style={styles.inputSmall} type="color" value={novoPreparatorio.cor} onChange={e => setNovoPreparatorio({...novoPreparatorio, cor: e.target.value})} title="Cor do Card" />
-                      <button style={styles.addButton} onClick={addPreparatorio}>Adicionar Curso</button>
+
+                      {/* CAMPO DE CAPA DO PREPARATÓRIO COM OPÇÃO DE DESKTOP E URL */}
+                      <div>
+                        <label style={{ color: '#90CAF9', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                          🖼️ Capa do Curso (Destaque Visual)
+                        </label>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <label style={{
+                            backgroundColor: '#2e7d32', color: '#FFF', padding: '10px 18px',
+                            borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold',
+                            display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(46,125,50,0.4)',
+                            transition: 'all 0.15s'
+                          }}>
+                            🖥️ Escolher Capa do Computador (Desktop)
+                            <input
+                              type="file"
+                              style={{ display: 'none' }}
+                              accept="image/*"
+                              onChange={(e) => handleFileUpload(e, 'novo')}
+                            />
+                          </label>
+                          <span style={{ color: '#888', fontSize: '12px' }}>ou cole uma URL/Emoji:</span>
+                          <input
+                            style={{ ...styles.input, flex: 1, minWidth: '200px' }}
+                            placeholder="https://... ou emoji 📚"
+                            value={novoPreparatorio.logo}
+                            onChange={e => setNovoPreparatorio({ ...novoPreparatorio, logo: e.target.value })}
+                          />
+                          {novoPreparatorio.logo && (
+                            <button
+                              type="button"
+                              onClick={() => setNovoPreparatorio({ ...novoPreparatorio, logo: '' })}
+                              style={{ background: 'transparent', border: '1px solid #c62828', color: '#ff6b6b', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                            >
+                              ✕ Limpar Capa
+                            </button>
+                          )}
+                        </div>
+
+                        {/* PRÉ-VISUALIZAÇÃO DA CAPA DO NOVO CURSO */}
+                        {novoPreparatorio.logo && (typeof novoPreparatorio.logo === 'string') && (novoPreparatorio.logo.startsWith('http') || novoPreparatorio.logo.startsWith('data:')) && (
+                          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{ width: '160px', height: '90px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #2196F3', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', position: 'relative' }}>
+                              <img src={novoPreparatorio.logo} alt="Preview da Capa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                            <span style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
+                              ✅ Prévia da Capa (será exibida com destaque no card do aluno)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        style={{ ...styles.addButton, alignSelf: 'flex-start', padding: '10px 24px', fontSize: '13px', fontWeight: 'bold' }}
+                        onClick={addPreparatorio}
+                      >
+                        ➕ Adicionar Curso
+                      </button>
                     </div>
                   </div>
 
@@ -2884,17 +2999,57 @@ function AdminPage() {
                     <input style={{...styles.input, width: '100%', boxSizing: 'border-box'}} placeholder="Nome" value={editandoPreparatorio.nome || ''} onChange={e => setEditandoPreparatorio({...editandoPreparatorio, nome: e.target.value})} />
                   </div>
                   <div>
-                    <label style={{color: '#AAA', fontSize: '12px', display: 'block', marginBottom: '6px'}}>Imagem / Logo</label>
-                    <div style={{display: 'flex', gap: '8px'}}>
-                      <input style={{...styles.input, flex: 1}} placeholder="URL ou Emoji" value={editandoPreparatorio.logo || ''} onChange={e => setEditandoPreparatorio({...editandoPreparatorio, logo: e.target.value})} />
-                      <label style={{...styles.addButton, padding: '10px 14px', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center'}}>
-                        📁 Desktop
-                        <input type="file" style={{display: 'none'}} accept="image/*" onChange={(e) => handleFileUpload(e, 'edit')} />
-                      </label>
+                    <label style={{color: '#90CAF9', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px'}}>
+                      🖼️ Capa do Curso (Destaque Visual)
+                    </label>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                      <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap'}}>
+                        <label style={{
+                          backgroundColor: '#2e7d32', color: '#FFF', padding: '10px 16px',
+                          borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                          display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(46,125,50,0.4)',
+                          transition: 'all 0.15s'
+                        }}>
+                          🖥️ Enviar do Computador (Desktop)
+                          <input type="file" style={{display: 'none'}} accept="image/*" onChange={(e) => handleFileUpload(e, 'edit')} />
+                        </label>
+                        <span style={{ color: '#777', fontSize: '11px' }}>ou URL / Emoji:</span>
+                        <input
+                          style={{...styles.input, flex: 1, minWidth: '160px'}}
+                          placeholder="https://... ou emoji 📚"
+                          value={editandoPreparatorio.logo || ''}
+                          onChange={e => setEditandoPreparatorio({...editandoPreparatorio, logo: e.target.value})}
+                        />
+                        {editandoPreparatorio.logo && (
+                          <button
+                            type="button"
+                            onClick={() => setEditandoPreparatorio({ ...editandoPreparatorio, logo: '' })}
+                            style={{ background: 'transparent', border: '1px solid #c62828', color: '#ff6b6b', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                            title="Remover Capa"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* PREVIEW DA CAPA NO MODAL DE EDIÇÃO */}
+                      {editandoPreparatorio.logo && (typeof editandoPreparatorio.logo === 'string') && (editandoPreparatorio.logo.startsWith('http') || editandoPreparatorio.logo.startsWith('data:')) ? (
+                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ color: '#AAA', fontSize: '11px' }}>Prévia da Capa (como aparecerá no card do aluno):</span>
+                          <div style={{ width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #444', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+                            <img
+                              src={editandoPreparatorio.logo}
+                              alt="preview da capa"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        editandoPreparatorio.logo && (
+                          <div style={{ fontSize: '28px', marginTop: '4px' }}>{editandoPreparatorio.logo}</div>
+                        )
+                      )}
                     </div>
-                    {editandoPreparatorio.logo && (typeof editandoPreparatorio.logo === 'string') && (editandoPreparatorio.logo.startsWith('http') || editandoPreparatorio.logo.startsWith('data:')) && (
-                      <img src={editandoPreparatorio.logo} alt="preview" style={{width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px', border: '1px solid #444'}} />
-                    )}
                   </div>
                   <div>
                     <label style={{color: '#AAA', fontSize: '12px', display: 'block', marginBottom: '6px'}}>Cor do Card</label>

@@ -272,28 +272,40 @@ function CarreiraPage() {
                   )}
 
                   <div style={styles.cardImage}>
-                    {prep.capa && (
+                    {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
                       <img
-                        src={prep.capa}
-                        alt="background"
-                        style={{ ...styles.cardImageImg, filter: temAcesso ? 'none' : 'brightness(0.35) saturate(0.3)' }}
+                        src={prep.logo}
+                        alt={prep.nome}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          filter: temAcesso ? 'none' : 'brightness(0.35) saturate(0.3)'
+                        }}
                       />
-                    )}
-                    <div style={{
-                      position: prep.capa ? 'absolute' : 'static',
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: prep.capa ? 'rgba(0,0,0,0.45)' : '#0d0d0f',
-                      zIndex: 2,
-                      padding: '20px',
-                      filter: temAcesso ? 'none' : 'brightness(0.4) saturate(0.2)',
-                    }}>
-                      {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
-                        <img src={prep.logo} alt={prep.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} />
-                      ) : (
+                    ) : prep.capa ? (
+                      <>
+                        <img
+                          src={prep.capa}
+                          alt="background"
+                          style={{ ...styles.cardImageImg, filter: temAcesso ? 'none' : 'brightness(0.35) saturate(0.3)' }}
+                        />
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 2
+                        }}>
+                          <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: '#0d0d0f'
+                      }}>
                         <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Cadeado sobre a imagem para preps sem acesso */}
                     {!temAcesso && (
@@ -374,21 +386,35 @@ function CarreiraPage() {
                     )}
 
                     <div style={styles.cardImage}>
-                      {prep.capa && <img src={prep.capa} alt="background" style={styles.cardImageImg} />}
-                      <div style={{
-                        position: prep.capa ? 'absolute' : 'static',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: prep.capa ? 'rgba(0,0,0,0.45)' : '#0d0d0f',
-                        zIndex: 2,
-                        padding: '20px'
-                      }}>
-                        {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
-                          <img src={prep.logo} alt={prep.nome} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} />
-                        ) : (
+                      {(typeof prep.logo === 'string' && (prep.logo.startsWith('http') || prep.logo.startsWith('data:'))) ? (
+                        <img
+                          src={prep.logo}
+                          alt={prep.nome}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : prep.capa ? (
+                        <>
+                          <img src={prep.capa} alt="background" style={styles.cardImageImg} />
+                          <div style={{
+                            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 2
+                          }}>
+                            <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{
+                          width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: '#0d0d0f'
+                        }}>
                           <div style={styles.cardIcon}>{prep.logo || '📚'}</div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     <div style={styles.cardInfo}>
