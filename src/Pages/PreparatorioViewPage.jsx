@@ -70,18 +70,15 @@ function PreparatorioViewPage() {
           modulosCarregados = mods || [];
         }
 
-        // 3. Filtrar módulos de acordo com os vínculos da carreira (se houver restrição)
-        const modulosPermitidos = vData.filter(v => v.modulo_id).map(v => v.modulo_id);
+        // 3. Calcular restrições de vínculos (aplicadas apenas nas AULAS, não nos módulos)
+        //    Bug corrigido: filtrar módulos pelo vínculo ocultava módulos que tinham aulas
+        //    vinculadas individualmente ou que simplesmente não foram cadastrados nos vínculos.
         const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
         const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
+        const temVinculos = vData.length > 0 && (modulosCompletos.length > 0 || aulasPermitidasIds.length > 0);
 
-        let modulosFiltrados = modulosCarregados;
-        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
-          modulosFiltrados = modulosCarregados.filter(m => modulosPermitidos.includes(m.id));
-        }
-
-        // 4. Buscar APENAS as aulas dos módulos filtrados e o progresso do usuário EM PARALELO
-        const targetModIds = modulosFiltrados.map(m => m.id).filter(Boolean);
+        // 4. Buscar aulas de TODOS os módulos das disciplinas (sem filtrar por vínculo no nível de módulo)
+        const targetModIds = modulosCarregados.map(m => m.id).filter(Boolean);
 
         const [aulasRes, progressoRes] = await Promise.all([
           targetModIds.length > 0
@@ -111,7 +108,8 @@ function PreparatorioViewPage() {
           moduloId: a.moduloId || a.modulo_id,
         }));
 
-        if (vData.length > 0 && (modulosPermitidos.length > 0 || aulasPermitidasIds.length > 0)) {
+        // Filtrar AULAS pelos vínculos (controle de acesso por aula/módulo-completo)
+        if (temVinculos) {
           aulasCarregadas = aulasCarregadas.filter(a =>
             modulosCompletos.includes(a.modulo_id || a.moduloId) ||
             aulasPermitidasIds.includes(a.id)
@@ -119,6 +117,11 @@ function PreparatorioViewPage() {
         }
 
         aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
+
+        // Remover módulos que ficaram sem nenhuma aula após filtragem por vínculos
+        const modIdsComAulas = new Set(aulasCarregadas.map(a => a.modulo_id || a.moduloId));
+        const modulosFiltrados = modulosCarregados.filter(m => modIdsComAulas.has(m.id));
+
         setModulos(modulosFiltrados);
         setAulas(aulasCarregadas);
 
