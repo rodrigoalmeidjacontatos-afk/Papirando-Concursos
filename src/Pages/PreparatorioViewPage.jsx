@@ -71,8 +71,7 @@ function PreparatorioViewPage() {
         }
 
         // 3. Calcular restrições de vínculos (aplicadas apenas nas AULAS, não nos módulos)
-        //    Bug corrigido: filtrar módulos pelo vínculo ocultava módulos que tinham aulas
-        //    vinculadas individualmente ou que simplesmente não foram cadastrados nos vínculos.
+        //    Vínculos só restringem usuários sem acesso completo (não-admin, não-premium, não-liberado).
         const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
         const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
         const temVinculos = vData.length > 0 && (modulosCompletos.length > 0 || aulasPermitidasIds.length > 0);
@@ -108,8 +107,15 @@ function PreparatorioViewPage() {
           moduloId: a.moduloId || a.modulo_id,
         }));
 
-        // Filtrar AULAS pelos vínculos (controle de acesso por aula/módulo-completo)
-        if (temVinculos) {
+        // Vínculos só restringem quem NÃO tem acesso completo ao curso
+        const cursoLiberado =
+          Array.isArray(preparatoriosLiberados) && (
+            preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) ||
+            preparatoriosLiberados.includes(`*:${preparatorioId}`)
+          );
+        const deveAplicarVinculos = temVinculos && !isAdmin && planoUsuario !== 'premium' && !cursoLiberado;
+
+        if (deveAplicarVinculos) {
           aulasCarregadas = aulasCarregadas.filter(a =>
             modulosCompletos.includes(a.modulo_id || a.moduloId) ||
             aulasPermitidasIds.includes(a.id)
