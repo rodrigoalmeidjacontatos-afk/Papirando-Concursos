@@ -70,13 +70,7 @@ function PreparatorioViewPage() {
           modulosCarregados = mods || [];
         }
 
-        // 3. Calcular restrições de vínculos (aplicadas apenas nas AULAS, não nos módulos)
-        //    Vínculos só restringem usuários sem acesso completo (não-admin, não-premium, não-liberado).
-        const modulosCompletos = vData.filter(v => v.modulo_id && !v.aula_id).map(v => v.modulo_id);
-        const aulasPermitidasIds = vData.filter(v => v.aula_id).map(v => v.aula_id);
-        const temVinculos = vData.length > 0 && (modulosCompletos.length > 0 || aulasPermitidasIds.length > 0);
-
-        // 4. Buscar aulas de TODOS os módulos das disciplinas (sem filtrar por vínculo no nível de módulo)
+        // 3. Buscar aulas de TODOS os módulos — controle de acesso é por aula via campo `nivel`
         const targetModIds = modulosCarregados.map(m => m.id).filter(Boolean);
 
         const [aulasRes, progressoRes] = await Promise.all([
@@ -107,24 +101,9 @@ function PreparatorioViewPage() {
           moduloId: a.moduloId || a.modulo_id,
         }));
 
-        // Vínculos só restringem quem NÃO tem acesso completo ao curso
-        const cursoLiberado =
-          Array.isArray(preparatoriosLiberados) && (
-            preparatoriosLiberados.includes(`${carreiraId}:${preparatorioId}`) ||
-            preparatoriosLiberados.includes(`*:${preparatorioId}`)
-          );
-        const deveAplicarVinculos = temVinculos && !isAdmin && planoUsuario !== 'premium' && !cursoLiberado;
-
-        if (deveAplicarVinculos) {
-          aulasCarregadas = aulasCarregadas.filter(a =>
-            modulosCompletos.includes(a.modulo_id || a.moduloId) ||
-            aulasPermitidasIds.includes(a.id)
-          );
-        }
-
         aulasCarregadas.sort((a, b) => (a.ordem || 999) - (b.ordem || 999));
 
-        // Remover módulos que ficaram sem nenhuma aula após filtragem por vínculos
+        // Remover módulos sem nenhuma aula cadastrada
         const modIdsComAulas = new Set(aulasCarregadas.map(a => a.modulo_id || a.moduloId));
         const modulosFiltrados = modulosCarregados.filter(m => modIdsComAulas.has(m.id));
 
