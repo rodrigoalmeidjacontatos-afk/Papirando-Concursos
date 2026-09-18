@@ -335,21 +335,98 @@ export default function AdminQuestoes() {
     });
   };
 
-  const baixarModeloCSV = () => {
-    const colunas = [
-      'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
-      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade', 'texto_associado', 'enunciado',
-      'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
-      'gabarito', 'comentario', 'referencia_legal', 'link_prova'
-    ];
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + colunas.join(";");
-    const encodedUri = encodeURI(csvContent);
+  const gerarDownloadCSV = (conteudo, nomeArquivo) => {
+    const blob = new Blob(["\uFEFF" + conteudo], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "modelo_importacao_questoes.csv");
+    link.setAttribute("href", url);
+    link.setAttribute("download", nomeArquivo);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const baixarModeloMultiplaEscolha = () => {
+    const cabecalho = [
+      'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
+      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade',
+      'texto_associado', 'enunciado',
+      'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
+      'gabarito', 'comentario', 'referencia_legal', 'link_prova'
+    ].join(";");
+
+    // Linha de exemplo preenchida
+    const exemplo = [
+      'Concurso PF 2024',          // concurso
+      'PF',                         // orgao
+      'Agente Federal',             // cargo
+      'Cebraspe',                   // banca
+      '2024',                       // ano
+      'DF',                         // estado
+      'Objetiva',                   // fase
+      '1',                          // numero_questao
+      'Direito Penal',              // disciplina
+      'Crimes contra a pessoa',     // assunto
+      'Homicídio doloso',           // subassunto
+      'homicídio;dolo;pena',        // palavra_chave
+      'Media',                      // dificuldade (Fácil | Media | Difícil)
+      'Multipla Escolha',           // modalidade — use "Multipla Escolha" para múltipla escolha
+      '',                           // texto_associado (deixe vazio se não houver)
+      'Qual a pena mínima para o homicídio doloso simples?', // enunciado
+      '6 anos',                     // alternativa_a
+      '4 anos',                     // alternativa_b
+      '12 anos',                    // alternativa_c
+      '20 anos',                    // alternativa_d
+      '2 anos',                     // alternativa_e
+      'A',                          // gabarito — use A | B | C | D | E
+      'Art. 121 do CP: pena de 6 a 20 anos.', // comentario
+      'Art. 121 do Código Penal',   // referencia_legal
+      'https://www.exemplo.com/prova.pdf' // link_prova
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(";");
+
+    gerarDownloadCSV(`${cabecalho}\n${exemplo}`, "modelo_multipla_escolha.csv");
+  };
+
+  const baixarModeloCebraspe = () => {
+    const cabecalho = [
+      'concurso', 'orgao', 'cargo', 'banca', 'ano', 'estado', 'fase', 'numero_questao',
+      'disciplina', 'assunto', 'subassunto', 'palavra_chave', 'dificuldade', 'modalidade',
+      'texto_associado', 'enunciado',
+      'alternativa_a', 'alternativa_b', 'alternativa_c', 'alternativa_d', 'alternativa_e',
+      'gabarito', 'comentario', 'referencia_legal', 'link_prova'
+    ].join(";");
+
+    // Linha de exemplo — modalidade Cebraspe (Certo/Errado)
+    const exemplo = [
+      'Concurso PF 2024',          // concurso
+      'PF',                         // orgao
+      'Agente Federal',             // cargo
+      'Cebraspe',                   // banca
+      '2024',                       // ano
+      'DF',                         // estado
+      'Objetiva',                   // fase
+      '42',                         // numero_questao
+      'Direito Constitucional',     // disciplina
+      'Direitos Fundamentais',      // assunto
+      'Igualdade',                  // subassunto
+      'igualdade;CF/88;art. 5º',   // palavra_chave
+      'Media',                      // dificuldade (Fácil | Media | Difícil)
+      'Certo/Errado',               // modalidade — use "Certo/Errado" para questões Cebraspe
+      '',                           // texto_associado (deixe vazio se não houver)
+      'Todos são iguais perante a lei, sem distinção de qualquer natureza, garantindo-se aos brasileiros e aos estrangeiros residentes no País a inviolabilidade do direito à vida, à liberdade, à igualdade, à segurança e à propriedade.', // enunciado
+      '',                           // alternativa_a — DEIXE VAZIO para Certo/Errado
+      '',                           // alternativa_b — DEIXE VAZIO para Certo/Errado
+      '',                           // alternativa_c — DEIXE VAZIO para Certo/Errado
+      '',                           // alternativa_d — DEIXE VAZIO para Certo/Errado
+      '',                           // alternativa_e — DEIXE VAZIO para Certo/Errado
+      'Certo',                      // gabarito — use APENAS "Certo" ou "Errado"
+      'Transcrição literal do Art. 5º, caput, da CF/88.', // comentario
+      'Art. 5º da Constituição Federal de 1988', // referencia_legal
+      'https://www.exemplo.com/prova.pdf' // link_prova
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(";");
+
+    gerarDownloadCSV(`${cabecalho}\n${exemplo}`, "modelo_cebraspe_certo_errado.csv");
   };
 
   const totalPaginas = Math.ceil(total / porPagina);
@@ -359,9 +436,14 @@ export default function AdminQuestoes() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{color: '#fff', margin: 0}}>Gerenciar Banco de Questões</h2>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={baixarModeloCSV} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-            Baixar Modelo CSV
-          </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={baixarModeloMultiplaEscolha} style={{ backgroundColor: '#555', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+              📥 Modelo Múltipla Escolha
+            </button>
+            <button onClick={baixarModeloCebraspe} style={{ backgroundColor: '#6a4c93', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+              📥 Modelo Cebraspe (C/E)
+            </button>
+          </div>
           <input 
             type="file" 
             accept=".csv" 
