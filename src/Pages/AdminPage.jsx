@@ -2842,7 +2842,9 @@ function AdminPage() {
                                           
                                           {isModExpanded && (
                                             <div style={styles.treeSubSubChildren}>
-                                              <div style={{...styles.addForm, backgroundColor: '#2A2A2A', padding: '12px', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'flex-end'}}>
+                                              {/* Formulário fixo (sticky) para adicionar nova aula */}
+                                              <div style={{position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#1a1a1a', paddingBottom: '8px'}}>
+                                                <div style={{...styles.addForm, backgroundColor: '#2A2A2A', padding: '12px', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'flex-end'}}>
                                                 <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                                                   <label style={{fontSize: '11px', color: '#AAA'}}>Título</label>
                                                   <input style={styles.inputSmall} placeholder="Título da Aula" value={novaAula.titulo} onChange={e => setNovaAula(prev => ({...prev, titulo: e.target.value}))} />
@@ -2888,10 +2890,12 @@ function AdminPage() {
                                                     <option value="admin">🔴 Admin (Apenas Admins)</option>
                                                   </select>
                                                 </div>
-                                                <button style={{...styles.smallButton, backgroundColor: '#4CAF50'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
-                                              </div>
+                                                 <button style={{...styles.smallButton, backgroundColor: '#4CAF50'}} onClick={() => addAula(mod.id)}>+ Add Aula</button>
+                                               </div>
+                                              </div>{/* fim sticky */}
                                               
-                                              <div style={{marginTop: '12px'}}>
+                                              {/* Lista de aulas com rolagem própria */}
+                                              <div style={{marginTop: '4px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px'}}>
                                                 {[...aulasDoMod].sort((a,b) => (a.ordem||999) - (b.ordem||999)).map((aula, aulaIdx) => (
                                                   <div
                                                     key={aula.id}
