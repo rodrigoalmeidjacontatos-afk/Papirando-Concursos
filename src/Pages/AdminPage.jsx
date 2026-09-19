@@ -126,7 +126,7 @@ function AdminPage() {
     
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, nome, display_name, created_at, plano, plano_anterior, data_expiracao, preparatorios_liberados') 
+      .select('id, email, nome, display_name, created_at, plano, plano_anterior, data_expiracao, preparatorios_liberados, is_admin') 
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -321,6 +321,26 @@ function AdminPage() {
       alert('✅ Usuário removido com sucesso!');
     } else {
       alert('❌ Erro ao excluir: ' + error.message);
+    }
+  };
+
+  const toggleAdmin = async (userId, email, isAdminAtual) => {
+    const novoStatus = !isAdminAtual;
+    const acao = novoStatus ? 'tornar ADMIN' : 'remover como Admin';
+    if (!window.confirm(`Tem certeza que deseja ${acao} o usuário ${email}?`)) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_admin: novoStatus })
+      .eq('id', userId);
+
+    if (!error) {
+      setUsuarios(prev => prev.map(u => u.id === userId ? { ...u, is_admin: novoStatus } : u));
+      // Notifica o usuário para recarregar o perfil em tempo real
+      notificarUsuarioEmTempoReal(userId, email, null);
+      alert(novoStatus ? `✅ ${email} agora é Admin!` : `✅ Acesso Admin removido de ${email}.`);
+    } else {
+      alert('❌ Erro ao atualizar: ' + error.message);
     }
   };
 
@@ -3841,25 +3861,41 @@ function AdminPage() {
                               >
                                 📂 {qtdCursos > 0 ? `${qtdCursos} Curso(s) Liberado(s)` : 'Liberar Cursos'}
                               </button>
-                              <button 
-                                onClick={() => {
-                                  if (u.email === 'rodrigoalmeidja@gmail.com') {
-                                     alert('Você já é o Super Admin por e-mail!');
-                                  } else {
-                                     alert('O e-mail deste usuário não possui privilégios de Admin.');
-                                  }
-                                }}
-                                style={{
-                                  ...styles.editButtonSmall, 
-                                  backgroundColor: u.email === 'rodrigoalmeidja@gmail.com' ? '#FFD700' : '#333',
-                                  color: u.email === 'rodrigoalmeidja@gmail.com' ? '#000' : '#888',
-                                  padding: '6px 8px', 
-                                  fontSize: '11px',
-                                  border: 'none'
-                                }}
-                              >
-                                {u.email === 'rodrigoalmeidja@gmail.com' ? '👑 Admin' : '👤 Aluno'}
-                              </button>
+                              {u.email === 'rodrigoalmeidja@gmail.com' ? (
+                                <button
+                                  disabled
+                                  style={{
+                                    ...styles.editButtonSmall,
+                                    backgroundColor: '#FFD700',
+                                    color: '#000',
+                                    padding: '6px 10px',
+                                    fontSize: '11px',
+                                    border: 'none',
+                                    cursor: 'default',
+                                    opacity: 1
+                                  }}
+                                  title="Super Admin — não pode ser alterado"
+                                >
+                                  👑 Super Admin
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => toggleAdmin(u.id, u.email, !!u.is_admin)}
+                                  title={u.is_admin ? 'Clique para remover acesso Admin' : 'Clique para tornar Admin'}
+                                  style={{
+                                    ...styles.editButtonSmall,
+                                    backgroundColor: u.is_admin ? 'rgba(255, 215, 0, 0.15)' : '#222',
+                                    color: u.is_admin ? '#FFD700' : '#AAA',
+                                    border: `1px solid ${u.is_admin ? '#FFD700' : '#444'}`,
+                                    padding: '6px 10px',
+                                    fontSize: '11px',
+                                    fontWeight: u.is_admin ? 'bold' : 'normal',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {u.is_admin ? '👑 Admin ✓' : '👤 Tornar Admin'}
+                                </button>
+                              )}
                               <button 
                                 onClick={() => excluirUsuario(u.id, u.email)}
                                 style={{...styles.deleteButton, padding: '6px 8px', fontSize: '11px'}}

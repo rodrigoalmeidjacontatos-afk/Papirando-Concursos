@@ -129,7 +129,7 @@ export function AuthProvider({ children }) {
       return prevJson === nextJson ? prev : liberados;
     });
     setAvatarUrl(prev => (prev === (profile.avatar_url || null) ? prev : (profile.avatar_url || null)));
-    setIsAdmin(prev => (prev === false ? prev : false));
+    setIsAdmin(prev => { const next = !!profile.is_admin; return prev === next ? prev : next; });
     setAuthLoading(prev => (prev === false ? prev : false));
 
     try {
@@ -182,7 +182,7 @@ export function AuthProvider({ children }) {
         const res = await fetchWithTimeout(
           supabase
             .from('profiles')
-            .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+            .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados, is_admin')
             .eq('id', userObj.id)
             .maybeSingle(),
           5000
@@ -202,7 +202,7 @@ export function AuthProvider({ children }) {
             const retry = await fetchWithTimeout(
               supabase
                 .from('profiles')
-                .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+                .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados, is_admin')
                 .eq('id', userObj.id)
                 .maybeSingle(),
               5000
@@ -221,7 +221,7 @@ export function AuthProvider({ children }) {
           const resEmail = await fetchWithTimeout(
             supabase
               .from('profiles')
-              .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados')
+              .select('id, email, plano, plano_anterior, avatar_url, display_name, data_expiracao, preparatorios_liberados, is_admin')
               .eq('email', userEmail)
               .maybeSingle(),
             5000
