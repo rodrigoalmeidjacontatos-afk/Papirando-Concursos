@@ -104,13 +104,13 @@ function Home() {
           setPrepsAtualizados(validos);
         }
 
-        // Notificações de documentos novos (últimas 48h)
+        // Notificações de documentos novos (últimas 48h) direto da tabela oficial de documentos
         const limite48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
         const { data: docsData } = await supabase
-          .from('notificacoes_documentos')
+          .from('documentos')
           .select('*')
-          .gte('criado_em', limite48h)
-          .order('criado_em', { ascending: false });
+          .gte('created_at', limite48h)
+          .order('created_at', { ascending: false });
         setDocsNovos(docsData || []);
       } catch (e) { /* silencioso */ }
     };
@@ -644,39 +644,66 @@ function Home() {
                               <div style={{ padding: '8px 16px 4px', fontSize: '10px', fontWeight: 'bold', color: '#555', letterSpacing: '1px', textTransform: 'uppercase' }}>
                                 📄 DOCUMENTOS
                               </div>
-                              {docsNovos.map(doc => (
-                                <div
-                                  key={doc.id}
-                                  style={{
-                                    padding: '12px 16px',
-                                    borderBottom: '1px solid #2A2A33',
-                                    display: 'flex', gap: '12px', alignItems: 'flex-start',
-                                    transition: 'background 0.15s',
-                                    cursor: 'pointer'
-                                  }}
-                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2A2A33'}
-                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                                  onClick={() => { setSinoAberto(false); window.location.href = '/documentos'; }}
-                                >
-                                  <span style={{ fontSize: '22px' }}>{doc.emoji || '📄'}</span>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ color: '#FFF', fontSize: '13px', fontWeight: '600', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.titulo}</div>
-                                    <div style={{ color: '#38bdf8', fontSize: '11px', marginBottom: '3px' }}>
-                                      🆕 Novo {doc.categoria}{doc.fonte && doc.fonte !== 'Avulso' ? ` · ${doc.fonte}` : ''}
-                                    </div>
-                                    {doc.descricao && (
-                                      <div style={{ color: '#888', fontSize: '10px', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.descricao}</div>
-                                    )}
-                                    <div style={{ color: '#666', fontSize: '10px' }}>
-                                      {(() => {
-                                        const diff = Date.now() - new Date(doc.criado_em).getTime();
-                                        const h = Math.floor(diff / 3600000);
-                                        return h < 1 ? 'há poucos minutos' : `há ${h}h`;
-                                      })()}
+                              {docsNovos.map(doc => {
+                                let fonte = 'Avulso';
+                                let tituloLimpo = doc.titulo || '';
+                                if (tituloLimpo.startsWith('[') && tituloLimpo.includes('] ')) {
+                                  const parts = tituloLimpo.split('] ');
+                                  fonte = parts[0].replace('[', '').trim();
+                                  tituloLimpo = parts.slice(1).join('] ').trim();
+                                }
+                                const emoji = {
+                                  'Simulado': '📝',
+                                  'Apostila': '📚',
+                                  'Edital': '⚖️',
+                                  'Outros': '📎'
+                                }[doc.categoria] || '📄';
+
+                                return (
+                                  <div
+                                    key={doc.id}
+                                    style={{
+                                      padding: '12px 16px',
+                                      borderBottom: '1px solid #2A2A33',
+                                      display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                      transition: 'background 0.15s',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2A2A33'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    onClick={() => { setSinoAberto(false); navigate('/documentos'); }}
+                                  >
+                                    <span style={{ fontSize: '22px' }}>{emoji}</span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ color: '#FFF', fontSize: '13px', fontWeight: '600', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {tituloLimpo}
+                                      </div>
+                                      <div style={{ color: '#38bdf8', fontSize: '11px', marginBottom: '3px' }}>
+                                        ✨ Novo {doc.categoria}{fonte !== 'Avulso' ? ` · ${fonte}` : ''}
+                                      </div>
+                                      {doc.descricao && (
+                                        <div style={{ color: '#888', fontSize: '10px', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {doc.descricao}
+                                        </div>
+                                      )}
+                                      {doc.created_at && (
+                                        <div style={{ color: '#666', fontSize: '10px' }}>
+                                          {(() => {
+                                            const diff = Date.now() - new Date(doc.created_at).getTime();
+                                            const m = Math.floor(diff / 60000);
+                                            const h = Math.floor(diff / 3600000);
+                                            const d = Math.floor(diff / 86400000);
+                                            if (m < 5) return 'há poucos minutos';
+                                            if (h < 1) return `há ${m} min`;
+                                            if (h < 24) return `há ${h}h`;
+                                            return `há ${d}d`;
+                                          })()}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </>
                           )}
                         </>
@@ -996,8 +1023,13 @@ function Home() {
                         <button onClick={() => scrollHorizontal(categoria.id, 'left')} style={styles.scrollButtonLeft} className="scroll-btn-left">‹</button>
                         <div ref={(el) => { carouselRefs.current[categoria.id] = el; }} style={styles.carousel}>
                           {categoria.cursos.map((curso, idx) => {
-                            // Verifica se este preparatório está na lista de atualizados do sino
-                            const estaAtualizado = prepsAtualizados.some(p => p.id === curso.id);
+                            // Verifica se este preparatório está na lista de atualizados do sino (por aulas ou documentos novos)
+                            const temDocNovo = docsNovos.some(d => {
+                              if (!d.titulo) return false;
+                              return d.titulo.toLowerCase().includes(`[${curso.nome.toLowerCase()}]`) || 
+                                     d.titulo.toLowerCase().includes(`[${curso.id.toLowerCase()}]`);
+                            });
+                            const estaAtualizado = prepsAtualizados.some(p => p.id === curso.id) || temDocNovo;
                             
                             return (
                             <div key={idx} className={`card-hover${estaAtualizado ? ' gold-card' : ''}`} style={styles.card} onClick={() => {

@@ -5,7 +5,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import { useAuth } from '../contexts/AuthContext';
 
 // Componente para a capa simulada de PDF em 3D Realista ou Pre-visualizacao real do PDF
-function PdfCover({ category, title, source, isBasico, url, hideSource }) {
+function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }) {
   const isPdf = url && url.toLowerCase().includes('.pdf');
 
   let colors = {
@@ -253,6 +253,26 @@ function PdfCover({ category, title, source, isBasico, url, hideSource }) {
       }}>
         PDF
       </div>
+
+      {/* Selo NOVO para documentos recentes */}
+      {isNovo && (
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '12px',
+          backgroundColor: '#FFD700',
+          color: '#000',
+          fontSize: '9px',
+          fontWeight: '900',
+          padding: '3px 8px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(255,215,0,0.5)',
+          zIndex: 5,
+          letterSpacing: '0.5px'
+        }}>
+          ✨ NOVO
+        </div>
+      )}
 
       {/* OVERLAY DE CADEADO PARA USUÁRIO BÁSICO */}
       {isBasico && (
@@ -585,6 +605,7 @@ function DocumentosPage() {
                           isBasico={isBasico}
                           url={doc.url}
                           hideSource={isBasico}
+                          isNovo={doc.created_at && (Date.now() - new Date(doc.created_at).getTime()) < 48 * 60 * 60 * 1000}
                         />
 
                         <div style={styles.cardInfo}>
@@ -646,6 +667,7 @@ function DocumentosPage() {
                   isBasico={isBasico}
                   url={doc.url}
                   hideSource={isBasico}
+                  isNovo={doc.created_at && (Date.now() - new Date(doc.created_at).getTime()) < 48 * 60 * 60 * 1000}
                 />
 
                 <div style={styles.cardInfo}>

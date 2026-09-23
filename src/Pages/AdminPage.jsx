@@ -3509,28 +3509,31 @@ function AdminPage() {
                       const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
                       setDocumentos(data || []);
 
-                      // 🔔 Criar notificação no sino para alertar alunos sobre novo documento
-                      const categoriaEmoji = {
-                        'Simulado': '📝',
-                        'Apostila': '📚',
-                        'Edital': '⚖️',
-                        'Outros': '📎'
-                      }[novoDocumento.categoria] || '📄';
-                      const fonteTexto = novoDocumento.fonte && novoDocumento.fonte !== 'Avulso'
-                        ? ` (${novoDocumento.fonte})`
-                        : '';
-                      await supabase.from('notificacoes_documentos').insert([{
-                        titulo: novoDocumento.titulo,
-                        descricao: novoDocumento.descricao || null,
-                        categoria: novoDocumento.categoria,
-                        fonte: novoDocumento.fonte || 'Avulso',
-                        emoji: categoriaEmoji,
-                        mensagem: `${categoriaEmoji} Novo ${novoDocumento.categoria}${fonteTexto}: ${novoDocumento.titulo}`,
-                        criado_em: new Date().toISOString()
-                      }]);
+                      // Se estiver vinculado a um preparatório, marca o preparatório como atualizado também (igual às aulas!)
+                      try {
+                        if (novoDocumento.fonte && novoDocumento.fonte !== 'Avulso') {
+                          const prepVinculado = preparatorios.find(p => p.nome === novoDocumento.fonte || p.id === novoDocumento.fonte);
+                          if (prepVinculado) {
+                            const desc = `Novo material: ${novoDocumento.titulo}`;
+                            await supabase.from('preparatorios').update({
+                              atualizado: true,
+                              data_atualizacao: new Date().toISOString(),
+                              descricao_atualizacao: desc
+                            }).eq('id', prepVinculado.id);
+
+                            setPreparatorios(prev => prev.map(p =>
+                              p.id === prepVinculado.id
+                                ? { ...p, atualizado: true, data_atualizacao: new Date().toISOString(), descricao_atualizacao: desc }
+                                : p
+                            ));
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Erro ao atualizar preparatório vinculado ao documento:', e);
+                      }
 
                       setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
-                      alert('✅ Documento adicionado à Central! Os alunos serão notificados no sino 🔔');
+                      alert('✅ Documento adicionado à Central! Os alunos foram notificados no sino 🔔');
                     }
                   }}>
                     Adicionar à Central
