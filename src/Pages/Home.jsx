@@ -51,6 +51,7 @@ function Home() {
   const [aulasAndamentoAberto, setAulasAndamentoAberto] = useState(false);
   const [sinoAberto, setSinoAberto] = useState(false);
   const [prepsAtualizados, setPrepsAtualizados] = useState([]);
+  const [docsNovos, setDocsNovos] = useState([]);
   const [configAbas, setConfigAbas] = useState({
     documentos: { ativo: true, plano: 'basico' },
     evolucao: { ativo: true, plano: 'basico' },
@@ -84,22 +85,33 @@ function Home() {
   // Criar refs para cada carrossel
   const carouselRefs = useRef({});
 
-  // === SINO: buscar preparatórios atualizados ===
+  // === SINO: buscar preparatórios atualizados + documentos novos ===
   useEffect(() => {
     const buscarAtualizacoes = async () => {
       try {
+        // Notificações de aulas (preparatórios)
         const { data } = await supabase
           .from('preparatorios')
           .select('id, nome, descricao_atualizacao, data_atualizacao, logo')
           .eq('atualizado', true);
-        if (!data) return;
-        const agora = Date.now();
-        const validos = data.filter(p => {
-          return p.data_atualizacao
-            ? (agora - new Date(p.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
-            : true;
-        });
-        setPrepsAtualizados(validos);
+        if (data) {
+          const agora = Date.now();
+          const validos = data.filter(p => {
+            return p.data_atualizacao
+              ? (agora - new Date(p.data_atualizacao).getTime()) < 24 * 60 * 60 * 1000
+              : true;
+          });
+          setPrepsAtualizados(validos);
+        }
+
+        // Notificações de documentos novos (últimas 48h)
+        const limite48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data: docsData } = await supabase
+          .from('notificacoes_documentos')
+          .select('*')
+          .gte('criado_em', limite48h)
+          .order('criado_em', { ascending: false });
+        setDocsNovos(docsData || []);
       } catch (e) { /* silencioso */ }
     };
     buscarAtualizacoes();
@@ -554,19 +566,19 @@ function Home() {
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       fontSize: '20px', position: 'relative', padding: '4px',
-                      color: prepsAtualizados.length > 0 ? '#FFD700' : '#888'
+                      color: (prepsAtualizados.length + docsNovos.length) > 0 ? '#FFD700' : '#888'
                     }}
                     title="Notificações"
                   >
                     🔔
-                    {prepsAtualizados.length > 0 && (
+                    {(prepsAtualizados.length + docsNovos.length) > 0 && (
                       <span style={{
                         position: 'absolute', top: '0', right: '0',
                         backgroundColor: '#E50914', color: '#FFF',
                         fontSize: '9px', fontWeight: 'bold',
                         width: '16px', height: '16px', borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>{prepsAtualizados.length}</span>
+                      }}>{prepsAtualizados.length + docsNovos.length}</span>
                     )}
                   </button>
 
@@ -574,45 +586,100 @@ function Home() {
                     <div style={{
                       position: 'absolute', top: '36px', right: 0, zIndex: 999,
                       backgroundColor: '#1E1E24', border: '1px solid #333',
-                      borderRadius: '12px', minWidth: '280px', maxWidth: '320px',
+                      borderRadius: '12px', minWidth: '300px', maxWidth: '340px',
                       boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      maxHeight: '480px',
+                      overflowY: 'auto'
                     }}>
-                      <div style={{ padding: '12px 16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ padding: '12px 16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#1E1E24', zIndex: 2 }}>
                         <span style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '13px' }}>🔔 Novidades</span>
                         <button onClick={() => setSinoAberto(false)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '16px' }}>×</button>
                       </div>
-                      {prepsAtualizados.length === 0 ? (
+
+                      {(prepsAtualizados.length === 0 && docsNovos.length === 0) ? (
                         <div style={{ padding: '20px 16px', color: '#666', fontSize: '13px', textAlign: 'center' }}>Nenhuma novidade por enquanto!</div>
                       ) : (
-                        prepsAtualizados.map(prep => (
-                          <div
-                            key={prep.id}
-                            style={{
-                              padding: '12px 16px',
-                              borderBottom: '1px solid #2A2A33',
-                              display: 'flex', gap: '12px', alignItems: 'flex-start',
-                              transition: 'background 0.15s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2A2A33'}
-                            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <span style={{ fontSize: '22px' }}>{typeof prep.logo === 'string' && !prep.logo.startsWith('http') ? prep.logo : '📚'}</span>
-                            <div>
-                              <div style={{ color: '#FFF', fontSize: '13px', fontWeight: '600', marginBottom: '2px' }}>{prep.nome}</div>
-                              <div style={{ color: '#FFD700', fontSize: '11px', marginBottom: '3px' }}>✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas'}</div>
-                              {prep.data_atualizacao && (
-                                <div style={{ color: '#666', fontSize: '10px' }}>
-                                  {(() => {
-                                    const diff = Date.now() - new Date(prep.data_atualizacao).getTime();
-                                    const h = Math.floor(diff / 3600000);
-                                    return h < 1 ? 'há poucos minutos' : `há ${h}h`;
-                                  })()}
+                        <>
+                          {/* Notificações de Aulas */}
+                          {prepsAtualizados.length > 0 && (
+                            <>
+                              <div style={{ padding: '8px 16px 4px', fontSize: '10px', fontWeight: 'bold', color: '#555', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                                📹 AULAS
+                              </div>
+                              {prepsAtualizados.map(prep => (
+                                <div
+                                  key={prep.id}
+                                  style={{
+                                    padding: '12px 16px',
+                                    borderBottom: '1px solid #2A2A33',
+                                    display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2A2A33'}
+                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                  <span style={{ fontSize: '22px' }}>{typeof prep.logo === 'string' && !prep.logo.startsWith('http') ? prep.logo : '📚'}</span>
+                                  <div>
+                                    <div style={{ color: '#FFF', fontSize: '13px', fontWeight: '600', marginBottom: '2px' }}>{prep.nome}</div>
+                                    <div style={{ color: '#FFD700', fontSize: '11px', marginBottom: '3px' }}>✨ {prep.descricao_atualizacao || 'Novas aulas adicionadas'}</div>
+                                    {prep.data_atualizacao && (
+                                      <div style={{ color: '#666', fontSize: '10px' }}>
+                                        {(() => {
+                                          const diff = Date.now() - new Date(prep.data_atualizacao).getTime();
+                                          const h = Math.floor(diff / 3600000);
+                                          return h < 1 ? 'há poucos minutos' : `há ${h}h`;
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        ))
+                              ))}
+                            </>
+                          )}
+
+                          {/* Notificações de Documentos */}
+                          {docsNovos.length > 0 && (
+                            <>
+                              <div style={{ padding: '8px 16px 4px', fontSize: '10px', fontWeight: 'bold', color: '#555', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                                📄 DOCUMENTOS
+                              </div>
+                              {docsNovos.map(doc => (
+                                <div
+                                  key={doc.id}
+                                  style={{
+                                    padding: '12px 16px',
+                                    borderBottom: '1px solid #2A2A33',
+                                    display: 'flex', gap: '12px', alignItems: 'flex-start',
+                                    transition: 'background 0.15s',
+                                    cursor: 'pointer'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2A2A33'}
+                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  onClick={() => { setSinoAberto(false); window.location.href = '/documentos'; }}
+                                >
+                                  <span style={{ fontSize: '22px' }}>{doc.emoji || '📄'}</span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ color: '#FFF', fontSize: '13px', fontWeight: '600', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.titulo}</div>
+                                    <div style={{ color: '#38bdf8', fontSize: '11px', marginBottom: '3px' }}>
+                                      🆕 Novo {doc.categoria}{doc.fonte && doc.fonte !== 'Avulso' ? ` · ${doc.fonte}` : ''}
+                                    </div>
+                                    {doc.descricao && (
+                                      <div style={{ color: '#888', fontSize: '10px', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.descricao}</div>
+                                    )}
+                                    <div style={{ color: '#666', fontSize: '10px' }}>
+                                      {(() => {
+                                        const diff = Date.now() - new Date(doc.criado_em).getTime();
+                                        const h = Math.floor(diff / 3600000);
+                                        return h < 1 ? 'há poucos minutos' : `há ${h}h`;
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

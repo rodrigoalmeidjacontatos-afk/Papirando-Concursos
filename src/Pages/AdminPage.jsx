@@ -3508,8 +3508,29 @@ function AdminPage() {
                     if(!error) {
                       const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
                       setDocumentos(data || []);
+
+                      // 🔔 Criar notificação no sino para alertar alunos sobre novo documento
+                      const categoriaEmoji = {
+                        'Simulado': '📝',
+                        'Apostila': '📚',
+                        'Edital': '⚖️',
+                        'Outros': '📎'
+                      }[novoDocumento.categoria] || '📄';
+                      const fonteTexto = novoDocumento.fonte && novoDocumento.fonte !== 'Avulso'
+                        ? ` (${novoDocumento.fonte})`
+                        : '';
+                      await supabase.from('notificacoes_documentos').insert([{
+                        titulo: novoDocumento.titulo,
+                        descricao: novoDocumento.descricao || null,
+                        categoria: novoDocumento.categoria,
+                        fonte: novoDocumento.fonte || 'Avulso',
+                        emoji: categoriaEmoji,
+                        mensagem: `${categoriaEmoji} Novo ${novoDocumento.categoria}${fonteTexto}: ${novoDocumento.titulo}`,
+                        criado_em: new Date().toISOString()
+                      }]);
+
                       setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
-                      alert('✅ Documento adicionado à Central!');
+                      alert('✅ Documento adicionado à Central! Os alunos serão notificados no sino 🔔');
                     }
                   }}>
                     Adicionar à Central
