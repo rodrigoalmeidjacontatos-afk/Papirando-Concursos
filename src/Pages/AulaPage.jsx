@@ -35,6 +35,9 @@ function AulaPage() {
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [muted, setMuted] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [hoverProgressTime, setHoverProgressTime] = useState(null);
+  const [hoverProgressPos, setHoverProgressPos] = useState(0);
+  const [isHoveringProgress, setIsHoveringProgress] = useState(false);
 
   // Estados de Dados
   // Auth vem do contexto global — sem re-verificar a cada montagem
@@ -1182,6 +1185,25 @@ function AulaPage() {
     setIsSeeking(false);
   };
 
+  const handleProgressMouseMove = (e) => {
+    if (!duracao || duracao <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : undefined);
+    if (clientX === undefined) return;
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const percent = (x / rect.width) * 100;
+    const time = (x / rect.width) * duracao;
+    setHoverProgressPos(percent);
+    setHoverProgressTime(time);
+    setIsHoveringProgress(true);
+  };
+
+  const handleProgressMouseLeave = () => {
+    setIsHoveringProgress(false);
+    setHoverProgressTime(null);
+  };
+
   const handleVolumeChange = (e) => {
     const newVolume = parseInt(e.target.value);
     setVolume(newVolume);
@@ -1835,12 +1857,82 @@ function AulaPage() {
                     onMouseUp={handleSeekEnd}
                     onTouchStart={handleSeekStart}
                     onTouchEnd={handleSeekEnd}
+                    onMouseMove={handleProgressMouseMove}
+                    onMouseEnter={handleProgressMouseMove}
+                    onMouseLeave={handleProgressMouseLeave}
                     style={{...styles.modernProgressSlider, height: '24px'}}
                     step="0.1"
                   />
-                  <div style={styles.modernProgressBase}>
-                    <div style={{ ...styles.modernProgressFill, width: `${(tempoAtual / duracao) * 100 || 0}%` }} />
-                    <div style={{ ...styles.modernProgressHandle, left: `${(tempoAtual / duracao) * 100 || 0}%` }} />
+                  {/* Tooltip de prévia do minuto exato */}
+                  {(isHoveringProgress || isSeeking) && duracao > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '30px',
+                        left: `${Math.max(4, Math.min(96, isSeeking ? (duracao > 0 ? (tempoAtual / duracao) * 100 : 0) : hoverProgressPos))}%`,
+                        transform: 'translateX(-50%)',
+                        backgroundColor: 'rgba(15, 15, 20, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        zIndex: 15,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.8)',
+                        letterSpacing: '0.5px',
+                        backdropFilter: 'blur(8px)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        transition: 'left 0.05s ease-out'
+                      }}
+                    >
+                      <span>{formatarTempo(isSeeking ? tempoAtual : (hoverProgressTime !== null ? hoverProgressTime : tempoAtual))}</span>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 0,
+                          height: 0,
+                          borderLeft: '5px solid transparent',
+                          borderRight: '5px solid transparent',
+                          borderTop: '5px solid rgba(15, 15, 20, 0.95)'
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div style={{
+                    ...styles.modernProgressBase,
+                    height: (isHoveringProgress || isSeeking) ? '6px' : '4px',
+                    transition: 'height 0.15s ease'
+                  }}>
+                    {(isHoveringProgress && !isSeeking) && (
+                      <div 
+                        style={{ 
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          height: '100%',
+                          width: `${hoverProgressPos}%`,
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          borderRadius: '2px',
+                          pointerEvents: 'none'
+                        }} 
+                      />
+                    )}
+                    <div style={{ ...styles.modernProgressFill, width: `${(tempoAtual / duracao) * 100 || 0}%`, position: 'relative', zIndex: 2 }} />
+                    <div style={{ 
+                      ...styles.modernProgressHandle, 
+                      left: `${(tempoAtual / duracao) * 100 || 0}%`, 
+                      zIndex: 3,
+                      transform: (isHoveringProgress || isSeeking) ? 'translate(-50%, -50%) scale(1.25)' : 'translate(-50%, -50%)',
+                      transition: 'transform 0.15s ease'
+                    }} />
                   </div>
                 </div>
 
@@ -1933,12 +2025,83 @@ function AulaPage() {
                       onMouseUp={handleSeekEnd}
                       onTouchStart={handleSeekStart}
                       onTouchEnd={handleSeekEnd}
+                      onMouseMove={handleProgressMouseMove}
+                      onMouseEnter={handleProgressMouseMove}
+                      onMouseLeave={handleProgressMouseLeave}
                       style={styles.modernProgressSlider}
                       step="0.1"
                     />
-                    <div style={styles.modernProgressBase}>
-                      <div style={{ ...styles.modernProgressFill, width: `${progressoPercentual}%` }} />
-                      <div style={{ ...styles.modernProgressHandle, left: `${progressoPercentual}%` }} />
+                    {/* Tooltip de prévia do minuto exato */}
+                    {(isHoveringProgress || isSeeking) && duracao > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '30px',
+                          left: `${Math.max(4, Math.min(96, isSeeking ? (duracao > 0 ? (tempoAtual / duracao) * 100 : 0) : hoverProgressPos))}%`,
+                          transform: 'translateX(-50%)',
+                          backgroundColor: 'rgba(15, 15, 20, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          whiteSpace: 'nowrap',
+                          pointerEvents: 'none',
+                          zIndex: 15,
+                          boxShadow: '0 4px 14px rgba(0,0,0,0.8)',
+                          letterSpacing: '0.5px',
+                          backdropFilter: 'blur(8px)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          transition: 'left 0.05s ease-out'
+                        }}
+                      >
+                        <span>{formatarTempo(isSeeking ? tempoAtual : (hoverProgressTime !== null ? hoverProgressTime : tempoAtual))}</span>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '5px solid transparent',
+                            borderRight: '5px solid transparent',
+                            borderTop: '5px solid rgba(15, 15, 20, 0.95)'
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div style={{
+                      ...styles.modernProgressBase,
+                      height: (isHoveringProgress || isSeeking) ? '6px' : '4px',
+                      transition: 'height 0.15s ease'
+                    }}>
+                      {/* Barra fantasma translúcida até a posição do ponteiro */}
+                      {(isHoveringProgress && !isSeeking) && (
+                        <div 
+                          style={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            height: '100%',
+                            width: `${hoverProgressPos}%`,
+                            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                            borderRadius: '2px',
+                            pointerEvents: 'none'
+                          }} 
+                        />
+                      )}
+                      <div style={{ ...styles.modernProgressFill, width: `${progressoPercentual}%`, position: 'relative', zIndex: 2 }} />
+                      <div style={{ 
+                        ...styles.modernProgressHandle, 
+                        left: `${progressoPercentual}%`, 
+                        zIndex: 3,
+                        transform: (isHoveringProgress || isSeeking) ? 'translate(-50%, -50%) scale(1.25)' : 'translate(-50%, -50%)',
+                        transition: 'transform 0.15s ease'
+                      }} />
                     </div>
                   </div>
 
