@@ -3024,7 +3024,7 @@ const styles = {
     maxHeight: 'calc(100vh - 80px)'
   },
   sidebarHeaderMain: {
-    padding: '24px 20px 10px 20px',
+    padding: '14px 16px 6px 16px',
   },
   sidebarHeaderSub: {
     padding: '20px',
@@ -3051,8 +3051,8 @@ const styles = {
     padding: '5px 0',
   },
   sidebarTitle: {
-    margin: '0 0 20px 0',
-    fontSize: '22px',
+    margin: '0 0 10px 0',
+    fontSize: '18px',
     fontWeight: '700',
     color: '#FFF',
   },
@@ -3079,8 +3079,8 @@ const styles = {
   },
   subTabsContainer: {
     display: 'flex',
-    gap: '30px',
-    marginBottom: '10px',
+    gap: '20px',
+    marginBottom: '4px',
   },
   subTabButton: {
     backgroundColor: 'transparent',
@@ -3135,8 +3135,8 @@ const styles = {
     lineHeight: '1.4',
   },
   searchContainer: {
-    padding: '10px 20px',
-    marginBottom: '10px',
+    padding: '6px 16px',
+    marginBottom: '4px',
   },
   searchWrapper: {
     position: 'relative',
@@ -3145,32 +3145,32 @@ const styles = {
   },
   searchInput: {
     width: '100%',
-    padding: '12px 16px 12px 16px',
+    padding: '9px 14px',
     backgroundColor: '#1A1A1A',
     border: '1px solid #333',
-    borderRadius: '12px',
+    borderRadius: '10px',
     color: '#FFF',
-    fontSize: '14px',
+    fontSize: '13px',
     outline: 'none',
   },
   searchIcon: {
     position: 'absolute',
-    right: '16px',
+    right: '14px',
     color: '#666',
-    fontSize: '16px',
+    fontSize: '15px',
   },
   listaAulas: { 
     flex: 1,
     overflowY: 'auto',
-    padding: '0 10px',
+    padding: '0 8px',
   },
   itemAula: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px',
-    margin: '4px 0',
-    borderRadius: '12px',
+    padding: '12px 14px',
+    margin: '3px 0',
+    borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.2s',
     border: '1px solid transparent',
@@ -3251,13 +3251,13 @@ const styles = {
   },
   // Novos Estilos para o Redesign
   selectionCardsContainer: {
-    padding: '0 0 10px 0',
+    padding: '0 0 6px 0',
   },
   selectorCard: {
-    margin: '10px 20px',
-    padding: '16px',
+    margin: '6px 16px',
+    padding: '10px 14px',
     backgroundColor: '#111',
-    borderRadius: '12px',
+    borderRadius: '10px',
     cursor: 'pointer',
     border: '1px solid #222',
     transition: 'all 0.2s',
