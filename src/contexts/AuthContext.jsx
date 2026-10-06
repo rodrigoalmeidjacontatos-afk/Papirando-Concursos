@@ -120,7 +120,10 @@ export function AuthProvider({ children }) {
 
     const nomeFinal = profile.display_name || userEmail.split('@')[0] || 'Aluno';
 
-    setPlanoUsuario(prev => (prev === planoNormalizado ? prev : planoNormalizado));
+    const ehAdmin = !!profile.is_admin;
+    const planoEfetivo = ehAdmin ? 'premium' : planoNormalizado;
+
+    setPlanoUsuario(prev => (prev === planoEfetivo ? prev : planoEfetivo));
     setUserName(prev => (prev === nomeFinal ? prev : nomeFinal));
     setDataExpiracao(prev => (prev === dataExp ? prev : dataExp));
     setPreparatoriosLiberados(prev => {
@@ -129,11 +132,11 @@ export function AuthProvider({ children }) {
       return prevJson === nextJson ? prev : liberados;
     });
     setAvatarUrl(prev => (prev === (profile.avatar_url || null) ? prev : (profile.avatar_url || null)));
-    setIsAdmin(prev => { const next = !!profile.is_admin; return prev === next ? prev : next; });
+    setIsAdmin(prev => (prev === ehAdmin ? prev : ehAdmin));
     setAuthLoading(prev => (prev === false ? prev : false));
 
     try {
-      localStorage.setItem('papirando_plano_cache', planoNormalizado);
+      localStorage.setItem('papirando_plano_cache', planoEfetivo);
       localStorage.setItem('papirando_nome_cache', nomeFinal);
       localStorage.setItem('papirando_preps_cache', JSON.stringify(liberados));
       if (profile.avatar_url) localStorage.setItem('papirando_avatar_cache', profile.avatar_url);

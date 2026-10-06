@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import AdminQuestoes from '../components/AdminQuestoes';
+import { useAuth } from '../contexts/AuthContext';
 
 function AdminPage() {
   const navigate = useNavigate();
+  const { user: authUser, isAdmin: authIsAdmin, authLoading } = useAuth();
+  const [isAdminBanco, setIsAdminBanco] = useState(null);
   const [activeMenu, setActiveMenu] = useState('categorias');
   const [userEmail, setUserEmail] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -578,9 +581,42 @@ function AdminPage() {
   // ========== AUTENTICAÇÃO E PROTEÇÃO DE ACESSO ==========
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserEmail(user?.email || null);
-      setAuthChecked(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setUserEmail(null);
+          setIsAdminBanco(false);
+          setAuthChecked(true);
+          return;
+        }
+
+        const email = user.email || '';
+        setUserEmail(email);
+
+        const emailLower = email.toLowerCase();
+        if (emailLower === 'rodrigoalmeidja@gmail.com' || emailLower.includes('rodrigoalmeidja')) {
+          setIsAdminBanco(true);
+          setAuthChecked(true);
+          return;
+        }
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.warn('[AdminPage] Erro ao checar perfil admin:', error);
+        }
+
+        setIsAdminBanco(!!profile?.is_admin);
+      } catch (err) {
+        console.error('[AdminPage] Erro ao verificar autenticação:', err);
+        setIsAdminBanco(false);
+      } finally {
+        setAuthChecked(true);
+      }
     }
     checkAuth();
   }, []);
@@ -1929,11 +1965,32 @@ function AdminPage() {
     { id: 'questoes', nome: '📝 Banco de Questões', icone: '📝' },
   ];
 
-  if (!authChecked) {
-    return <div style={{ color: '#fff', padding: 40 }}>Verificando autenticação...</div>;
+  const ehAdmin = authIsAdmin || isAdminBanco || userEmail === 'rodrigoalmeidja@gmail.com' || (authUser?.email && authUser.email.toLowerCase() === 'rodrigoalmeidja@gmail.com');
+
+  if (!authChecked || (authLoading && !ehAdmin)) {
+    return (
+      <div style={{ color: '#fff', padding: 40, textAlign: 'center', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Verificando permissões de administrador...
+      </div>
+    );
   }
-  if (userEmail !== 'rodrigoalmeidja@gmail.com') {
-    return <div style={{ color: '#fff', padding: 40 }}>Acesso restrito ao proprietário.</div>;
+
+  if (!ehAdmin) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#0A0A0A', color: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px' }}>Acesso Restrito</h2>
+        <p style={{ color: '#AAA', marginBottom: '24px', maxWidth: '420px', fontSize: '15px' }}>
+          Este painel é exclusivo para administradores da plataforma.
+        </p>
+        <button
+          onClick={() => navigate('/')}
+          style={{ backgroundColor: '#E50914', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          ← Voltar ao Início
+        </button>
+      </div>
+    );
   }
 
   return (
