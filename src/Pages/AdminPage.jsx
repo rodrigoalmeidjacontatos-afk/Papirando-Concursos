@@ -1676,6 +1676,8 @@ function AdminPage() {
         }
       };
       await supabase.from('vinculos').insert([{ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: moduloId, aula_id: aulaId }]);
+      // Remove qualquer registro legado do módulo sem aula_id que pudesse liberar o módulo inteiro automaticamente
+      await supabase.from('vinculos').delete().eq('carreira_id', carreiraId).eq('preparatorio_id', prepId).eq('modulo_id', moduloId).is('aula_id', null);
       await marcarPrepComoAtualizado(prepId);
     }
     setVinculos(novoVinculos);
@@ -3235,7 +3237,10 @@ function AdminPage() {
                                   .filter(mod => !buscaModuloVinculo || mod.nome.toLowerCase().includes(buscaModuloVinculo.toLowerCase()));
 
                                 const totalAulasDis = modulosDaDisc.reduce((a, m) => a + getAulasPorModulo(m.id).length, 0);
-                                const vinculadasDis = modulosDaDisc.reduce((a, m) => a + (isModuloVinculado(selectedCarreira, prep.id, m.id) ? getAulasPorModulo(m.id).length : 0), 0);
+                                const vinculadasDis = modulosDaDisc.reduce((a, m) => {
+                                  const aulasDoMod = getAulasPorModulo(m.id);
+                                  return a + aulasDoMod.filter(aula => isAulaVinculada(selectedCarreira, prep.id, m.id, aula.id)).length;
+                                }, 0);
 
                                 if (modulosDaDisc.length === 0) return null;
                                 return (
@@ -3243,7 +3248,9 @@ function AdminPage() {
                                     <div style={styles.vinculoDisciplinaHeader} onClick={() => setExpandedDiscVinculo(isDiscExp ? null : disc.id)}>
                                       <span>{disc.icone} {disc.nome}</span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', color: '#888' }}>{vinculadasDis}/{totalAulasDis} aulas</span>
+                                        <span style={{ fontSize: '11px', color: vinculadasDis === totalAulasDis && totalAulasDis > 0 ? '#4CAF50' : vinculadasDis > 0 ? '#f5a623' : '#888', fontWeight: vinculadasDis > 0 ? 'bold' : 'normal' }}>
+                                          {vinculadasDis}/{totalAulasDis} aulas
+                                        </span>
                                         <button
                                           style={{ ...styles.smallButton, backgroundColor: '#4CAF50', fontSize: '11px', padding: '4px 12px' }}
                                           onClick={e => { e.stopPropagation(); selecionarDisciplinaVinculo(selectedCarreira, prep.id, disc.id); }}
@@ -3259,13 +3266,16 @@ function AdminPage() {
                                         {modulosDaDisc.map(mod => {
                                           const modVinc = isModuloVinculado(selectedCarreira, prep.id, mod.id);
                                           const aulasDoMod = getAulasPorModulo(mod.id);
+                                          const aulasSelMod = aulasDoMod.filter(a => isAulaVinculada(selectedCarreira, prep.id, mod.id, a.id)).length;
                                           return (
                                             <div key={mod.id} style={styles.vinculoModulo}>
                                               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px'}}>
                                                 <label style={styles.checkboxLabel}>
                                                   <input type="checkbox" checked={modVinc} onChange={() => toggleModuloVinculo(selectedCarreira, prep.id, mod.id)} />
                                                   <span style={{color: '#FFF', fontWeight: 'bold'}}>Módulo: {mod.nome}</span>
-                                                  <span style={{ color: '#666', fontSize: '11px', marginLeft: '4px' }}>({aulasDoMod.length} aulas)</span>
+                                                  <span style={{ color: aulasSelMod > 0 ? '#4CAF50' : '#888', fontSize: '11px', marginLeft: '6px', fontWeight: aulasSelMod > 0 ? 'bold' : 'normal' }}>
+                                                    ({aulasSelMod}/{aulasDoMod.length} aulas{aulasSelMod === aulasDoMod.length && aulasDoMod.length > 0 ? ' - todas' : ''})
+                                                  </span>
                                                 </label>
                                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                                   {modVinc && (
