@@ -1609,17 +1609,25 @@ function AdminPage() {
     const carrVinculos = vinculos[carreiraId] || {};
     const prepVinculos = carrVinculos[prepId] || { modulos: {} };
     if (!prepVinculos.modulos) prepVinculos.modulos = {};
-    
+
     const modsAtual = prepVinculos.modulos;
     let novoVinculos;
+
     if (modsAtual[moduloId]) {
+      // Desmarca o módulo: remove do estado local e apaga todos os vínculos de aulas desse módulo no banco
       const newMods = { ...modsAtual };
       delete newMods[moduloId];
       novoVinculos = { ...vinculos, [carreiraId]: { ...carrVinculos, [prepId]: { ...prepVinculos, modulos: newMods } } };
+      // Remove vínculos de aulas individuais E o vínculo sem aula_id (módulo completo), se houver
       await supabase.from('vinculos').delete().eq('carreira_id', carreiraId).eq('preparatorio_id', prepId).eq('modulo_id', moduloId);
+      // Fecha o painel de aulas desse módulo
+      setExpandedModuloAulas(prev => { const n = { ...prev }; delete n[moduloId]; return n; });
     } else {
+      // Marca o módulo: apenas registra no estado local SEM inserir nada no banco ainda.
+      // O admin deve expandir as aulas e marcar individualmente (ou usar "Sel. Módulo" para selecionar todas).
       novoVinculos = { ...vinculos, [carreiraId]: { ...carrVinculos, [prepId]: { ...prepVinculos, modulos: { ...modsAtual, [moduloId]: { aulas: {} } } } } };
-      await supabase.from('vinculos').insert([{ carreira_id: carreiraId, preparatorio_id: prepId, modulo_id: moduloId }]);
+      // Abre automaticamente o painel de aulas para facilitar a seleção individual
+      setExpandedModuloAulas(prev => ({ ...prev, [moduloId]: true }));
     }
     setVinculos(novoVinculos);
   };
