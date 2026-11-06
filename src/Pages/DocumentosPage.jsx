@@ -11,16 +11,24 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
     border: '#38bdf8',
-    emblem: '\uD83D\uDCDD',
+    emblem: '📝',
     badge: 'SIMULADO',
     badgeBg: '#0284c7'
   };
 
-  if (category === 'Apostila') {
+  if (category === 'PDF') {
+    colors = {
+      bg: 'linear-gradient(135deg, #2d0e14, #120507)',
+      border: '#f43f5e',
+      emblem: '📄',
+      badge: 'PDF',
+      badgeBg: '#e11d48'
+    };
+  } else if (category === 'Apostila') {
     colors = {
       bg: 'linear-gradient(135deg, #3f1516, #1c0a0b)',
       border: '#ef4444',
-      emblem: '\uD83D\uDCDA',
+      emblem: '📚',
       badge: 'APOSTILA',
       badgeBg: '#b91c1c'
     };
@@ -28,7 +36,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #27272a, #09090b)',
       border: '#a1a1aa',
-      emblem: '\u2696\uFE0F',
+      emblem: '⚖️',
       badge: 'EDITAL',
       badgeBg: '#52525b'
     };
@@ -36,7 +44,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #1e1b4b, #090514)',
       border: '#a855f7',
-      emblem: '\uD83D\uDCCE',
+      emblem: '📎',
       badge: 'MATERIAL',
       badgeBg: '#7e22ce'
     };
@@ -317,7 +325,7 @@ function DocumentosPage() {
   const [carregando, setCarregando] = useState(true);
   const [viewMode, setViewMode] = useState('shelves');
 
-  const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
+  const categorias = ['Todos', 'PDF', 'Simulado', 'Apostila', 'Edital', 'Outros'];
 
   // Funcao para gerar cor HSL unica e consistente baseada no nome do preparatorio
   const getCourseColor = (name) => {
@@ -433,7 +441,7 @@ function DocumentosPage() {
           <span style={styles.cardBadge}>{doc.categoria}</span>
           {!isBasico && doc.disciplina && (
             <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
-              {doc.disciplina}
+              📁 {doc.disciplina}
             </span>
           )}
         </div>
@@ -503,22 +511,27 @@ function DocumentosPage() {
             
             <div style={styles.statsContainer}>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>[S]</span>
+                <span style={styles.statIcon}>📄</span>
+                <span style={styles.statValue}>{countByCategory('PDF')}</span>
+                <span style={styles.statLabel}>PDFs</span>
+              </div>
+              <div style={styles.statItem}>
+                <span style={styles.statIcon}>📝</span>
                 <span style={styles.statValue}>{countByCategory('Simulado')}</span>
                 <span style={styles.statLabel}>Simulados</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>[A]</span>
+                <span style={styles.statIcon}>📚</span>
                 <span style={styles.statValue}>{countByCategory('Apostila')}</span>
                 <span style={styles.statLabel}>Apostilas</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>[E]</span>
+                <span style={styles.statIcon}>⚖️</span>
                 <span style={styles.statValue}>{countByCategory('Edital')}</span>
                 <span style={styles.statLabel}>Editais</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>[+]</span>
+                <span style={styles.statIcon}>📎</span>
                 <span style={styles.statValue}>{countByCategory('Outros')}</span>
                 <span style={styles.statLabel}>Outros</span>
               </div>
@@ -654,7 +667,7 @@ function DocumentosPage() {
                             {(disciplinaKeys.length > 1 || disciplina !== 'Geral') && (
                               <div style={styles.discHeader}>
                                 <span style={styles.discTitle}>
-                                  {disciplina}
+                                  📁 {disciplina}
                                 </span>
                                 <span style={styles.shelfCounter}>{docsDisc.length} {docsDisc.length === 1 ? 'arquivo' : 'arquivos'}</span>
                               </div>
@@ -714,7 +727,7 @@ function DocumentosPage() {
                     )}
                     {!isBasico && doc.disciplina && (
                       <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
-                        {doc.disciplina}
+                        📁 {doc.disciplina}
                       </span>
                     )}
                   </div>

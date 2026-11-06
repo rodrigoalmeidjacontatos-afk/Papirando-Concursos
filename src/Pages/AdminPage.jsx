@@ -3523,6 +3523,7 @@ function AdminPage() {
                   <input style={styles.input} placeholder="Descrição curta" value={novoDocumento.descricao} onChange={e => setNovoDocumento({...novoDocumento, descricao: e.target.value})} />
                   <div style={{display: 'flex', gap: '10px'}}>
                     <select style={{...styles.select, flex: 1}} value={novoDocumento.categoria} onChange={e => setNovoDocumento({...novoDocumento, categoria: e.target.value})}>
+                      <option value="PDF">PDF</option>
                       <option value="Simulado">Simulado</option>
                       <option value="Apostila">Apostila</option>
                       <option value="Edital">Edital</option>
@@ -3666,6 +3667,7 @@ function AdminPage() {
                         <div style={styles.editForm}>
                           <input style={{...styles.input, flex: 1}} value={editandoDocumento.titulo_limpo || ''} onChange={e => setEditandoDocumento({...editandoDocumento, titulo_limpo: e.target.value})} />
                           <select style={styles.select} value={editandoDocumento.categoria} onChange={e => setEditandoDocumento({...editandoDocumento, categoria: e.target.value})}>
+                            <option value="PDF">PDF</option>
                             <option value="Simulado">Simulado</option>
                             <option value="Apostila">Apostila</option>
                             <option value="Edital">Edital</option>
@@ -3695,14 +3697,11 @@ function AdminPage() {
                              const prefixo = editandoDocumento.fonte && editandoDocumento.fonte !== 'Avulso' ? `[${editandoDocumento.fonte}] ` : '';
                              const docAtualizado = {
                                titulo: `${prefixo}${editandoDocumento.titulo_limpo}`,
-                               descricao: editandoDocumento.descricao,
-                               categoria: editandoDocumento.categoria,
-                               url: editandoDocumento.url
+                               descricao: editandoDocumento.descricao || '',
+                               categoria: editandoDocumento.categoria || 'PDF',
+                               url: editandoDocumento.url || '',
+                               disciplina: editandoDocumento.disciplina || null
                              };
-                             // Tenta salvar campo disciplina (requer coluna no banco)
-                             if (editandoDocumento.disciplina !== undefined) {
-                               docAtualizado.disciplina = editandoDocumento.disciplina || null;
-                             }
                              const { error } = await supabase.from('documentos').update(docAtualizado).eq('id', doc.id);
                              if(!error) {
                                const updatedDocs = documentos.map(d => d.id === doc.id ? { ...doc, ...docAtualizado } : d);
@@ -3710,17 +3709,7 @@ function AdminPage() {
                                setEditandoDocumento(null);
                              } else {
                                console.error('Erro ao salvar documento:', error);
-                               // Se falhou por causa da coluna disciplina, tenta sem ela
-                               const docSemDisc = { titulo: docAtualizado.titulo, descricao: docAtualizado.descricao, categoria: docAtualizado.categoria, url: docAtualizado.url };
-                               const { error: err2 } = await supabase.from('documentos').update(docSemDisc).eq('id', doc.id);
-                               if(!err2) {
-                                 const updatedDocs = documentos.map(d => d.id === doc.id ? { ...doc, ...docSemDisc } : d);
-                                 setDocumentos(updatedDocs);
-                                 setEditandoDocumento(null);
-                                 alert('Salvo! (Para usar disciplinas, crie a coluna no Supabase: ALTER TABLE documentos ADD COLUMN disciplina text)');
-                               } else {
-                                 alert('Erro ao salvar: ' + err2.message);
-                               }
+                               alert('Erro ao salvar: ' + error.message);
                              }
                           }}>Salvar</button>
                           <button style={styles.cancelButtonSmall} onClick={() => setEditandoDocumento(null)}>Cancelar</button>
@@ -3728,7 +3717,7 @@ function AdminPage() {
                       ) : (
                         <>
                           <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                            <span style={{fontSize: '24px'}}>{doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : '📎'}</span>
+                            <span style={{fontSize: '24px'}}>{doc.categoria === 'PDF' ? '📄' : doc.categoria === 'Simulado' ? '📝' : doc.categoria === 'Apostila' ? '📚' : doc.categoria === 'Edital' ? '⚖️' : '📎'}</span>
                             <div>
                               <div style={{fontWeight: 'bold', color: '#FFF'}}>
                                 {tituloLimpo}
