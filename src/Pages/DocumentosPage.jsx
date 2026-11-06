@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
@@ -314,6 +314,117 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
   );
 }
 
+// Componente de Prateleira com setas de navegacao horizontal (estilo Netflix)
+function ShelfCarousel({ children }) {
+  const rowRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    if (rowRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = rowRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = rowRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll, { passive: true });
+      window.addEventListener('resize', checkScroll);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [children]);
+
+  const scroll = (direction) => {
+    if (rowRef.current) {
+      const scrollAmount = Math.max(300, rowRef.current.clientWidth * 0.7);
+      rowRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      {/* Seta Esquerda */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          style={{
+            position: 'absolute',
+            left: '-14px',
+            top: '50%',
+            transform: 'translateY(-60%)',
+            zIndex: 15,
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(15, 15, 18, 0.96)',
+            border: '2px solid #E50914',
+            color: '#FFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '20px',
+            boxShadow: '0 4px 18px rgba(0,0,0,0.8)',
+            transition: 'all 0.2s ease'
+          }}
+          className="carousel-arrow"
+          title="Ver materiais anteriores"
+          aria-label="Anterior"
+        >
+          ❮
+        </button>
+      )}
+
+      {/* Linha horizontal com os cards */}
+      <div ref={rowRef} style={styles.shelfRow} className="custom-scrollbar">
+        {children}
+      </div>
+
+      {/* Seta Direita */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          style={{
+            position: 'absolute',
+            right: '-14px',
+            top: '50%',
+            transform: 'translateY(-60%)',
+            zIndex: 15,
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(15, 15, 18, 0.96)',
+            border: '2px solid #E50914',
+            color: '#FFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '20px',
+            boxShadow: '0 4px 18px rgba(0,0,0,0.8)',
+            transition: 'all 0.2s ease'
+          }}
+          className="carousel-arrow"
+          title="Ver próximos materiais"
+          aria-label="Próximo"
+        >
+          ❯
+        </button>
+      )}
+    </div>
+  );
+}
+
 function DocumentosPage() {
   const navigate = useNavigate();
   const { planoUsuario, isAdmin, authLoading } = useAuth();
@@ -477,6 +588,11 @@ function DocumentosPage() {
           transform: translateY(-6px);
           box-shadow: 0 15px 35px rgba(229,9,20,0.16) !important;
           border-color: rgba(229,9,20,0.35) !important;
+        }
+        .carousel-arrow:hover {
+          background-color: #E50914 !important;
+          transform: translateY(-60%) scale(1.15) !important;
+          box-shadow: 0 0 20px rgba(229, 9, 20, 0.6) !important;
         }
       `}</style>
 
@@ -673,10 +789,10 @@ function DocumentosPage() {
                               </div>
                             )}
 
-                            {/* Fila horizontal de cards */}
-                            <div style={styles.shelfRow} className="custom-scrollbar">
+                            {/* Fila horizontal de cards com setas de navegacao */}
+                            <ShelfCarousel>
                               {docsDisc.map(doc => renderCard(doc))}
-                            </div>
+                            </ShelfCarousel>
                           </div>
                         );
                       })}
