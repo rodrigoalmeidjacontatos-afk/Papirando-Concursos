@@ -3600,11 +3600,20 @@ function AdminPage() {
                       titulo: `${prefixo}${novoDocumento.titulo}`,
                       descricao: novoDocumento.descricao,
                       categoria: novoDocumento.categoria,
-                      url: novoDocumento.url,
-                      disciplina: novoDocumento.disciplina || null
+                      url: novoDocumento.url
                     };
+                    // Adiciona disciplina apenas se foi preenchida
+                    if (novoDocumento.disciplina) {
+                      documentoComPrefixo.disciplina = novoDocumento.disciplina;
+                    }
 
-                    const { error } = await supabase.from('documentos').insert([documentoComPrefixo]);
+                    let { error } = await supabase.from('documentos').insert([documentoComPrefixo]);
+                    // Se falhar (ex: coluna nao existe), tenta sem o campo disciplina
+                    if (error && novoDocumento.disciplina) {
+                      const docSemDisc = { titulo: documentoComPrefixo.titulo, descricao: documentoComPrefixo.descricao, categoria: documentoComPrefixo.categoria, url: documentoComPrefixo.url };
+                      const res2 = await supabase.from('documentos').insert([docSemDisc]);
+                      error = res2.error;
+                    }
                     if(!error) {
                       const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
                       setDocumentos(data || []);
@@ -3688,14 +3697,30 @@ function AdminPage() {
                                titulo: `${prefixo}${editandoDocumento.titulo_limpo}`,
                                descricao: editandoDocumento.descricao,
                                categoria: editandoDocumento.categoria,
-                               url: editandoDocumento.url,
-                               disciplina: editandoDocumento.disciplina || null
+                               url: editandoDocumento.url
                              };
+                             // Tenta salvar campo disciplina (requer coluna no banco)
+                             if (editandoDocumento.disciplina !== undefined) {
+                               docAtualizado.disciplina = editandoDocumento.disciplina || null;
+                             }
                              const { error } = await supabase.from('documentos').update(docAtualizado).eq('id', doc.id);
                              if(!error) {
                                const updatedDocs = documentos.map(d => d.id === doc.id ? { ...doc, ...docAtualizado } : d);
                                setDocumentos(updatedDocs);
                                setEditandoDocumento(null);
+                             } else {
+                               console.error('Erro ao salvar documento:', error);
+                               // Se falhou por causa da coluna disciplina, tenta sem ela
+                               const docSemDisc = { titulo: docAtualizado.titulo, descricao: docAtualizado.descricao, categoria: docAtualizado.categoria, url: docAtualizado.url };
+                               const { error: err2 } = await supabase.from('documentos').update(docSemDisc).eq('id', doc.id);
+                               if(!err2) {
+                                 const updatedDocs = documentos.map(d => d.id === doc.id ? { ...doc, ...docSemDisc } : d);
+                                 setDocumentos(updatedDocs);
+                                 setEditandoDocumento(null);
+                                 alert('Salvo! (Para usar disciplinas, crie a coluna no Supabase: ALTER TABLE documentos ADD COLUMN disciplina text)');
+                               } else {
+                                 alert('Erro ao salvar: ' + err2.message);
+                               }
                              }
                           }}>Salvar</button>
                           <button style={styles.cancelButtonSmall} onClick={() => setEditandoDocumento(null)}>Cancelar</button>

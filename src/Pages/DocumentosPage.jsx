@@ -11,7 +11,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
     border: '#38bdf8',
-    emblem: 'ðŸ“',
+    emblem: '\uD83D\uDCDD',
     badge: 'SIMULADO',
     badgeBg: '#0284c7'
   };
@@ -20,7 +20,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #3f1516, #1c0a0b)',
       border: '#ef4444',
-      emblem: 'ðŸ“š',
+      emblem: '\uD83D\uDCDA',
       badge: 'APOSTILA',
       badgeBg: '#b91c1c'
     };
@@ -28,7 +28,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #27272a, #09090b)',
       border: '#a1a1aa',
-      emblem: 'âš–ï¸',
+      emblem: '\u2696\uFE0F',
       badge: 'EDITAL',
       badgeBg: '#52525b'
     };
@@ -36,7 +36,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #1e1b4b, #090514)',
       border: '#a855f7',
-      emblem: 'ðŸ“Ž',
+      emblem: '\uD83D\uDCCE',
       badge: 'MATERIAL',
       badgeBg: '#7e22ce'
     };
@@ -44,7 +44,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
 
   const sourceLabel = source || 'Avulso';
   
-  // FunÃ§Ã£o para gerar cor HSL Ãºnica e consistente baseada no nome do preparatÃ³rio
+  // Funcao para gerar cor HSL unica e consistente baseada no nome do preparatorio
   const getCourseColor = (name) => {
     if (!name || name === 'Avulso') return { text: '#94a3b8' };
     let hash = 0;
@@ -78,7 +78,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
       }} />
 
       {isPdf ? (
-        /* Container absoluto estrito para forÃ§ar o limite de altura no iOS/Safari de Tablets e Smartphones */
+        /* Container absoluto estrito para forcar o limite de altura no iOS/Safari */
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -94,7 +94,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
               position: 'absolute',
               top: 0, left: 0,
               width: '100%',
-              height: '270px', // Ligeiramente maior para recortar e ocultar controles inferiores nativos
+              height: '270px',
               border: 'none',
               pointerEvents: 'none',
               backgroundColor: '#141414'
@@ -115,7 +115,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           boxSizing: 'border-box',
           position: 'relative'
         }}>
-          {/* Textura de Linhas Verticais de Livro (EncadernaÃ§Ã£o) */}
+          {/* Textura de Linhas Verticais de Livro (Encadernacao) */}
           <div style={{
             position: 'absolute',
             left: 0, top: 0, bottom: 0,
@@ -134,7 +134,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             pointerEvents: 'none'
           }} />
 
-          {/* CabeÃ§alho de Capa */}
+          {/* Cabecalho de Capa */}
           <div style={{ zIndex: 3, display: 'flex', justifyContent: 'flex-end', marginLeft: '12px' }}>
             <span style={{
               fontSize: '8px',
@@ -162,7 +162,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             {colors.emblem}
           </div>
 
-          {/* TÃ­tulo e Linha de RodapÃ© */}
+          {/* Titulo e Linha de Rodape */}
           <div style={{ zIndex: 3, textAlign: 'center', paddingLeft: '12px' }}>
             <div style={{
               width: '30px',
@@ -270,11 +270,11 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           zIndex: 5,
           letterSpacing: '0.5px'
         }}>
-          âœ¨ NOVO
+          NOVO
         </div>
       )}
 
-      {/* OVERLAY DE CADEADO PARA USUÃRIO BÃSICO */}
+      {/* OVERLAY DE CADEADO PARA USUARIO BASICO */}
       {isBasico && (
         <div style={{
           position: 'absolute',
@@ -287,7 +287,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           justifyContent: 'center',
           zIndex: 5
         }}>
-          <span style={{ fontSize: '38px', marginBottom: '8px', filter: 'drop-shadow(0 0 10px rgba(255,179,0,0.5))' }}>ðŸ”’</span>
+          <span style={{ fontSize: '38px', marginBottom: '8px' }}>{'\uD83D\uDD12'}</span>
           <span style={{
             fontSize: '10px',
             fontWeight: 'bold',
@@ -298,7 +298,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             border: '1px solid #ffb300',
             letterSpacing: '0.5px'
           }}>
-            EXCLUSIVO MÃ‰DIO/PREMIUM
+            EXCLUSIVO MEDIO/PREMIUM
           </span>
         </div>
       )}
@@ -315,11 +315,11 @@ function DocumentosPage() {
   const [fonteAtiva, setFonteAtiva] = useState('Todos');
   const [fontes, setFontes] = useState(['Todos']);
   const [carregando, setCarregando] = useState(true);
-  const [viewMode, setViewMode] = useState('shelves'); // 'shelves' para prateleiras Netflix, 'grid' para grade classica
+  const [viewMode, setViewMode] = useState('shelves');
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
 
-  // FunÃ§Ã£o para gerar cor HSL Ãºnica e consistente baseada no nome do preparatÃ³rio
+  // Funcao para gerar cor HSL unica e consistente baseada no nome do preparatorio
   const getCourseColor = (name) => {
     if (!name || name === 'Avulso') return { text: '#AAA', bg: 'rgba(255,255,255,0.05)', border: '1px solid #333' };
     let hash = 0;
@@ -337,12 +337,11 @@ function DocumentosPage() {
   useEffect(() => {
     async function carregarDados() {
       try {
-        // 1. Carregar documentos do Supabase
         const { data } = await supabase.from('documentos').select('*').order('created_at', { ascending: false });
         const docs = data || [];
         setDocumentos(docs);
 
-        // Extrair dinamicamente a lista de origens/preparatÃ³rios existentes nos documentos
+        // Extrair dinamicamente a lista de origens/preparatorios existentes nos documentos
         const mappedFontes = docs.map(doc => {
           let fonte = 'Avulso';
           if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
@@ -353,8 +352,6 @@ function DocumentosPage() {
         });
         const uniqueFontes = ['Todos', ...new Set(mappedFontes)];
         setFontes(uniqueFontes);
-
-        // Plano e admin vÃªm do contexto global â€” sem re-fetch aqui
       } catch (err) {
         console.error("Erro ao carregar dados da Central de Documentos:", err);
       } finally {
@@ -364,7 +361,7 @@ function DocumentosPage() {
     carregarDados();
   }, []);
 
-  // Mapeia e filtra os documentos com base nas seleÃ§Ãµes e pesquisa
+  // Mapeia e filtra os documentos com base nas selecoes e pesquisa
   const documentosMapeados = documentos.map(doc => {
     let fonte = 'Avulso';
     let tituloLimpo = doc.titulo;
@@ -380,20 +377,18 @@ function DocumentosPage() {
 
   const documentosFiltrados = documentosMapeados.filter(doc => {
     const matchesSearch = doc.tituloLimpo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          doc.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          doc.disciplina?.toLowerCase().includes(searchTerm.toLowerCase());
+                          (doc.descricao || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (doc.disciplina || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategoria = categoriaAtiva === 'Todos' || doc.categoria === categoriaAtiva;
     const matchesFonte = fonteAtiva === 'Todos' || doc.fonte === fonteAtiva;
     return matchesSearch && matchesCategoria && matchesFonte;
   });
 
-  const countByCategory = (cat) => {
-    return documentosMapeados.filter(d => d.categoria === cat).length;
-  };
+  const countByCategory = (cat) => documentosMapeados.filter(d => d.categoria === cat).length;
 
   const isBasico = planoUsuario === 'basico';
 
-  // ===== LÃ“GICA DE AGRUPAMENTO: PreparatÃ³rio > Disciplina =====
+  // ===== LOGICA DE AGRUPAMENTO: Preparatorio > Disciplina =====
   // Monta estrutura: { [fonte]: { [disciplina]: [docs] } }
   const buildGroupedShelves = (docs) => {
     const groups = {};
@@ -438,7 +433,7 @@ function DocumentosPage() {
           <span style={styles.cardBadge}>{doc.categoria}</span>
           {!isBasico && doc.disciplina && (
             <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
-              ðŸ“‚ {doc.disciplina}
+              {doc.disciplina}
             </span>
           )}
         </div>
@@ -446,11 +441,11 @@ function DocumentosPage() {
 
       {isBasico ? (
         <div style={styles.downloadBtnLocked}>
-          ðŸ”’ Exclusivo MÃ©dio / Premium
+          Exclusivo Medio / Premium
         </div>
       ) : (
         <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
-          Visualizar / Baixar ðŸ“¥
+          Visualizar / Baixar
         </a>
       )}
     </div>
@@ -462,29 +457,18 @@ function DocumentosPage() {
 
   return (
     <div style={styles.container}>
-      {/* Estilos CSS Injetados para micro-animacoes e custom scrollbars */}
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.15);
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #E50914;
-        }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #E50914; }
         .hover-card-premium {
           transition: transform 0.25s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.25s ease, border-color 0.25s ease !important;
         }
         .hover-card-premium:hover {
           transform: translateY(-6px);
-          box-shadow: 0 15px 35px rgba(229, 9, 20, 0.16) !important;
-          border-color: rgba(229, 9, 20, 0.35) !important;
+          box-shadow: 0 15px 35px rgba(229,9,20,0.16) !important;
+          border-color: rgba(229,9,20,0.35) !important;
         }
       `}</style>
 
@@ -498,7 +482,7 @@ function DocumentosPage() {
             </div>
           </div>
           <nav style={styles.nav}>
-            <button style={styles.navButton} onClick={() => navigate('/')}>InÃ­cio</button>
+            <button style={styles.navButton} onClick={() => navigate('/')}>Inicio</button>
             {isAdmin && (
               <button onClick={() => navigate('/admin')} style={{ background: 'none', border: '1px solid #E50914', color: '#E50914', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', transition: 'background 0.3s' }}>
                 Painel Admin
@@ -509,35 +493,34 @@ function DocumentosPage() {
       </header>
 
       <main style={styles.main}>
-        {/* Dashboard Banner Superior (Netflix Hero Style) */}
+        {/* Dashboard Banner Superior */}
         <div style={styles.heroDashboard}>
           <div style={styles.heroGlow} />
           <div style={{ position: 'relative', zIndex: 2 }}>
-            <span style={styles.heroCategoryBadge}>ÃREA DE APOIO DO ALUNO</span>
+            <span style={styles.heroCategoryBadge}>AREA DE APOIO DO ALUNO</span>
             <h1 style={styles.heroTitle}>Biblioteca de Materiais</h1>
-            <p style={styles.heroSubtitle}>Os melhores simulados, apostilas e editais em um sÃ³ lugar. Focado na sua aprovaÃ§Ã£o.</p>
+            <p style={styles.heroSubtitle}>Os melhores simulados, apostilas e editais em um so lugar. Focado na sua aprovacao.</p>
             
-            {/* EstatÃ­sticas RÃ¡pidas */}
             <div style={styles.statsContainer}>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>ðŸ“</span>
+                <span style={styles.statIcon}>[S]</span>
                 <span style={styles.statValue}>{countByCategory('Simulado')}</span>
                 <span style={styles.statLabel}>Simulados</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>ðŸ“š</span>
+                <span style={styles.statIcon}>[A]</span>
                 <span style={styles.statValue}>{countByCategory('Apostila')}</span>
                 <span style={styles.statLabel}>Apostilas</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>âš–ï¸</span>
+                <span style={styles.statIcon}>[E]</span>
                 <span style={styles.statValue}>{countByCategory('Edital')}</span>
                 <span style={styles.statLabel}>Editais</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>ðŸ“Ž</span>
+                <span style={styles.statIcon}>[+]</span>
                 <span style={styles.statValue}>{countByCategory('Outros')}</span>
-                <span style={styles.statLabel}>Recursos</span>
+                <span style={styles.statLabel}>Outros</span>
               </div>
             </div>
           </div>
@@ -546,7 +529,6 @@ function DocumentosPage() {
         {/* Painel de Busca, Filtros e Alternador */}
         <div style={styles.searchSection}>
           <div style={styles.searchAndToggleRow}>
-            {/* Busca */}
             <div style={styles.searchBarWrapper}>
               <input 
                 type="text" 
@@ -555,10 +537,9 @@ function DocumentosPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <span style={styles.searchIcon}>ðŸ”</span>
+              <span style={styles.searchIcon}>&#128269;</span>
             </div>
 
-            {/* Alternador de Layout */}
             <div style={styles.toggleWrapper}>
               <button 
                 onClick={() => setViewMode('shelves')} 
@@ -569,7 +550,7 @@ function DocumentosPage() {
                   borderColor: viewMode === 'shelves' ? '#E50914' : '#333'
                 }}
               >
-                ðŸ¿ Prateleiras
+                Prateleiras
               </button>
               <button 
                 onClick={() => setViewMode('grid')} 
@@ -580,14 +561,14 @@ function DocumentosPage() {
                   borderColor: viewMode === 'grid' ? '#E50914' : '#333'
                 }}
               >
-                ðŸŽ´ Grade
+                Grade
               </button>
             </div>
           </div>
 
           {/* Filtro 1: Categoria */}
           <div style={{ marginBottom: '15px' }}>
-            <span style={styles.filterLabel}>ðŸ“š CATEGORIA:</span>
+            <span style={styles.filterLabel}>CATEGORIA:</span>
             <div style={styles.filterBar}>
               {categorias.map(cat => (
                 <button 
@@ -605,10 +586,10 @@ function DocumentosPage() {
             </div>
           </div>
 
-          {/* Filtro 2: PreparatÃ³rio/Fonte DinÃ¢mica */}
+          {/* Filtro 2: Preparatorio/Fonte Dinamica */}
           {fontes.length > 1 && (
             <div>
-              <span style={styles.filterLabel}>ðŸ·ï¸ FILTRAR POR PREPARATÃ“RIO:</span>
+              <span style={styles.filterLabel}>FILTRAR POR PREPARATORIO:</span>
               <div style={styles.filterBar}>
                 {fontes.map(f => (
                   <button 
@@ -628,7 +609,7 @@ function DocumentosPage() {
           )}
         </div>
 
-        {/* MODO PRATELEIRAS â€” Agrupado por PreparatÃ³rio > Disciplina */}
+        {/* MODO PRATELEIRAS — Agrupado por Preparatorio > Disciplina */}
         {viewMode === 'shelves' ? (() => {
           const grouped = buildGroupedShelves(documentosFiltrados);
           const fonteKeys = Object.keys(grouped);
@@ -647,7 +628,7 @@ function DocumentosPage() {
 
                 return (
                   <div key={fonte} style={styles.prepContainer}>
-                    {/* CabeÃ§alho do PreparatÃ³rio */}
+                    {/* Cabecalho do Preparatorio */}
                     <div style={styles.prepHeader}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
@@ -657,7 +638,7 @@ function DocumentosPage() {
                           backgroundColor: fonte !== 'Avulso' ? sourceColor.text : '#555'
                         }} />
                         <h2 style={{ ...styles.prepTitle, color: fonte !== 'Avulso' ? sourceColor.text : '#AAA' }}>
-                          {fonte !== 'Avulso' ? 'ðŸŽ“ ' : 'ðŸ“‚ '}{fonte}
+                          {fonte}
                         </h2>
                       </div>
                       <span style={styles.shelfCounter}>{totalDocs} {totalDocs === 1 ? 'material' : 'materiais'}</span>
@@ -669,11 +650,11 @@ function DocumentosPage() {
                         const docsDisc = disciplinaMap[disciplina];
                         return (
                           <div key={disciplina} style={styles.discContainer}>
-                            {/* CabeÃ§alho da Disciplina */}
+                            {/* Cabecalho da Disciplina — so exibe se tiver mais de uma ou se nao for "Geral" */}
                             {(disciplinaKeys.length > 1 || disciplina !== 'Geral') && (
                               <div style={styles.discHeader}>
                                 <span style={styles.discTitle}>
-                                  ðŸ“‚ {disciplina}
+                                  {disciplina}
                                 </span>
                                 <span style={styles.shelfCounter}>{docsDisc.length} {docsDisc.length === 1 ? 'arquivo' : 'arquivos'}</span>
                               </div>
@@ -693,7 +674,7 @@ function DocumentosPage() {
             </div>
           );
         })() : (
-          /* MODO GRADE CLÃSSICA */
+          /* MODO GRADE CLASSICA */
           <div style={styles.grid}>
             {documentosFiltrados.map(doc => (
               <div 
@@ -733,7 +714,7 @@ function DocumentosPage() {
                     )}
                     {!isBasico && doc.disciplina && (
                       <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
-                        ðŸ“‚ {doc.disciplina}
+                        {doc.disciplina}
                       </span>
                     )}
                   </div>
@@ -741,11 +722,11 @@ function DocumentosPage() {
 
                 {isBasico ? (
                   <div style={styles.downloadBtnLocked}>
-                    ðŸ”’ Exclusivo MÃ©dio / Premium
+                    Exclusivo Medio / Premium
                   </div>
                 ) : (
                   <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
-                    Visualizar / Baixar ðŸ“¥
+                    Visualizar / Baixar
                   </a>
                 )}
               </div>
@@ -772,7 +753,6 @@ const styles = {
   navButton: { background: 'none', border: 'none', color: '#AAA', cursor: 'pointer', fontSize: '14px', transition: 'color 0.2s' },
   main: { maxWidth: '1300px', margin: '0 auto', padding: '40px 20px 80px' },
   
-  // Dashboard Banner Style
   heroDashboard: { 
     position: 'relative', 
     backgroundColor: '#0F0F12', 
@@ -795,7 +775,6 @@ const styles = {
   heroTitle: { fontSize: '32px', fontWeight: '850', color: '#FFF', margin: '0 0 10px' },
   heroSubtitle: { color: '#94a3b8', fontSize: '14px', margin: '0 0 25px', maxWidth: '600px', lineHeight: '1.6' },
   
-  // Stats Container
   statsContainer: { display: 'flex', gap: '15px', flexWrap: 'wrap' },
   statItem: {
     display: 'flex',
@@ -810,7 +789,6 @@ const styles = {
   statValue: { fontSize: '18px', fontWeight: 'bold', color: '#FFF' },
   statLabel: { fontSize: '12px', color: '#888' },
 
-  // Search Section
   searchSection: { textAlign: 'center', marginBottom: '45px' },
   searchAndToggleRow: {
     display: 'flex',
@@ -825,7 +803,6 @@ const styles = {
   searchInput: { width: '100%', padding: '14px 20px 14px 50px', backgroundColor: '#111', border: '1px solid #222', borderRadius: '30px', color: '#FFF', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' },
   searchIcon: { position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: '#666', fontSize: '16px' },
   
-  // Toggle Switch
   toggleWrapper: {
     display: 'flex',
     backgroundColor: '#111',
@@ -847,13 +824,8 @@ const styles = {
   filterBar: { display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' },
   filterTab: { padding: '7px 18px', borderRadius: '20px', border: '1px solid #222', color: '#FFF', cursor: 'pointer', transition: 'all 0.2s', fontSize: '12px', fontWeight: '500' },
   
-  // Grid Layout
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '30px' },
   
-  // Shelf Layout (Netflix Rows)
-  shelfContainer: { display: 'flex', flexDirection: 'column', gap: '15px', borderBottom: '1px solid #141416', paddingBottom: '15px' },
-  shelfHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 4px' },
-  shelfTitle: { fontSize: '20px', fontWeight: '800', color: '#FFF', margin: 0, letterSpacing: '0.5px' },
   shelfCounter: { fontSize: '12px', color: '#555', fontWeight: '500' },
   shelfRow: { 
     display: 'flex', 
@@ -865,7 +837,6 @@ const styles = {
     scrollBehavior: 'smooth'
   },
 
-  // Card Structure
   card: { backgroundColor: '#111', borderRadius: '16px', border: '1px solid #1c1c1f', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.4)', boxSizing: 'border-box' },
   cardInfo: { flex: 1, padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' },
   cardTitle: { fontSize: '15px', fontWeight: 'bold', margin: 0, color: '#FFF', lineHeight: '1.4' },
