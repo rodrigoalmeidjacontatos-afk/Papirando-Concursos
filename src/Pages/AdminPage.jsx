@@ -96,7 +96,7 @@ function AdminPage() {
 
   // ========== DOCUMENTOS ==========
   const [documentos, setDocumentos] = useState([]);
-  const [novoDocumento, setNovoDocumento] = useState({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
+  const [novoDocumento, setNovoDocumento] = useState({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso', disciplina: '' });
   const [editandoDocumento, setEditandoDocumento] = useState(null);
 
   // ========== CONFIGURAÇÃO DE ABAS ==========
@@ -3528,12 +3528,36 @@ function AdminPage() {
                       <option value="Edital">Edital</option>
                       <option value="Outros">Outros</option>
                     </select>
-                    <select style={{...styles.select, flex: 1}} value={novoDocumento.fonte || 'Avulso'} onChange={e => setNovoDocumento({...novoDocumento, fonte: e.target.value})}>
+                    <select style={{...styles.select, flex: 1}} value={novoDocumento.fonte || 'Avulso'} onChange={e => setNovoDocumento({...novoDocumento, fonte: e.target.value, disciplina: ''})}>
                       <option value="Avulso">Avulso (Independente)</option>
                       {preparatorios.map(p => (
                         <option key={p.id} value={p.nome}>{p.nome}</option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Select de Disciplina — aparece apenas quando um preparatório for selecionado */}
+                  {novoDocumento.fonte && novoDocumento.fonte !== 'Avulso' && (() => {
+                    const prepSelecionado = preparatorios.find(p => p.nome === novoDocumento.fonte);
+                    const disciplinasDoPrep = prepSelecionado
+                      ? disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepSelecionado.id)
+                      : [];
+                    if (disciplinasDoPrep.length === 0) return null;
+                    return (
+                      <select
+                        style={{...styles.select, width: '100%'}}
+                        value={novoDocumento.disciplina || ''}
+                        onChange={e => setNovoDocumento({...novoDocumento, disciplina: e.target.value})}
+                      >
+                        <option value="">📂 Selecionar Disciplina (opcional)</option>
+                        {disciplinasDoPrep.map(d => (
+                          <option key={d.id} value={d.nome}>{d.icone ? `${d.icone} ` : ''}{d.nome}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+
+                  <div style={{display: 'flex', gap: '10px'}}>
                     <div style={{flex: 2, display: 'flex', gap: '8px'}}>
                       <input style={{...styles.input, flex: 1}} placeholder="URL ou Upload ->" value={novoDocumento.url} onChange={e => setNovoDocumento({...novoDocumento, url: e.target.value})} />
                       <label style={{...styles.addButton, padding: '10px 14px', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'flex', alignItems: 'center', backgroundColor: '#4CAF50'}}>
@@ -3576,7 +3600,8 @@ function AdminPage() {
                       titulo: `${prefixo}${novoDocumento.titulo}`,
                       descricao: novoDocumento.descricao,
                       categoria: novoDocumento.categoria,
-                      url: novoDocumento.url
+                      url: novoDocumento.url,
+                      disciplina: novoDocumento.disciplina || null
                     };
 
                     const { error } = await supabase.from('documentos').insert([documentoComPrefixo]);
@@ -3607,7 +3632,7 @@ function AdminPage() {
                         console.warn('Erro ao atualizar preparatório vinculado ao documento:', e);
                       }
 
-                      setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso' });
+                      setNovoDocumento({ titulo: '', descricao: '', categoria: 'Simulado', url: '', fonte: 'Avulso', disciplina: '' });
                       alert('✅ Documento adicionado à Central! Os alunos foram notificados no sino 🔔');
                     }
                   }}>
@@ -3637,19 +3662,34 @@ function AdminPage() {
                             <option value="Edital">Edital</option>
                             <option value="Outros">Outros</option>
                           </select>
-                          <select style={styles.select} value={editandoDocumento.fonte || 'Avulso'} onChange={e => setEditandoDocumento({...editandoDocumento, fonte: e.target.value})}>
+                          <select style={styles.select} value={editandoDocumento.fonte || 'Avulso'} onChange={e => setEditandoDocumento({...editandoDocumento, fonte: e.target.value, disciplina: ''})}>
                             <option value="Avulso">Avulso</option>
                             {preparatorios.map(p => (
                               <option key={p.id} value={p.nome}>{p.nome}</option>
                             ))}
                           </select>
+                          {/* Select de Disciplina no modo edição */}
+                          {editandoDocumento.fonte && editandoDocumento.fonte !== 'Avulso' && (() => {
+                            const prepSel = preparatorios.find(p => p.nome === editandoDocumento.fonte);
+                            const discsEdit = prepSel ? disciplinas.filter(d => (d.preparatorioId || d.preparatorio_id) === prepSel.id) : [];
+                            if (discsEdit.length === 0) return null;
+                            return (
+                              <select style={styles.select} value={editandoDocumento.disciplina || ''} onChange={e => setEditandoDocumento({...editandoDocumento, disciplina: e.target.value})}>
+                                <option value="">📂 Disciplina (opcional)</option>
+                                {discsEdit.map(d => (
+                                  <option key={d.id} value={d.nome}>{d.icone ? `${d.icone} ` : ''}{d.nome}</option>
+                                ))}
+                              </select>
+                            );
+                          })()}
                           <button style={styles.saveButtonSmall} onClick={async () => {
                              const prefixo = editandoDocumento.fonte && editandoDocumento.fonte !== 'Avulso' ? `[${editandoDocumento.fonte}] ` : '';
                              const docAtualizado = {
                                titulo: `${prefixo}${editandoDocumento.titulo_limpo}`,
                                descricao: editandoDocumento.descricao,
                                categoria: editandoDocumento.categoria,
-                               url: editandoDocumento.url
+                               url: editandoDocumento.url,
+                               disciplina: editandoDocumento.disciplina || null
                              };
                              const { error } = await supabase.from('documentos').update(docAtualizado).eq('id', doc.id);
                              if(!error) {
@@ -3679,7 +3719,7 @@ function AdminPage() {
                                   {exibicaoFonte}
                                 </span>
                               </div>
-                              <div style={{fontSize: '12px', color: '#888'}}>{doc.categoria} • {doc.descricao}</div>
+                              <div style={{fontSize: '12px', color: '#888'}}>{doc.categoria}{doc.disciplina ? ` • 📂 ${doc.disciplina}` : ''} • {doc.descricao}</div>
                             </div>
                           </div>
                           <div style={styles.actionButtons}>

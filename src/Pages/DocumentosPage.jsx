@@ -11,7 +11,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
   let colors = {
     bg: 'linear-gradient(135deg, #1b263b, #0d1b2a)',
     border: '#38bdf8',
-    emblem: '📝',
+    emblem: 'ðŸ“',
     badge: 'SIMULADO',
     badgeBg: '#0284c7'
   };
@@ -20,7 +20,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #3f1516, #1c0a0b)',
       border: '#ef4444',
-      emblem: '📚',
+      emblem: 'ðŸ“š',
       badge: 'APOSTILA',
       badgeBg: '#b91c1c'
     };
@@ -28,7 +28,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #27272a, #09090b)',
       border: '#a1a1aa',
-      emblem: '⚖️',
+      emblem: 'âš–ï¸',
       badge: 'EDITAL',
       badgeBg: '#52525b'
     };
@@ -36,7 +36,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
     colors = {
       bg: 'linear-gradient(135deg, #1e1b4b, #090514)',
       border: '#a855f7',
-      emblem: '📎',
+      emblem: 'ðŸ“Ž',
       badge: 'MATERIAL',
       badgeBg: '#7e22ce'
     };
@@ -44,7 +44,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
 
   const sourceLabel = source || 'Avulso';
   
-  // Função para gerar cor HSL única e consistente baseada no nome do preparatório
+  // FunÃ§Ã£o para gerar cor HSL Ãºnica e consistente baseada no nome do preparatÃ³rio
   const getCourseColor = (name) => {
     if (!name || name === 'Avulso') return { text: '#94a3b8' };
     let hash = 0;
@@ -78,7 +78,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
       }} />
 
       {isPdf ? (
-        /* Container absoluto estrito para forçar o limite de altura no iOS/Safari de Tablets e Smartphones */
+        /* Container absoluto estrito para forÃ§ar o limite de altura no iOS/Safari de Tablets e Smartphones */
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -115,7 +115,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           boxSizing: 'border-box',
           position: 'relative'
         }}>
-          {/* Textura de Linhas Verticais de Livro (Encadernação) */}
+          {/* Textura de Linhas Verticais de Livro (EncadernaÃ§Ã£o) */}
           <div style={{
             position: 'absolute',
             left: 0, top: 0, bottom: 0,
@@ -134,7 +134,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             pointerEvents: 'none'
           }} />
 
-          {/* Cabeçalho de Capa */}
+          {/* CabeÃ§alho de Capa */}
           <div style={{ zIndex: 3, display: 'flex', justifyContent: 'flex-end', marginLeft: '12px' }}>
             <span style={{
               fontSize: '8px',
@@ -162,7 +162,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             {colors.emblem}
           </div>
 
-          {/* Título e Linha de Rodapé */}
+          {/* TÃ­tulo e Linha de RodapÃ© */}
           <div style={{ zIndex: 3, textAlign: 'center', paddingLeft: '12px' }}>
             <div style={{
               width: '30px',
@@ -270,11 +270,11 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           zIndex: 5,
           letterSpacing: '0.5px'
         }}>
-          ✨ NOVO
+          âœ¨ NOVO
         </div>
       )}
 
-      {/* OVERLAY DE CADEADO PARA USUÁRIO BÁSICO */}
+      {/* OVERLAY DE CADEADO PARA USUÃRIO BÃSICO */}
       {isBasico && (
         <div style={{
           position: 'absolute',
@@ -287,7 +287,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
           justifyContent: 'center',
           zIndex: 5
         }}>
-          <span style={{ fontSize: '38px', marginBottom: '8px', filter: 'drop-shadow(0 0 10px rgba(255,179,0,0.5))' }}>🔒</span>
+          <span style={{ fontSize: '38px', marginBottom: '8px', filter: 'drop-shadow(0 0 10px rgba(255,179,0,0.5))' }}>ðŸ”’</span>
           <span style={{
             fontSize: '10px',
             fontWeight: 'bold',
@@ -298,7 +298,7 @@ function PdfCover({ category, title, source, isBasico, url, hideSource, isNovo }
             border: '1px solid #ffb300',
             letterSpacing: '0.5px'
           }}>
-            EXCLUSIVO MÉDIO/PREMIUM
+            EXCLUSIVO MÃ‰DIO/PREMIUM
           </span>
         </div>
       )}
@@ -318,9 +318,8 @@ function DocumentosPage() {
   const [viewMode, setViewMode] = useState('shelves'); // 'shelves' para prateleiras Netflix, 'grid' para grade classica
 
   const categorias = ['Todos', 'Simulado', 'Apostila', 'Edital', 'Outros'];
-  const shelfCategories = ['Simulado', 'Apostila', 'Edital', 'Outros'];
 
-  // Função para gerar cor HSL única e consistente baseada no nome do preparatório
+  // FunÃ§Ã£o para gerar cor HSL Ãºnica e consistente baseada no nome do preparatÃ³rio
   const getCourseColor = (name) => {
     if (!name || name === 'Avulso') return { text: '#AAA', bg: 'rgba(255,255,255,0.05)', border: '1px solid #333' };
     let hash = 0;
@@ -343,7 +342,7 @@ function DocumentosPage() {
         const docs = data || [];
         setDocumentos(docs);
 
-        // Extrair dinamicamente a lista de origens/preparatórios existentes nos documentos
+        // Extrair dinamicamente a lista de origens/preparatÃ³rios existentes nos documentos
         const mappedFontes = docs.map(doc => {
           let fonte = 'Avulso';
           if (doc.titulo.startsWith('[') && doc.titulo.includes('] ')) {
@@ -355,7 +354,7 @@ function DocumentosPage() {
         const uniqueFontes = ['Todos', ...new Set(mappedFontes)];
         setFontes(uniqueFontes);
 
-        // Plano e admin vêm do contexto global — sem re-fetch aqui
+        // Plano e admin vÃªm do contexto global â€” sem re-fetch aqui
       } catch (err) {
         console.error("Erro ao carregar dados da Central de Documentos:", err);
       } finally {
@@ -365,7 +364,7 @@ function DocumentosPage() {
     carregarDados();
   }, []);
 
-  // Mapeia e filtra os documentos com base nas seleções e pesquisa
+  // Mapeia e filtra os documentos com base nas seleÃ§Ãµes e pesquisa
   const documentosMapeados = documentos.map(doc => {
     let fonte = 'Avulso';
     let tituloLimpo = doc.titulo;
@@ -381,7 +380,8 @@ function DocumentosPage() {
 
   const documentosFiltrados = documentosMapeados.filter(doc => {
     const matchesSearch = doc.tituloLimpo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          doc.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
+                          doc.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          doc.disciplina?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategoria = categoriaAtiva === 'Todos' || doc.categoria === categoriaAtiva;
     const matchesFonte = fonteAtiva === 'Todos' || doc.fonte === fonteAtiva;
     return matchesSearch && matchesCategoria && matchesFonte;
@@ -392,6 +392,69 @@ function DocumentosPage() {
   };
 
   const isBasico = planoUsuario === 'basico';
+
+  // ===== LÃ“GICA DE AGRUPAMENTO: PreparatÃ³rio > Disciplina =====
+  // Monta estrutura: { [fonte]: { [disciplina]: [docs] } }
+  const buildGroupedShelves = (docs) => {
+    const groups = {};
+    docs.forEach(doc => {
+      const fonte = doc.fonte || 'Avulso';
+      const disciplina = doc.disciplina || 'Geral';
+      if (!groups[fonte]) groups[fonte] = {};
+      if (!groups[fonte][disciplina]) groups[fonte][disciplina] = [];
+      groups[fonte][disciplina].push(doc);
+    });
+    return groups;
+  };
+
+  // Renderiza um card de documento
+  const renderCard = (doc) => (
+    <div
+      key={doc.id}
+      style={{
+        ...styles.card,
+        minWidth: '260px',
+        maxWidth: '260px',
+        opacity: isBasico ? 0.8 : 1,
+        transform: isBasico ? 'none' : undefined,
+        cursor: isBasico ? 'not-allowed' : 'default'
+      }}
+      className="hover-card-premium"
+    >
+      <PdfCover
+        category={doc.categoria}
+        title={doc.tituloLimpo}
+        source={doc.fonte}
+        isBasico={isBasico}
+        url={doc.url}
+        hideSource={isBasico}
+        isNovo={doc.created_at && (Date.now() - new Date(doc.created_at).getTime()) < 48 * 60 * 60 * 1000}
+      />
+
+      <div style={styles.cardInfo}>
+        <h3 style={styles.cardTitle}>{doc.tituloLimpo}</h3>
+        <p style={styles.cardDesc}>{doc.descricao}</p>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: 'auto' }}>
+          <span style={styles.cardBadge}>{doc.categoria}</span>
+          {!isBasico && doc.disciplina && (
+            <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
+              ðŸ“‚ {doc.disciplina}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {isBasico ? (
+        <div style={styles.downloadBtnLocked}>
+          ðŸ”’ Exclusivo MÃ©dio / Premium
+        </div>
+      ) : (
+        <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
+          Visualizar / Baixar ðŸ“¥
+        </a>
+      )}
+    </div>
+  );
 
   if (authLoading || carregando) {
     return <LoadingScreen text="Carregando biblioteca de materiais..." />;
@@ -435,7 +498,7 @@ function DocumentosPage() {
             </div>
           </div>
           <nav style={styles.nav}>
-            <button style={styles.navButton} onClick={() => navigate('/')}>Início</button>
+            <button style={styles.navButton} onClick={() => navigate('/')}>InÃ­cio</button>
             {isAdmin && (
               <button onClick={() => navigate('/admin')} style={{ background: 'none', border: '1px solid #E50914', color: '#E50914', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', transition: 'background 0.3s' }}>
                 Painel Admin
@@ -450,29 +513,29 @@ function DocumentosPage() {
         <div style={styles.heroDashboard}>
           <div style={styles.heroGlow} />
           <div style={{ position: 'relative', zIndex: 2 }}>
-            <span style={styles.heroCategoryBadge}>ÁREA DE APOIO DO ALUNO</span>
+            <span style={styles.heroCategoryBadge}>ÃREA DE APOIO DO ALUNO</span>
             <h1 style={styles.heroTitle}>Biblioteca de Materiais</h1>
-            <p style={styles.heroSubtitle}>Os melhores simulados, apostilas e editais em um só lugar. Focado na sua aprovação.</p>
+            <p style={styles.heroSubtitle}>Os melhores simulados, apostilas e editais em um sÃ³ lugar. Focado na sua aprovaÃ§Ã£o.</p>
             
-            {/* Estatísticas Rápidas */}
+            {/* EstatÃ­sticas RÃ¡pidas */}
             <div style={styles.statsContainer}>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>📝</span>
+                <span style={styles.statIcon}>ðŸ“</span>
                 <span style={styles.statValue}>{countByCategory('Simulado')}</span>
                 <span style={styles.statLabel}>Simulados</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>📚</span>
+                <span style={styles.statIcon}>ðŸ“š</span>
                 <span style={styles.statValue}>{countByCategory('Apostila')}</span>
                 <span style={styles.statLabel}>Apostilas</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>⚖️</span>
+                <span style={styles.statIcon}>âš–ï¸</span>
                 <span style={styles.statValue}>{countByCategory('Edital')}</span>
                 <span style={styles.statLabel}>Editais</span>
               </div>
               <div style={styles.statItem}>
-                <span style={styles.statIcon}>📎</span>
+                <span style={styles.statIcon}>ðŸ“Ž</span>
                 <span style={styles.statValue}>{countByCategory('Outros')}</span>
                 <span style={styles.statLabel}>Recursos</span>
               </div>
@@ -487,12 +550,12 @@ function DocumentosPage() {
             <div style={styles.searchBarWrapper}>
               <input 
                 type="text" 
-                placeholder="Pesquisar material..." 
+                placeholder="Pesquisar material ou disciplina..." 
                 style={styles.searchInput}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <span style={styles.searchIcon}>🔍</span>
+              <span style={styles.searchIcon}>ðŸ”</span>
             </div>
 
             {/* Alternador de Layout */}
@@ -506,7 +569,7 @@ function DocumentosPage() {
                   borderColor: viewMode === 'shelves' ? '#E50914' : '#333'
                 }}
               >
-                🍿 Prateleiras
+                ðŸ¿ Prateleiras
               </button>
               <button 
                 onClick={() => setViewMode('grid')} 
@@ -517,14 +580,14 @@ function DocumentosPage() {
                   borderColor: viewMode === 'grid' ? '#E50914' : '#333'
                 }}
               >
-                🎴 Grade
+                ðŸŽ´ Grade
               </button>
             </div>
           </div>
 
-          {/* Filtro 1: Categoria (Visível principalmente na visualização em Grade ou para filtrar geral) */}
+          {/* Filtro 1: Categoria */}
           <div style={{ marginBottom: '15px' }}>
-            <span style={styles.filterLabel}>📚 CATEGORIA:</span>
+            <span style={styles.filterLabel}>ðŸ“š CATEGORIA:</span>
             <div style={styles.filterBar}>
               {categorias.map(cat => (
                 <button 
@@ -542,10 +605,10 @@ function DocumentosPage() {
             </div>
           </div>
 
-          {/* Filtro 2: Origem/Fonte Dinâmica */}
+          {/* Filtro 2: PreparatÃ³rio/Fonte DinÃ¢mica */}
           {fontes.length > 1 && (
             <div>
-              <span style={styles.filterLabel}>🏷️ FILTRAR POR PREPARATÓRIO:</span>
+              <span style={styles.filterLabel}>ðŸ·ï¸ FILTRAR POR PREPARATÃ“RIO:</span>
               <div style={styles.filterBar}>
                 {fontes.map(f => (
                   <button 
@@ -565,89 +628,72 @@ function DocumentosPage() {
           )}
         </div>
 
-        {/* MODO PRATELEIRAS NETFLIX */}
-        {viewMode === 'shelves' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '45px' }}>
-            {shelfCategories.map(cat => {
-              // Aplica o filtro de Categoria de prateleira (a menos que o filtro geral esteja ativado em outra categoria)
-              if (categoriaAtiva !== 'Todos' && categoriaAtiva !== cat) return null;
-              
-              const docsDaPrateleira = documentosFiltrados.filter(d => d.categoria === cat);
-              if (docsDaPrateleira.length === 0) return null;
+        {/* MODO PRATELEIRAS â€” Agrupado por PreparatÃ³rio > Disciplina */}
+        {viewMode === 'shelves' ? (() => {
+          const grouped = buildGroupedShelves(documentosFiltrados);
+          const fonteKeys = Object.keys(grouped);
 
-              return (
-                <div key={cat} style={styles.shelfContainer}>
-                  <div style={styles.shelfHeader}>
-                    <h2 style={styles.shelfTitle}>
-                      {cat === 'Simulado' ? '📝' : cat === 'Apostila' ? '📚' : cat === 'Edital' ? '⚖️' : '📎'} {cat}s
-                    </h2>
-                    <span style={styles.shelfCounter}>{docsDaPrateleira.length} {docsDaPrateleira.length === 1 ? 'material' : 'materiais'}</span>
-                  </div>
+          if (fonteKeys.length === 0) {
+            return <p style={styles.empty}>Nenhum material encontrado para os filtros selecionados.</p>;
+          }
 
-                  <div style={styles.shelfRow} className="custom-scrollbar">
-                    {docsDaPrateleira.map(doc => (
-                      <div 
-                        key={doc.id} 
-                        style={{
-                          ...styles.card,
-                          minWidth: '280px',
-                          maxWidth: '280px',
-                          opacity: isBasico ? 0.8 : 1,
-                          transform: isBasico ? 'none' : undefined,
-                          cursor: isBasico ? 'not-allowed' : 'default'
-                        }}
-                        className="hover-card-premium"
-                      >
-                        <PdfCover 
-                          category={doc.categoria} 
-                          title={doc.tituloLimpo} 
-                          source={doc.fonte} 
-                          isBasico={isBasico}
-                          url={doc.url}
-                          hideSource={isBasico}
-                          isNovo={doc.created_at && (Date.now() - new Date(doc.created_at).getTime()) < 48 * 60 * 60 * 1000}
-                        />
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '50px' }}>
+              {fonteKeys.map(fonte => {
+                const disciplinaMap = grouped[fonte];
+                const disciplinaKeys = Object.keys(disciplinaMap);
+                const totalDocs = disciplinaKeys.reduce((acc, d) => acc + disciplinaMap[d].length, 0);
+                const sourceColor = getCourseColor(fonte !== 'Avulso' ? fonte : null);
 
-                        <div style={styles.cardInfo}>
-                          <h3 style={styles.cardTitle}>{doc.tituloLimpo}</h3>
-                          <p style={styles.cardDesc}>{doc.descricao}</p>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: 'auto' }}>
-                            <span style={styles.cardBadge}>{doc.categoria}</span>
-                            {!isBasico && (
-                              <span style={{
-                                ...styles.cardBadge, 
-                                backgroundColor: getCourseColor(doc.fonte).bg,
-                                color: getCourseColor(doc.fonte).text,
-                                border: getCourseColor(doc.fonte).border
-                              }}>
-                                {doc.fonte}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {isBasico ? (
-                          <div style={styles.downloadBtnLocked}>
-                            🔒 Exclusivo Médio / Premium
-                          </div>
-                        ) : (
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
-                            Visualizar / Baixar 📥
-                          </a>
-                        )}
+                return (
+                  <div key={fonte} style={styles.prepContainer}>
+                    {/* CabeÃ§alho do PreparatÃ³rio */}
+                    <div style={styles.prepHeader}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '4px',
+                          height: '28px',
+                          borderRadius: '2px',
+                          backgroundColor: fonte !== 'Avulso' ? sourceColor.text : '#555'
+                        }} />
+                        <h2 style={{ ...styles.prepTitle, color: fonte !== 'Avulso' ? sourceColor.text : '#AAA' }}>
+                          {fonte !== 'Avulso' ? 'ðŸŽ“ ' : 'ðŸ“‚ '}{fonte}
+                        </h2>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                      <span style={styles.shelfCounter}>{totalDocs} {totalDocs === 1 ? 'material' : 'materiais'}</span>
+                    </div>
 
-            {documentosFiltrados.length === 0 && (
-              <p style={styles.empty}>Nenhum material encontrado para os filtros selecionados.</p>
-            )}
-          </div>
-        ) : (
-          /* MODO GRADE CLÁSSICA */
+                    {/* Sub-prateleiras por Disciplina */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                      {disciplinaKeys.map(disciplina => {
+                        const docsDisc = disciplinaMap[disciplina];
+                        return (
+                          <div key={disciplina} style={styles.discContainer}>
+                            {/* CabeÃ§alho da Disciplina */}
+                            {(disciplinaKeys.length > 1 || disciplina !== 'Geral') && (
+                              <div style={styles.discHeader}>
+                                <span style={styles.discTitle}>
+                                  ðŸ“‚ {disciplina}
+                                </span>
+                                <span style={styles.shelfCounter}>{docsDisc.length} {docsDisc.length === 1 ? 'arquivo' : 'arquivos'}</span>
+                              </div>
+                            )}
+
+                            {/* Fila horizontal de cards */}
+                            <div style={styles.shelfRow} className="custom-scrollbar">
+                              {docsDisc.map(doc => renderCard(doc))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })() : (
+          /* MODO GRADE CLÃSSICA */
           <div style={styles.grid}>
             {documentosFiltrados.map(doc => (
               <div 
@@ -685,16 +731,21 @@ function DocumentosPage() {
                         {doc.fonte}
                       </span>
                     )}
+                    {!isBasico && doc.disciplina && (
+                      <span style={{ ...styles.cardBadge, backgroundColor: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}>
+                        ðŸ“‚ {doc.disciplina}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {isBasico ? (
                   <div style={styles.downloadBtnLocked}>
-                    🔒 Exclusivo Médio / Premium
+                    ðŸ”’ Exclusivo MÃ©dio / Premium
                   </div>
                 ) : (
                   <a href={doc.url} target="_blank" rel="noopener noreferrer" style={styles.downloadBtn}>
-                    Visualizar / Baixar 📥
+                    Visualizar / Baixar ðŸ“¥
                   </a>
                 )}
               </div>
@@ -822,7 +873,50 @@ const styles = {
   cardBadge: { fontSize: '9px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px', color: '#AAA', textTransform: 'uppercase', border: '1px solid #222', fontWeight: 'bold', display: 'inline-block' },
   downloadBtn: { display: 'block', margin: '0 18px 18px', padding: '12px', backgroundColor: '#E50914', color: '#FFF', textAlign: 'center', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px', transition: 'background 0.2s, transform 0.2s', boxShadow: '0 4px 10px rgba(229,9,20,0.2)' },
   downloadBtnLocked: { margin: '0 18px 18px', padding: '12px', backgroundColor: '#1c1c1c', color: '#555', textAlign: 'center', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', border: '1px solid #282828', userSelect: 'none' },
-  empty: { textAlign: 'center', gridColumn: '1 / -1', padding: '60px', color: '#555', fontSize: '14px' }
+  empty: { textAlign: 'center', gridColumn: '1 / -1', padding: '60px', color: '#555', fontSize: '14px' },
+
+  // Prep + Disciplina Shelves
+  prepContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    padding: '24px',
+    backgroundColor: '#0d0d10',
+    borderRadius: '20px',
+    border: '1px solid #1a1a20',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+  },
+  prepHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: '12px',
+    borderBottom: '1px solid #1e1e26'
+  },
+  prepTitle: {
+    fontSize: '20px',
+    fontWeight: '800',
+    margin: 0,
+    letterSpacing: '0.3px'
+  },
+  discContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  discHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 4px'
+  },
+  discTitle: {
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#6ee7b7',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase'
+  }
 };
 
 export default DocumentosPage;
