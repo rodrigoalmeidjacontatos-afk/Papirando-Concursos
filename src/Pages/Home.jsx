@@ -56,8 +56,7 @@ function Home() {
     documentos: { ativo: true, plano: 'basico' },
     evolucao: { ativo: true, plano: 'basico' },
     questoes: { ativo: true, plano: 'basico' },
-    desempenho_questoes: { ativo: true, plano: 'basico' },
-    caderno_erros: { ativo: true, plano: 'basico' }
+    desempenho_questoes: { ativo: true, plano: 'basico' }
   });
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
@@ -871,7 +870,6 @@ function Home() {
           const showDocumentos = podeVerAba(configAbas.documentos);
           const showQuestoes = podeVerAba(configAbas.questoes);
           const showDesempenhoQuestoes = podeVerAba(configAbas.desempenho_questoes);
-          const showCadernoErros = podeVerAba(configAbas.caderno_erros);
 
           return (
             <div className="tab-container" style={{
@@ -994,28 +992,6 @@ function Home() {
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg> Desempenho em Questões
-            </button>
-          )}
-
-          {showCadernoErros && (
-            <button
-              onClick={() => navigate('/caderno-erros')}
-              style={{
-                background: 'transparent',
-                border: '1px solid #333',
-                color: '#888',
-                padding: '10px 22px',
-                borderRadius: '999px',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.25s'
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> Caderno de Erros
             </button>
           )}
         </div>
