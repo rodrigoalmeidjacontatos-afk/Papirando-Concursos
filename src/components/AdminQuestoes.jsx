@@ -44,8 +44,11 @@ export default function AdminQuestoes() {
   const [selecionados, setSelecionados] = useState(new Set());
   const [excluindoLote, setExcluindoLote] = useState(false);
   const [imagemAux, setImagemAux] = useState('');
-  const fileInputRef = useRef(null);
-  const fileInputAtualizarRef = useRef(null);
+  const [fileInputRef, fileInputAtualizarRef] = [useRef(null), useRef(null)];
+  const [modalMesclarAberto, setModalMesclarAberto] = useState(false);
+  const [disciplinaOrigem, setDisciplinaOrigem] = useState('');
+  const [disciplinaDestino, setDisciplinaDestino] = useState('');
+  const [mesclando, setMesclando] = useState(false);
 
   const [opcoesDisciplina, setOpcoesDisciplina] = useState([]);
   const [opcoesAssunto, setOpcoesAssunto] = useState([]);
@@ -478,6 +481,49 @@ export default function AdminQuestoes() {
     gerarDownloadCSV(`${cabecalho}\n${exemplo}`, "modelo_cebraspe_certo_errado.csv");
   };
 
+  const handleMesclarDisciplinas = async () => {
+    if (!disciplinaOrigem || !disciplinaDestino) {
+      return alert('Selecione a disciplina de origem e a disciplina de destino.');
+    }
+    if (disciplinaOrigem === disciplinaDestino) {
+      return alert('A disciplina de origem e destino não podem ser iguais.');
+    }
+    if (!window.confirm(`Tem certeza que deseja alterar todas as questões de:\n"${disciplinaOrigem}"\n\nPara:\n"${disciplinaDestino}"?`)) {
+      return;
+    }
+
+    setMesclando(true);
+    try {
+      const { data, error } = await supabase
+        .from('questoes')
+        .update({ disciplina: disciplinaDestino })
+        .eq('disciplina', disciplinaOrigem)
+        .select('id');
+
+      if (error) throw error;
+
+      const qtd = data ? data.length : 0;
+      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para "${disciplinaDestino}".`);
+      
+      // Atualiza as opções locais
+      setOpcoesDisciplina(prev => {
+        const next = prev.filter(d => d !== disciplinaOrigem);
+        if (!next.includes(disciplinaDestino)) next.push(disciplinaDestino);
+        return next.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      });
+
+      setDisciplinaOrigem('');
+      setDisciplinaDestino('');
+      setModalMesclarAberto(false);
+      fetchQuestoes(1, buscaAtiva);
+    } catch (err) {
+      console.error('Erro ao mesclar disciplinas:', err);
+      alert('Erro ao mesclar: ' + err.message);
+    } finally {
+      setMesclando(false);
+    }
+  };
+
   const totalPaginas = Math.ceil(total / porPagina);
 
   return (
@@ -515,8 +561,134 @@ export default function AdminQuestoes() {
           <button onClick={() => document.getElementById('csvAtualizar').click()} style={{ backgroundColor: '#FF9800', color: '#FFF', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
             Atualizar Subassuntos (CSV)
           </button>
+          <button 
+            onClick={() => setModalMesclarAberto(true)} 
+            style={{ 
+              backgroundColor: '#9C27B0', 
+              color: '#FFF', 
+              padding: '10px 16px', 
+              border: 'none', 
+              borderRadius: '6px', 
+              cursor: 'pointer', 
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            🔄 Mesclar Disciplinas (Lote)
+          </button>
         </div>
       </div>
+
+      {/* MODAL DE MESCLAR DISCIPLINAS EM LOTE */}
+      {modalMesclarAberto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: '#1E1E24',
+            border: '1px solid #9C27B088',
+            borderRadius: '16px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.9)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: '#FFF', margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🔄 Mesclar / Padronizar Disciplina
+              </h3>
+              <button 
+                onClick={() => setModalMesclarAberto(false)}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '20px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '20px' }}>
+              Todas as questões cadastradas na disciplina de <strong>origem</strong> serão atualizadas de uma vez para o nome da disciplina de <strong>destino</strong>.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  De (Disciplina Antiga / Incorreta):
+                </label>
+                <select
+                  value={disciplinaOrigem}
+                  onChange={e => setDisciplinaOrigem(e.target.value)}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">Selecione a disciplina para alterar...</option>
+                  {opcoesDisciplina.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ color: '#81C784', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  Para (Disciplina Correta / Padronizada):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Direito Administrativo"
+                  value={disciplinaDestino}
+                  onChange={e => setDisciplinaDestino(e.target.value)}
+                  list="lista-sugestoes-destino"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+                <datalist id="lista-sugestoes-destino">
+                  {opcoesDisciplina.map(d => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                onClick={() => setModalMesclarAberto(false)}
+                disabled={mesclando}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #555',
+                  color: '#AAA',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleMesclarDisciplinas}
+                disabled={mesclando || !disciplinaOrigem || !disciplinaDestino}
+                style={{
+                  backgroundColor: '#9C27B0',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 24px',
+                  borderRadius: '6px',
+                  cursor: (mesclando || !disciplinaOrigem || !disciplinaDestino) ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  opacity: (mesclando || !disciplinaOrigem || !disciplinaDestino) ? 0.6 : 1
+                }}
+              >
+                {mesclando ? 'Atualizando Questões...' : 'Confirmar e Mesclar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FORMULÁRIO */}
       <div style={{ backgroundColor: '#1E1E24', padding: '24px', borderRadius: '12px', border: '1px solid #333', marginBottom: '24px' }}>
