@@ -39,7 +39,7 @@ export default function QuestoesPage() {
     orgao: '',
     ano: '',
     dificuldade: '',
-    ocultarResolvidas: true
+    ocultarResolvidas: false
   });
   const [palavraChave, setPalavraChave] = useState(''); // Controlado separadamente - dispara na lupa/Enter
   
@@ -212,7 +212,7 @@ export default function QuestoesPage() {
   };
 
   const clearFiltros = () => {
-    setFiltros({ disciplina: '', assunto: '', subassunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '', ocultarResolvidas: true });
+    setFiltros({ disciplina: '', assunto: '', subassunto: '', banca: '', concurso: '', cargo: '', orgao: '', ano: '', dificuldade: '', ocultarResolvidas: false });
     setPalavraChave('');
     setPaginaAtual(1);
   };

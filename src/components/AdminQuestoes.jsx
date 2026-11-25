@@ -41,6 +41,8 @@ export default function AdminQuestoes() {
 
   const [editandoId, setEditandoId] = useState(null);
   const [idCopiado, setIdCopiado] = useState(null);
+  const [selecionados, setSelecionados] = useState(new Set());
+  const [excluindoLote, setExcluindoLote] = useState(false);
   const [imagemAux, setImagemAux] = useState('');
   const fileInputRef = useRef(null);
   const fileInputAtualizarRef = useRef(null);
@@ -216,9 +218,56 @@ export default function AdminQuestoes() {
     try {
       const { error } = await supabase.from('questoes').delete().eq('id', id);
       if (error) throw error;
+      setSelecionados(prev => { const next = new Set(prev); next.delete(id); return next; });
       fetchQuestoes(pagina, buscaAtiva);
     } catch (e) {
       alert('Erro ao excluir: ' + e.message);
+    }
+  };
+
+  const toggleSelecionado = (id) => {
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelecionarTodos = () => {
+    const idsNaPagina = questoes.map(q => q.id);
+    const todosSelecionados = idsNaPagina.length > 0 && idsNaPagina.every(id => selecionados.has(id));
+    if (todosSelecionados) {
+      setSelecionados(prev => {
+        const next = new Set(prev);
+        idsNaPagina.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelecionados(prev => {
+        const next = new Set(prev);
+        idsNaPagina.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const excluirSelecionados = async () => {
+    if (selecionados.size === 0) return;
+    const qtd = selecionados.size;
+    if (!window.confirm(`Tem certeza que deseja excluir ${qtd} questão(ões) selecionada(s)? Esta ação não pode ser desfeita.`)) return;
+    setExcluindoLote(true);
+    try {
+      const ids = Array.from(selecionados);
+      const { error } = await supabase.from('questoes').delete().in('id', ids);
+      if (error) throw error;
+      alert(`${qtd} questão(ões) excluída(s) com sucesso!`);
+      setSelecionados(new Set());
+      fetchQuestoes(1, buscaAtiva);
+      setPagina(1);
+    } catch (e) {
+      alert('Erro ao excluir em lote: ' + e.message);
+    } finally {
+      setExcluindoLote(false);
     }
   };
 
@@ -568,7 +617,31 @@ export default function AdminQuestoes() {
       {/* LISTAGEM */}
       <div style={{ backgroundColor: '#1E1E24', padding: '24px', borderRadius: '12px', border: '1px solid #333' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <h3 style={{ color: '#FFF', margin: 0 }}>Questões Cadastradas ({total})</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h3 style={{ color: '#FFF', margin: 0 }}>Questões Cadastradas ({total})</h3>
+            {selecionados.size > 0 && (
+              <button
+                onClick={excluirSelecionados}
+                disabled={excluindoLote}
+                style={{
+                  backgroundColor: excluindoLote ? '#666' : '#F44336',
+                  color: '#FFF',
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: excluindoLote ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  animation: 'none'
+                }}
+              >
+                🗑️ {excluindoLote ? 'Excluindo...' : `Excluir Selecionados (${selecionados.size})`}
+              </button>
+            )}
+          </div>
 
           {/* BARRA DE BUSCA */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '480px' }}>
@@ -611,6 +684,15 @@ export default function AdminQuestoes() {
             <table style={{ width: '100%', borderCollapse: 'collapse', color: '#CCC', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #444', textAlign: 'left' }}>
+                  <th style={{ padding: '10px', width: '40px' }}>
+                    <input
+                      type="checkbox"
+                      checked={questoes.length > 0 && questoes.every(q => selecionados.has(q.id))}
+                      onChange={toggleSelecionarTodos}
+                      title="Selecionar/Desmarcar todos desta página"
+                      style={{ width: '18px', height: '18px', accentColor: '#E50914', cursor: 'pointer' }}
+                    />
+                  </th>
                   <th style={{ padding: '10px', whiteSpace: 'nowrap', color: '#888' }}>ID</th>
                   <th style={{ padding: '10px' }}>Banca / Órgão</th>
                   <th style={{ padding: '10px' }}>Disciplina</th>
@@ -621,16 +703,24 @@ export default function AdminQuestoes() {
               </thead>
               <tbody>
                 {questoes.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>Nenhuma questão encontrada.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>Nenhuma questão encontrada.</td></tr>
                 )}
                 {questoes.map(q => {
                   const displayId = `PC-${q.id.substring(0, 6).toUpperCase()}`;
                   const copiado = idCopiado === q.id;
                   return (
-                    <tr key={q.id} style={{ borderBottom: '1px solid #2a2a2a', transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#25252e'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    <tr key={q.id} style={{ borderBottom: '1px solid #2a2a2a', transition: 'background 0.15s', backgroundColor: selecionados.has(q.id) ? '#1a1a2e' : 'transparent' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = selecionados.has(q.id) ? '#22224a' : '#25252e'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = selecionados.has(q.id) ? '#1a1a2e' : 'transparent'}
                     >
+                      <td style={{ padding: '10px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selecionados.has(q.id)}
+                          onChange={() => toggleSelecionado(q.id)}
+                          style={{ width: '18px', height: '18px', accentColor: '#E50914', cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={{ padding: '10px' }}>
                         <div
                           title={`ID completo: ${q.id}\nClique para copiar`}
