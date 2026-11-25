@@ -12,6 +12,7 @@ import PlanosPage from './Pages/PlanosPage';
 import DocumentosPage from './Pages/DocumentosPage';
 import QuestoesPage from './Pages/QuestoesPage';
 import DesempenhoQuestoesPage from './Pages/DesempenhoQuestoesPage';
+import CadernoErrosPage from './Pages/CadernoErrosPage';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -67,6 +68,7 @@ function App() {
               <Route path="/documentos" element={<DocumentosPage />} />
               <Route path="/questoes" element={<QuestoesPage />} />
               <Route path="/desempenho-questoes" element={<DesempenhoQuestoesPage />} />
+              <Route path="/caderno-erros" element={<CadernoErrosPage />} />
               {/* Rota catch-all para evitar telas pretas/em branco em links inválidos */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

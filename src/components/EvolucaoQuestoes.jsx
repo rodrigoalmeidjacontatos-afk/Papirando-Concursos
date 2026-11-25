@@ -7,6 +7,7 @@ export default function EvolucaoQuestoes({ userEmail }) {
   const [periodoSelecionado, setPeriodoSelecionado] = useState(null);
   const [disciplinaAberta, setDisciplinaAberta] = useState(null); // drill-down
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false); // modal de confirmação
+  const [limparCadernoTambem, setLimparCadernoTambem] = useState(false);
   const [limpando, setLimpando] = useState(false);
   const [configMetricas, setConfigMetricas] = useState([
     { id: 1, icone: '🔴', nome: 'Fora da Disputa', min: 0, max: 69.99, cor: '#FF4C4C' },
@@ -157,7 +158,16 @@ export default function EvolucaoQuestoes({ userEmail }) {
         .delete()
         .eq('user_email', userEmail);
       if (error) throw error;
+
+      if (limparCadernoTambem) {
+        await supabase
+          .from('caderno_erros')
+          .delete()
+          .eq('user_email', userEmail);
+      }
+
       setConfirmandoLimpar(false);
+      setLimparCadernoTambem(false);
       setDisciplinaAberta(null);
       setStats({ vazio: true });
     } catch (e) {
@@ -424,9 +434,30 @@ export default function EvolucaoQuestoes({ userEmail }) {
             <p style={{ color: '#AAA', fontSize: '14px', lineHeight: '1.7', margin: '0 0 8px' }}>
               Essa ação irá <strong style={{ color: '#E53935' }}>apagar permanentemente</strong> todo o seu histórico de questões respondidas.
             </p>
-            <p style={{ color: '#666', fontSize: '13px', margin: '0 0 28px' }}>
+            <p style={{ color: '#666', fontSize: '13px', margin: '0 0 20px' }}>
               Seus acertos, erros e estatísticas serão zerados. Essa ação <strong style={{ color: '#E53935' }}>não pode ser desfeita</strong>.
             </p>
+
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              cursor: 'pointer',
+              color: '#FFB74D',
+              fontSize: '13px',
+              fontWeight: '600',
+              marginBottom: '24px',
+              userSelect: 'none'
+            }}>
+              <input
+                type="checkbox"
+                checked={limparCadernoTambem}
+                onChange={e => setLimparCadernoTambem(e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: '#E50914', cursor: 'pointer' }}
+              />
+              Limpar também meu Caderno de Erros
+            </label>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
                 onClick={() => setConfirmandoLimpar(false)}

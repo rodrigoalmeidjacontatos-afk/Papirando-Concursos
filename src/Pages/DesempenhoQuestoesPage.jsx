@@ -38,6 +38,25 @@ export default function DesempenhoQuestoesPage() {
         {/* ESPAÇO À DIREITA */}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
           <button 
+            onClick={() => navigate('/caderno-erros')} 
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(229, 9, 20, 0.2) 0%, rgba(255, 152, 0, 0.15) 100%)', 
+              border: '1px solid #FF9800', 
+              color: '#FFB74D', 
+              padding: '8px 16px', 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              fontSize: '13px', 
+              fontWeight: '900', 
+              display: 'flex', alignItems: 'center', gap: '8px',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 152, 0, 0.4)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            📖 Caderno de Erros
+          </button>
+          <button 
             onClick={() => navigate('/')} 
             style={{ 
               background: 'transparent', 

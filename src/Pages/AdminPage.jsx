@@ -104,7 +104,8 @@ function AdminPage() {
     documentos: { ativo: true, plano: 'basico' },
     evolucao: { ativo: true, plano: 'basico' },
     questoes: { ativo: true, plano: 'basico' },
-    desempenho_questoes: { ativo: true, plano: 'basico' }
+    desempenho_questoes: { ativo: true, plano: 'basico' },
+    caderno_erros: { ativo: true, plano: 'basico' }
   });
 
   // ========== CONFIGURAÇÃO DE MÉTRICAS DE DESEMPENHO ==========
@@ -2303,6 +2304,35 @@ function AdminPage() {
                       style={styles.select}
                       value={configAbas.desempenho_questoes?.plano || 'basico'}
                       onChange={e => setConfigAbas({...configAbas, desempenho_questoes: {...configAbas.desempenho_questoes, plano: e.target.value}})}
+                    >
+                      <option value="basico">🟢 Básico (Todos)</option>
+                      <option value="medio">🔵 Médio</option>
+                      <option value="premium">🟡 Premium</option>
+                      <option value="admin">🔴 Admin (Apenas Admins)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{...styles.formCard, marginTop: '20px'}}>
+                <h3 style={{color: '#F5F5F5', marginBottom: '15px'}}>Aba: Caderno de Erros</h3>
+                <div style={{display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap'}}>
+                  <label style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', cursor: 'pointer'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={configAbas.caderno_erros?.ativo ?? true}
+                      onChange={e => setConfigAbas({...configAbas, caderno_erros: {...configAbas.caderno_erros, ativo: e.target.checked}})}
+                      style={{width: '18px', height: '18px'}}
+                    />
+                    Aba Ativa (Visível)
+                  </label>
+                  
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <span style={{color: '#AAA'}}>Plano Mínimo:</span>
+                    <select 
+                      style={styles.select}
+                      value={configAbas.caderno_erros?.plano || 'basico'}
+                      onChange={e => setConfigAbas({...configAbas, caderno_erros: {...configAbas.caderno_erros, plano: e.target.value}})}
                     >
                       <option value="basico">🟢 Básico (Todos)</option>
                       <option value="medio">🔵 Médio</option>

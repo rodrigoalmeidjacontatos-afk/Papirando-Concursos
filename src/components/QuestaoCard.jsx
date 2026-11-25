@@ -9,6 +9,8 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   const [mostrarComentario, setMostrarComentario] = useState(false);
   const [favorita, setFavorita] = useState(false);
   const [expandirTexto, setExpandirTexto] = useState(false);
+  const [noCaderno, setNoCaderno] = useState(false);
+  const [salvandoChute, setSalvandoChute] = useState(false);
 
   useEffect(() => {
     // Resetar estado quando mudar de questão (se renderizado no mesmo componente)
@@ -16,6 +18,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
     setRespostaMarcada(null);
     setStatus(null);
     setMostrarComentario(false);
+    setNoCaderno(false);
 
     const checkSeFavorita = async () => {
       if (!userEmail) return;
@@ -119,7 +122,110 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
     enunciadoLimpo = enunciadoLimpo.replace(/\[IMG:(.+?)\]/, '').trim();
   }
 
-  const responder = async () => {
+    const registrarNoCaderno = async (isErro, foiChute = false, altMarcada = respostaMarcada) => {
+      if (!userEmail) return;
+      try {
+        const { data: existente } = await supabase
+          .from('caderno_erros')
+          .select('id, qtd_erros, etapa_revisao, acertos_seguidos')
+          .eq('user_email', userEmail)
+          .eq('questao_id', questao.id)
+          .maybeSingle();
+
+        if (isErro) {
+          if (existente) {
+            await supabase
+              .from('caderno_erros')
+              .update({
+                resposta_marcada: altMarcada,
+                resposta_correta: gabaritoNormalizado,
+                data_erro: new Date().toISOString(),
+                qtd_erros: (existente.qtd_erros || 1) + 1,
+                status: 'pendente',
+                etapa_revisao: 0,
+                acertos_seguidos: 0,
+                proxima_revisao: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existente.id);
+          } else {
+            await supabase
+              .from('caderno_erros')
+              .insert([{
+                user_id: userId || null,
+                user_email: userEmail,
+                questao_id: questao.id,
+                resposta_marcada: altMarcada,
+                resposta_correta: gabaritoNormalizado,
+                data_erro: new Date().toISOString(),
+                qtd_erros: 1,
+                tipo_erro: 'Falta de conhecimento',
+                status: 'pendente',
+                etapa_revisao: 0,
+                acertos_seguidos: 0,
+                proxima_revisao: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+              }]);
+          }
+          setNoCaderno(true);
+        } else if (foiChute) {
+          // Usuário acertou mas marcou no chute
+          if (existente) {
+            await supabase
+              .from('caderno_erros')
+              .update({
+                tipo_erro: 'Chute',
+                status: 'pendente',
+                proxima_revisao: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existente.id);
+          } else {
+            await supabase
+              .from('caderno_erros')
+              .insert([{
+                user_id: userId || null,
+                user_email: userEmail,
+                questao_id: questao.id,
+                resposta_marcada: altMarcada,
+                resposta_correta: gabaritoNormalizado,
+                data_erro: new Date().toISOString(),
+                qtd_erros: 0,
+                tipo_erro: 'Chute',
+                status: 'pendente',
+                etapa_revisao: 0,
+                acertos_seguidos: 0,
+                proxima_revisao: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+              }]);
+          }
+          setNoCaderno(true);
+        } else if (existente) {
+          // Usuário acertou uma questão que já estava no caderno (revisão)
+          const novosAcertos = (existente.acertos_seguidos || 0) + 1;
+          const proximaEtapa = (existente.etapa_revisao || 0) + 1;
+          const dominada = novosAcertos >= 3;
+          
+          let diasProxima = 1;
+          if (proximaEtapa === 1) diasProxima = 7;
+          else if (proximaEtapa >= 2) diasProxima = 30;
+
+          await supabase
+            .from('caderno_erros')
+            .update({
+              acertos_seguidos: novosAcertos,
+              etapa_revisao: proximaEtapa,
+              status: dominada ? 'dominada' : 'em_revisao',
+              ultima_revisao: new Date().toISOString(),
+              proxima_revisao: dominada ? null : new Date(Date.now() + diasProxima * 24 * 60 * 60 * 1000).toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existente.id);
+        }
+      } catch (err) {
+        console.error('Erro ao atualizar caderno de erros:', err);
+      }
+    };
+
+    const responder = async () => {
     if (!respostaMarcada) return alert('Selecione uma alternativa.');
     if (status) return; // já respondeu
 
@@ -135,6 +241,8 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
           alternativa_marcada: respostaMarcada,
           correta: correta
         }]);
+        // Registro no Caderno de Erros (automático se errou ou avança revisão se acertou)
+        await registrarNoCaderno(!correta, false, respostaMarcada);
       }
       
       setStatus(correta ? 'acertou' : 'errou');
@@ -144,6 +252,19 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
       alert('Erro ao salvar sua resposta.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarcarChute = async () => {
+    if (!userEmail) return alert('Faça login para adicionar ao caderno.');
+    setSalvandoChute(true);
+    try {
+      await registrarNoCaderno(false, true, respostaMarcada);
+      alert('Adicionada ao Caderno de Erros como Chute!');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSalvandoChute(false);
     }
   };
 
@@ -429,6 +550,45 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
               }}>
                 {status === 'acertou' ? 'Você Acertou' : 'Você Errou'}
               </span>
+
+              {status === 'errou' && (
+                <span style={{
+                  fontSize: '12px',
+                  color: '#FF8A80',
+                  backgroundColor: 'rgba(244, 67, 54, 0.15)',
+                  border: '1px solid rgba(244, 67, 54, 0.3)',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}>
+                  📖 Adicionada ao Caderno de Erros
+                </span>
+              )}
+
+              {status === 'acertou' && (
+                <button
+                  onClick={handleMarcarChute}
+                  disabled={salvandoChute || noCaderno}
+                  style={{
+                    backgroundColor: noCaderno ? 'rgba(255, 152, 0, 0.2)' : 'transparent',
+                    color: '#FFB74D',
+                    border: '1px solid #FF9800',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    cursor: noCaderno ? 'default' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="Mesmo acertando, envie para o Caderno de Erros para revisar depois"
+                >
+                  🎯 {noCaderno ? 'No Caderno (Chute)' : (salvandoChute ? 'Adicionando...' : 'Marquei no Chute')}
+                </button>
+              )}
               <button
                 onClick={() => setMostrarComentario(!mostrarComentario)}
                 style={{
