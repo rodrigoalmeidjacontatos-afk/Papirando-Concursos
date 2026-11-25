@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import LoadingScreen from '../components/LoadingScreen';
-import EvolucaoQuestoes from '../components/EvolucaoQuestoes';
+
 import './Home.css';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -55,7 +55,8 @@ function Home() {
   const [configAbas, setConfigAbas] = useState({
     documentos: { ativo: true, plano: 'basico' },
     evolucao: { ativo: true, plano: 'basico' },
-    questoes: { ativo: true, plano: 'basico' }
+    questoes: { ativo: true, plano: 'basico' },
+    desempenho_questoes: { ativo: true, plano: 'basico' }
   });
 
   const [estatisticasEstudo, setEstatisticasEstudo] = useState({
@@ -868,6 +869,7 @@ function Home() {
           const showEvolucao = podeVerAba(configAbas.evolucao);
           const showDocumentos = podeVerAba(configAbas.documentos);
           const showQuestoes = podeVerAba(configAbas.questoes);
+          const showDesempenhoQuestoes = podeVerAba(configAbas.desempenho_questoes);
 
           return (
             <div className="tab-container" style={{
@@ -968,6 +970,28 @@ function Home() {
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Questões
+            </button>
+          )}
+
+          {showDesempenhoQuestoes && (
+            <button
+              onClick={() => navigate('/desempenho-questoes')}
+              style={{
+                background: 'transparent',
+                border: '1px solid #333',
+                color: '#888',
+                padding: '10px 22px',
+                borderRadius: '999px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.25s'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg> Desempenho em Questões
             </button>
           )}
         </div>
@@ -1424,9 +1448,6 @@ function Home() {
                 </div>
               )}
             </div>
-
-            {/* SEÇÃO DE DESEMPENHO EM QUESTÕES */}
-            <EvolucaoQuestoes userEmail={user?.email} />
 
           </div>
         )}
