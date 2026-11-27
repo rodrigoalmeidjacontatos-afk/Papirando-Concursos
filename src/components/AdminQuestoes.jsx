@@ -52,14 +52,16 @@ export default function AdminQuestoes() {
   const [imagemAux, setImagemAux] = useState('');
   const [fileInputRef, fileInputAtualizarRef] = [useRef(null), useRef(null)];
   const [modalMesclarAberto, setModalMesclarAberto] = useState(false);
-  const [disciplinaOrigem, setDisciplinaOrigem] = useState('');
+  const [disciplinasOrigemSelecionadas, setDisciplinasOrigemSelecionadas] = useState([]);
+  const [buscaFiltroDiscOrigem, setBuscaFiltroDiscOrigem] = useState('');
   const [disciplinaDestino, setDisciplinaDestino] = useState('');
   const [mesclando, setMesclando] = useState(false);
 
   // Modal Mesclar Assuntos
   const [modalMesclarAssuntoAberto, setModalMesclarAssuntoAberto] = useState(false);
   const [disciplinaFiltroAssunto, setDisciplinaFiltroAssunto] = useState('');
-  const [assuntoOrigem, setAssuntoOrigem] = useState('');
+  const [assuntosOrigemSelecionados, setAssuntosOrigemSelecionados] = useState([]);
+  const [buscaFiltroAssuntoOrigem, setBuscaFiltroAssuntoOrigem] = useState('');
   const [assuntoDestino, setAssuntoDestino] = useState('');
   const [mesclandoAssunto, setMesclandoAssunto] = useState(false);
   const [mapaDisciplinaAssuntos, setMapaDisciplinaAssuntos] = useState([]);
@@ -539,13 +541,16 @@ export default function AdminQuestoes() {
   };
 
   const handleMesclarDisciplinas = async () => {
-    if (!disciplinaOrigem || !disciplinaDestino) {
-      return alert('Selecione a disciplina de origem e a disciplina de destino.');
+    if (disciplinasOrigemSelecionadas.length === 0 || !disciplinaDestino.trim()) {
+      return alert('Selecione pelo menos uma disciplina de origem e defina a disciplina de destino.');
     }
-    if (disciplinaOrigem === disciplinaDestino) {
-      return alert('A disciplina de origem e destino não podem ser iguais.');
+    const destinoClean = disciplinaDestino.trim();
+    const origensValidas = disciplinasOrigemSelecionadas.filter(d => d !== destinoClean);
+    if (origensValidas.length === 0) {
+      return alert('A disciplina de destino não pode ser a única selecionada.');
     }
-    if (!window.confirm(`Tem certeza que deseja alterar todas as questões de:\n"${disciplinaOrigem}"\n\nPara:\n"${disciplinaDestino}"?`)) {
+
+    if (!window.confirm(`Tem certeza que deseja mesclar ${origensValidas.length} disciplina(s):\n${origensValidas.map(d => `• "${d}"`).join('\n')}\n\nPara a disciplina única:\n"${destinoClean}"?`)) {
       return;
     }
 
@@ -553,24 +558,25 @@ export default function AdminQuestoes() {
     try {
       const { data, error } = await supabase
         .from('questoes')
-        .update({ disciplina: disciplinaDestino })
-        .eq('disciplina', disciplinaOrigem)
+        .update({ disciplina: destinoClean })
+        .in('disciplina', origensValidas)
         .select('id');
 
       if (error) throw error;
 
       const qtd = data ? data.length : 0;
-      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para "${disciplinaDestino}".`);
+      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para "${destinoClean}".`);
       
       // Atualiza as opções locais
       setOpcoesDisciplina(prev => {
-        const next = prev.filter(d => d !== disciplinaOrigem);
-        if (!next.includes(disciplinaDestino)) next.push(disciplinaDestino);
+        const next = prev.filter(d => !origensValidas.includes(d));
+        if (!next.includes(destinoClean)) next.push(destinoClean);
         return next.sort((a, b) => a.localeCompare(b, 'pt-BR'));
       });
 
-      setDisciplinaOrigem('');
+      setDisciplinasOrigemSelecionadas([]);
       setDisciplinaDestino('');
+      setBuscaFiltroDiscOrigem('');
       setModalMesclarAberto(false);
       carregarOpcoesAutocomplete();
       fetchQuestoes(1, buscaAtiva);
@@ -583,15 +589,17 @@ export default function AdminQuestoes() {
   };
 
   const handleMesclarAssuntos = async () => {
-    if (!assuntoOrigem || !assuntoDestino) {
-      return alert('Selecione o assunto de origem e o assunto de destino.');
+    if (assuntosOrigemSelecionados.length === 0 || !assuntoDestino.trim()) {
+      return alert('Selecione pelo menos um assunto de origem e defina o assunto de destino.');
     }
-    if (assuntoOrigem.trim().toLowerCase() === assuntoDestino.trim().toLowerCase()) {
-      return alert('O assunto de origem e destino não podem ser idênticos.');
+    const destinoClean = assuntoDestino.trim();
+    const origensValidas = assuntosOrigemSelecionados.filter(a => a.toLowerCase() !== destinoClean.toLowerCase());
+    if (origensValidas.length === 0) {
+      return alert('O assunto de destino não pode ser idêntico a todos os selecionados.');
     }
 
     const filtroMsg = disciplinaFiltroAssunto ? `\n(Apenas dentro da disciplina: "${disciplinaFiltroAssunto}")` : '\n(Em todas as disciplinas)';
-    if (!window.confirm(`Tem certeza que deseja alterar todas as questões com assunto:\n"${assuntoOrigem}"\n\nPara:\n"${assuntoDestino}"?${filtroMsg}`)) {
+    if (!window.confirm(`Tem certeza que deseja alterar ${origensValidas.length} assunto(s):\n${origensValidas.map(a => `• "${a}"`).join('\n')}\n\nPara o assunto padronizado:\n"${destinoClean}"?${filtroMsg}`)) {
       return;
     }
 
@@ -599,8 +607,8 @@ export default function AdminQuestoes() {
     try {
       let query = supabase
         .from('questoes')
-        .update({ assunto: assuntoDestino })
-        .eq('assunto', assuntoOrigem);
+        .update({ assunto: destinoClean })
+        .in('assunto', origensValidas);
 
       if (disciplinaFiltroAssunto) {
         query = query.eq('disciplina', disciplinaFiltroAssunto);
@@ -610,10 +618,11 @@ export default function AdminQuestoes() {
       if (error) throw error;
 
       const qtd = data ? data.length : 0;
-      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para o assunto "${assuntoDestino}".`);
+      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para o assunto "${destinoClean}".`);
 
-      setAssuntoOrigem('');
+      setAssuntosOrigemSelecionados([]);
       setAssuntoDestino('');
+      setBuscaFiltroAssuntoOrigem('');
       setModalMesclarAssuntoAberto(false);
       carregarOpcoesAutocomplete();
       fetchQuestoes(1, buscaAtiva);
@@ -627,15 +636,29 @@ export default function AdminQuestoes() {
 
   // Lista de assuntos filtrados pela disciplina selecionada no modal de assunto
   const assuntosDisponiveisParaMesclar = React.useMemo(() => {
-    if (!disciplinaFiltroAssunto) {
-      return opcoesAssunto;
+    let base = opcoesAssunto;
+    if (disciplinaFiltroAssunto) {
+      const filtrados = mapaDisciplinaAssuntos
+        .filter(item => item.disciplina === disciplinaFiltroAssunto)
+        .map(item => item.assunto)
+        .filter(Boolean);
+      base = [...new Set(filtrados)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
-    const filtrados = mapaDisciplinaAssuntos
-      .filter(item => item.disciplina === disciplinaFiltroAssunto)
-      .map(item => item.assunto)
-      .filter(Boolean);
-    return [...new Set(filtrados)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [disciplinaFiltroAssunto, mapaDisciplinaAssuntos, opcoesAssunto]);
+    if (buscaFiltroAssuntoOrigem.trim()) {
+      const termo = buscaFiltroAssuntoOrigem.toLowerCase();
+      return base.filter(a => a.toLowerCase().includes(termo));
+    }
+    return base;
+  }, [disciplinaFiltroAssunto, mapaDisciplinaAssuntos, opcoesAssunto, buscaFiltroAssuntoOrigem]);
+
+  // Lista de disciplinas filtradas por busca no modal
+  const disciplinasDisponiveisParaMesclar = React.useMemo(() => {
+    if (buscaFiltroDiscOrigem.trim()) {
+      const termo = buscaFiltroDiscOrigem.toLowerCase();
+      return opcoesDisciplina.filter(d => d.toLowerCase().includes(termo));
+    }
+    return opcoesDisciplina;
+  }, [opcoesDisciplina, buscaFiltroDiscOrigem]);
 
   const totalPaginas = Math.ceil(total / porPagina);
 
@@ -724,13 +747,16 @@ export default function AdminQuestoes() {
             border: '1px solid #9C27B088',
             borderRadius: '16px',
             padding: '30px',
-            maxWidth: '500px',
+            maxWidth: '600px',
             width: '90%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
             boxShadow: '0 20px 60px rgba(0,0,0,0.9)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ color: '#FFF', margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🔄 Mesclar / Padronizar Disciplina
+                🔄 Mesclar / Padronizar Disciplinas
               </h3>
               <button 
                 onClick={() => setModalMesclarAberto(false)}
@@ -740,30 +766,96 @@ export default function AdminQuestoes() {
               </button>
             </div>
 
-            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '20px' }}>
-              Todas as questões cadastradas na disciplina de <strong>origem</strong> serão atualizadas de uma vez para o nome da disciplina de <strong>destino</strong>.
+            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '16px' }}>
+              Marque <strong>uma ou várias</strong> disciplinas que deseja unir. Todas as questões correspondentes serão atualizadas de uma só vez para o nome padronizado.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px', overflowY: 'auto', paddingRight: '4px' }}>
+              
+              {/* SELEÇÃO MÚLTIPLA DE ORIGEM */}
               <div>
-                <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                  De (Disciplina Antiga / Incorreta):
-                </label>
-                <select
-                  value={disciplinaOrigem}
-                  onChange={e => setDisciplinaOrigem(e.target.value)}
-                  style={{ ...inputStyle, width: '100%' }}
-                >
-                  <option value="">Selecione a disciplina para alterar...</option>
-                  {opcoesDisciplina.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold' }}>
+                    De (Selecione uma ou mais disciplinas para unir):
+                  </label>
+                  <span style={{ fontSize: '11px', color: '#FFB74D', fontWeight: 'bold' }}>
+                    {disciplinasOrigemSelecionadas.length} selecionada(s)
+                  </span>
+                </div>
+
+                {/* Campo de filtro rápido */}
+                <input
+                  type="text"
+                  placeholder="Filtrar matérias na lista..."
+                  value={buscaFiltroDiscOrigem}
+                  onChange={e => setBuscaFiltroDiscOrigem(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: '8px', padding: '8px 12px', fontSize: '12px' }}
+                />
+
+                {/* Caixa com checkboxes */}
+                <div style={{
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                  backgroundColor: '#141419',
+                  border: '1px solid #333',
+                  borderRadius: '8px',
+                  padding: '8px'
+                }}>
+                  {disciplinasDisponiveisParaMesclar.length === 0 ? (
+                    <div style={{ color: '#666', fontSize: '12px', padding: '12px', textAlign: 'center' }}>Nenhuma matéria encontrada.</div>
+                  ) : (
+                    disciplinasDisponiveisParaMesclar.map(d => {
+                      const isSel = disciplinasOrigemSelecionadas.includes(d);
+                      return (
+                        <label
+                          key={d}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '6px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            color: isSel ? '#FFF' : '#CCC',
+                            backgroundColor: isSel ? 'rgba(156, 39, 176, 0.25)' : 'transparent',
+                            marginBottom: '2px',
+                            transition: 'background 0.15s'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSel}
+                            onChange={() => {
+                              setDisciplinasOrigemSelecionadas(prev => 
+                                isSel ? prev.filter(item => item !== d) : [...prev, d]
+                              );
+                            }}
+                            style={{ accentColor: '#9C27B0', width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <span style={{ flex: 1 }}>{d}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {disciplinasOrigemSelecionadas.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setDisciplinasOrigemSelecionadas([])}
+                      style={{ background: 'none', border: 'none', color: '#E53935', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Desmarcar todas
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* DESTINO */}
               <div>
                 <label style={{ color: '#81C784', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                  Para (Disciplina Correta / Padronizada):
+                  Para (Nome da Disciplina Única Padronizada):
                 </label>
                 <input
                   type="text"
@@ -778,10 +870,13 @@ export default function AdminQuestoes() {
                     <option key={d} value={d} />
                   ))}
                 </datalist>
+                <span style={{ fontSize: '11px', color: '#777', marginTop: '4px', display: 'block' }}>
+                  Você pode selecionar uma matéria existente da lista ou digitar um nome novo.
+                </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: 'auto', borderTop: '1px solid #2A2A35', paddingTop: '16px' }}>
               <button
                 onClick={() => setModalMesclarAberto(false)}
                 disabled={mesclando}
@@ -800,20 +895,20 @@ export default function AdminQuestoes() {
               </button>
               <button
                 onClick={handleMesclarDisciplinas}
-                disabled={mesclando || !disciplinaOrigem || !disciplinaDestino}
+                disabled={mesclando || disciplinasOrigemSelecionadas.length === 0 || !disciplinaDestino.trim()}
                 style={{
                   backgroundColor: '#9C27B0',
                   color: '#FFF',
                   border: 'none',
                   padding: '10px 24px',
                   borderRadius: '6px',
-                  cursor: (mesclando || !disciplinaOrigem || !disciplinaDestino) ? 'not-allowed' : 'pointer',
+                  cursor: (mesclando || disciplinasOrigemSelecionadas.length === 0 || !disciplinaDestino.trim()) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  opacity: (mesclando || !disciplinaOrigem || !disciplinaDestino) ? 0.6 : 1
+                  opacity: (mesclando || disciplinasOrigemSelecionadas.length === 0 || !disciplinaDestino.trim()) ? 0.6 : 1
                 }}
               >
-                {mesclando ? 'Atualizando Questões...' : 'Confirmar e Mesclar'}
+                {mesclando ? 'Atualizando Questões...' : `Mesclar ${disciplinasOrigemSelecionadas.length || ''} Selecionada(s)`}
               </button>
             </div>
           </div>
@@ -833,8 +928,11 @@ export default function AdminQuestoes() {
             border: '1px solid #3F51B588',
             borderRadius: '16px',
             padding: '30px',
-            maxWidth: '560px',
+            maxWidth: '620px',
             width: '90%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
             boxShadow: '0 20px 60px rgba(0,0,0,0.9)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -849,11 +947,13 @@ export default function AdminQuestoes() {
               </button>
             </div>
 
-            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '20px' }}>
-              Corrija assuntos duplicados ou com pequenas variações de escrita (ex: erros de digitação, singular/plural ou acentuação). Todas as questões receberão o nome do assunto correto.
+            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '16px' }}>
+              Marque <strong>várias variações de um mesmo assunto</strong> (por exemplo, erros de grafia, singular/plural ou acentos) para uni-las em um assunto definitivo.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px', overflowY: 'auto', paddingRight: '4px' }}>
+              
+              {/* FILTRO DE DISCIPLINA */}
               <div>
                 <label style={{ color: '#BBB', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
                   Filtrar por Disciplina (Opcional):
@@ -862,7 +962,7 @@ export default function AdminQuestoes() {
                   value={disciplinaFiltroAssunto}
                   onChange={e => {
                     setDisciplinaFiltroAssunto(e.target.value);
-                    setAssuntoOrigem('');
+                    setAssuntosOrigemSelecionados([]);
                   }}
                   style={{ ...inputStyle, width: '100%' }}
                 >
@@ -872,29 +972,94 @@ export default function AdminQuestoes() {
                   ))}
                 </select>
                 <span style={{ fontSize: '11px', color: '#777', marginTop: '4px', display: 'block' }}>
-                  Selecione uma disciplina para filtrar a lista de assuntos abaixo ou deixe em branco para ver todos.
+                  Selecione uma disciplina para filtrar os assuntos correspondentes ou deixe em branco para ver todos.
                 </span>
               </div>
 
+              {/* SELEÇÃO MÚLTIPLA DE ASSUNTOS DE ORIGEM */}
               <div>
-                <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                  De (Assunto Antigo / Com Variação):
-                </label>
-                <select
-                  value={assuntoOrigem}
-                  onChange={e => setAssuntoOrigem(e.target.value)}
-                  style={{ ...inputStyle, width: '100%' }}
-                >
-                  <option value="">Selecione o assunto para alterar...</option>
-                  {assuntosDisponiveisParaMesclar.map(a => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold' }}>
+                    De (Marque os assuntos com variação que serão unidos):
+                  </label>
+                  <span style={{ fontSize: '11px', color: '#FFB74D', fontWeight: 'bold' }}>
+                    {assuntosOrigemSelecionados.length} selecionado(s)
+                  </span>
+                </div>
+
+                {/* Filtro rápido por texto */}
+                <input
+                  type="text"
+                  placeholder="Pesquisar assunto na lista..."
+                  value={buscaFiltroAssuntoOrigem}
+                  onChange={e => setBuscaFiltroAssuntoOrigem(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: '8px', padding: '8px 12px', fontSize: '12px' }}
+                />
+
+                {/* Caixa com checkboxes */}
+                <div style={{
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                  backgroundColor: '#141419',
+                  border: '1px solid #333',
+                  borderRadius: '8px',
+                  padding: '8px'
+                }}>
+                  {assuntosDisponiveisParaMesclar.length === 0 ? (
+                    <div style={{ color: '#666', fontSize: '12px', padding: '12px', textAlign: 'center' }}>Nenhum assunto encontrado.</div>
+                  ) : (
+                    assuntosDisponiveisParaMesclar.map(a => {
+                      const isSel = assuntosOrigemSelecionados.includes(a);
+                      return (
+                        <label
+                          key={a}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '6px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            color: isSel ? '#FFF' : '#CCC',
+                            backgroundColor: isSel ? 'rgba(63, 81, 181, 0.25)' : 'transparent',
+                            marginBottom: '2px',
+                            transition: 'background 0.15s'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSel}
+                            onChange={() => {
+                              setAssuntosOrigemSelecionados(prev => 
+                                isSel ? prev.filter(item => item !== a) : [...prev, a]
+                              );
+                            }}
+                            style={{ accentColor: '#3F51B5', width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <span style={{ flex: 1 }}>{a}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {assuntosOrigemSelecionados.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setAssuntosOrigemSelecionados([])}
+                      style={{ background: 'none', border: 'none', color: '#E53935', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Desmarcar todos
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* DESTINO */}
               <div>
                 <label style={{ color: '#81C784', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                  Para (Assunto Correto / Padronizado):
+                  Para (Nome do Assunto Único Padronizado):
                 </label>
                 <input
                   type="text"
@@ -909,10 +1074,13 @@ export default function AdminQuestoes() {
                     <option key={a} value={a} />
                   ))}
                 </datalist>
+                <span style={{ fontSize: '11px', color: '#777', marginTop: '4px', display: 'block' }}>
+                  Digite o nome correto ou escolha um existente da lista de sugestões.
+                </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: 'auto', borderTop: '1px solid #2A2A35', paddingTop: '16px' }}>
               <button
                 onClick={() => setModalMesclarAssuntoAberto(false)}
                 disabled={mesclandoAssunto}
@@ -931,20 +1099,20 @@ export default function AdminQuestoes() {
               </button>
               <button
                 onClick={handleMesclarAssuntos}
-                disabled={mesclandoAssunto || !assuntoOrigem || !assuntoDestino}
+                disabled={mesclandoAssunto || assuntosOrigemSelecionados.length === 0 || !assuntoDestino.trim()}
                 style={{
                   backgroundColor: '#3F51B5',
                   color: '#FFF',
                   border: 'none',
                   padding: '10px 24px',
                   borderRadius: '6px',
-                  cursor: (mesclandoAssunto || !assuntoOrigem || !assuntoDestino) ? 'not-allowed' : 'pointer',
+                  cursor: (mesclandoAssunto || assuntosOrigemSelecionados.length === 0 || !assuntoDestino.trim()) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  opacity: (mesclandoAssunto || !assuntoOrigem || !assuntoDestino) ? 0.6 : 1
+                  opacity: (mesclandoAssunto || assuntosOrigemSelecionados.length === 0 || !assuntoDestino.trim()) ? 0.6 : 1
                 }}
               >
-                {mesclandoAssunto ? 'Atualizando Questões...' : 'Confirmar e Mesclar Assunto'}
+                {mesclandoAssunto ? 'Atualizando Questões...' : `Mesclar ${assuntosOrigemSelecionados.length || ''} Assunto(s)`}
               </button>
             </div>
           </div>
