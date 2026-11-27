@@ -50,47 +50,98 @@ export default function AdminQuestoes() {
   const [disciplinaDestino, setDisciplinaDestino] = useState('');
   const [mesclando, setMesclando] = useState(false);
 
+  // Modal Mesclar Assuntos
+  const [modalMesclarAssuntoAberto, setModalMesclarAssuntoAberto] = useState(false);
+  const [disciplinaFiltroAssunto, setDisciplinaFiltroAssunto] = useState('');
+  const [assuntoOrigem, setAssuntoOrigem] = useState('');
+  const [assuntoDestino, setAssuntoDestino] = useState('');
+  const [mesclandoAssunto, setMesclandoAssunto] = useState(false);
+  const [mapaDisciplinaAssuntos, setMapaDisciplinaAssuntos] = useState([]);
+
   const [opcoesDisciplina, setOpcoesDisciplina] = useState([]);
   const [opcoesAssunto, setOpcoesAssunto] = useState([]);
   const [opcoesBanca, setOpcoesBanca] = useState([]);
   const [opcoesOrgao, setOpcoesOrgao] = useState([]);
   const [opcoesCargo, setOpcoesCargo] = useState([]);
 
-  useEffect(() => {
-    async function fetchOpcoesAutocomplete() {
-      try {
+  const carregarOpcoesAutocomplete = useCallback(async () => {
+    try {
+      // 1. Tenta carregar via RPC oficial get_questoes_filtros (traz 100% de todas as questões do banco)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_questoes_filtros');
+      if (!rpcError && rpcData) {
+        if (rpcData.disciplinas) {
+          setOpcoesDisciplina(rpcData.disciplinas.filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+        if (rpcData.bancas) {
+          setOpcoesBanca(rpcData.bancas.filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+        if (rpcData.orgaos) {
+          setOpcoesOrgao(rpcData.orgaos.filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+        if (rpcData.cargos) {
+          setOpcoesCargo(rpcData.cargos.filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+        if (rpcData.disciplina_assuntos) {
+          setMapaDisciplinaAssuntos(rpcData.disciplina_assuntos);
+          const todosAssuntos = [...new Set(rpcData.disciplina_assuntos.map(da => da.assunto).filter(Boolean))];
+          setOpcoesAssunto(todosAssuntos.sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+        return;
+      }
+
+      // Fallback paginado para carregar tudo mesmo sem RPC
+      const PAGE_SIZE = 1000;
+      let allData = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
         const { data, error } = await supabase
           .from('questoes')
           .select('disciplina, assunto, banca, orgao, cargo')
-          .limit(10000);
-          
-        if (!error && data) {
-          const discSet = new Set();
-          const assSet = new Set();
-          const bancaSet = new Set();
-          const orgaoSet = new Set();
-          const cargoSet = new Set();
-          
-          data.forEach(item => {
-            if (item.disciplina) discSet.add(item.disciplina.trim());
-            if (item.assunto) assSet.add(item.assunto.trim());
-            if (item.banca) bancaSet.add(item.banca.trim());
-            if (item.orgao) orgaoSet.add(item.orgao.trim());
-            if (item.cargo) cargoSet.add(item.cargo.trim());
-          });
-          
-          setOpcoesDisciplina(Array.from(discSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
-          setOpcoesAssunto(Array.from(assSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
-          setOpcoesBanca(Array.from(bancaSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
-          setOpcoesOrgao(Array.from(orgaoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
-          setOpcoesCargo(Array.from(cargoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error || !data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allData = allData.concat(data);
+          if (data.length < PAGE_SIZE) hasMore = false;
+          else from += PAGE_SIZE;
         }
-      } catch (e) {
-        console.error('Erro ao buscar opções de autocomplete:', e);
       }
+
+      const discSet = new Set();
+      const assSet = new Set();
+      const bancaSet = new Set();
+      const orgaoSet = new Set();
+      const cargoSet = new Set();
+      const discAssList = [];
+
+      allData.forEach(item => {
+        const d = item.disciplina ? item.disciplina.trim() : '';
+        const a = item.assunto ? item.assunto.trim() : '';
+        if (d) discSet.add(d);
+        if (a) assSet.add(a);
+        if (item.banca) bancaSet.add(item.banca.trim());
+        if (item.orgao) orgaoSet.add(item.orgao.trim());
+        if (item.cargo) cargoSet.add(item.cargo.trim());
+        if (d && a) discAssList.push({ disciplina: d, assunto: a });
+      });
+
+      setOpcoesDisciplina(Array.from(discSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setOpcoesAssunto(Array.from(assSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setOpcoesBanca(Array.from(bancaSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setOpcoesOrgao(Array.from(orgaoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setOpcoesCargo(Array.from(cargoSet).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setMapaDisciplinaAssuntos(discAssList);
+    } catch (e) {
+      console.error('Erro ao buscar opções de autocomplete:', e);
     }
-    fetchOpcoesAutocomplete();
   }, []);
+
+  useEffect(() => {
+    carregarOpcoesAutocomplete();
+  }, [carregarOpcoesAutocomplete]);
 
   const fetchQuestoes = useCallback(async (pg = pagina, buscaFiltro = buscaAtiva) => {
     setLoading(true);
@@ -515,6 +566,7 @@ export default function AdminQuestoes() {
       setDisciplinaOrigem('');
       setDisciplinaDestino('');
       setModalMesclarAberto(false);
+      carregarOpcoesAutocomplete();
       fetchQuestoes(1, buscaAtiva);
     } catch (err) {
       console.error('Erro ao mesclar disciplinas:', err);
@@ -523,6 +575,61 @@ export default function AdminQuestoes() {
       setMesclando(false);
     }
   };
+
+  const handleMesclarAssuntos = async () => {
+    if (!assuntoOrigem || !assuntoDestino) {
+      return alert('Selecione o assunto de origem e o assunto de destino.');
+    }
+    if (assuntoOrigem.trim().toLowerCase() === assuntoDestino.trim().toLowerCase()) {
+      return alert('O assunto de origem e destino não podem ser idênticos.');
+    }
+
+    const filtroMsg = disciplinaFiltroAssunto ? `\n(Apenas dentro da disciplina: "${disciplinaFiltroAssunto}")` : '\n(Em todas as disciplinas)';
+    if (!window.confirm(`Tem certeza que deseja alterar todas as questões com assunto:\n"${assuntoOrigem}"\n\nPara:\n"${assuntoDestino}"?${filtroMsg}`)) {
+      return;
+    }
+
+    setMesclandoAssunto(true);
+    try {
+      let query = supabase
+        .from('questoes')
+        .update({ assunto: assuntoDestino })
+        .eq('assunto', assuntoOrigem);
+
+      if (disciplinaFiltroAssunto) {
+        query = query.eq('disciplina', disciplinaFiltroAssunto);
+      }
+
+      const { data, error } = await query.select('id');
+      if (error) throw error;
+
+      const qtd = data ? data.length : 0;
+      alert(`Sucesso! ${qtd} questão(ões) atualizada(s) para o assunto "${assuntoDestino}".`);
+
+      setAssuntoOrigem('');
+      setAssuntoDestino('');
+      setModalMesclarAssuntoAberto(false);
+      carregarOpcoesAutocomplete();
+      fetchQuestoes(1, buscaAtiva);
+    } catch (err) {
+      console.error('Erro ao mesclar assuntos:', err);
+      alert('Erro ao mesclar assuntos: ' + err.message);
+    } finally {
+      setMesclandoAssunto(false);
+    }
+  };
+
+  // Lista de assuntos filtrados pela disciplina selecionada no modal de assunto
+  const assuntosDisponiveisParaMesclar = React.useMemo(() => {
+    if (!disciplinaFiltroAssunto) {
+      return opcoesAssunto;
+    }
+    const filtrados = mapaDisciplinaAssuntos
+      .filter(item => item.disciplina === disciplinaFiltroAssunto)
+      .map(item => item.assunto)
+      .filter(Boolean);
+    return [...new Set(filtrados)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [disciplinaFiltroAssunto, mapaDisciplinaAssuntos, opcoesAssunto]);
 
   const totalPaginas = Math.ceil(total / porPagina);
 
@@ -577,6 +684,23 @@ export default function AdminQuestoes() {
             }}
           >
             🔄 Mesclar Disciplinas (Lote)
+          </button>
+          <button 
+            onClick={() => setModalMesclarAssuntoAberto(true)} 
+            style={{ 
+              backgroundColor: '#3F51B5', 
+              color: '#FFF', 
+              padding: '10px 16px', 
+              border: 'none', 
+              borderRadius: '6px', 
+              cursor: 'pointer', 
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            📚 Mesclar Assuntos (Lote)
           </button>
         </div>
       </div>
@@ -684,6 +808,137 @@ export default function AdminQuestoes() {
                 }}
               >
                 {mesclando ? 'Atualizando Questões...' : 'Confirmar e Mesclar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE MESCLAR ASSUNTOS EM LOTE */}
+      {modalMesclarAssuntoAberto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: '#1E1E24',
+            border: '1px solid #3F51B588',
+            borderRadius: '16px',
+            padding: '30px',
+            maxWidth: '560px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.9)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: '#FFF', margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📚 Mesclar / Padronizar Assuntos
+              </h3>
+              <button 
+                onClick={() => setModalMesclarAssuntoAberto(false)}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '20px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ color: '#AAA', fontSize: '13px', lineHeight: 1.6, marginBottom: '20px' }}>
+              Corrija assuntos duplicados ou com pequenas variações de escrita (ex: erros de digitação, singular/plural ou acentuação). Todas as questões receberão o nome do assunto correto.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={{ color: '#BBB', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  Filtrar por Disciplina (Opcional):
+                </label>
+                <select
+                  value={disciplinaFiltroAssunto}
+                  onChange={e => {
+                    setDisciplinaFiltroAssunto(e.target.value);
+                    setAssuntoOrigem('');
+                  }}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">Todas as Disciplinas</option>
+                  {opcoesDisciplina.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '11px', color: '#777', marginTop: '4px', display: 'block' }}>
+                  Selecione uma disciplina para filtrar a lista de assuntos abaixo ou deixe em branco para ver todos.
+                </span>
+              </div>
+
+              <div>
+                <label style={{ color: '#FF8A80', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  De (Assunto Antigo / Com Variação):
+                </label>
+                <select
+                  value={assuntoOrigem}
+                  onChange={e => setAssuntoOrigem(e.target.value)}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">Selecione o assunto para alterar...</option>
+                  {assuntosDisponiveisParaMesclar.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ color: '#81C784', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  Para (Assunto Correto / Padronizado):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Licitações e Contratos Administrativos"
+                  value={assuntoDestino}
+                  onChange={e => setAssuntoDestino(e.target.value)}
+                  list="lista-sugestoes-assunto-destino"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+                <datalist id="lista-sugestoes-assunto-destino">
+                  {assuntosDisponiveisParaMesclar.map(a => (
+                    <option key={a} value={a} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                onClick={() => setModalMesclarAssuntoAberto(false)}
+                disabled={mesclandoAssunto}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid #555',
+                  color: '#AAA',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleMesclarAssuntos}
+                disabled={mesclandoAssunto || !assuntoOrigem || !assuntoDestino}
+                style={{
+                  backgroundColor: '#3F51B5',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 24px',
+                  borderRadius: '6px',
+                  cursor: (mesclandoAssunto || !assuntoOrigem || !assuntoDestino) ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  opacity: (mesclandoAssunto || !assuntoOrigem || !assuntoDestino) ? 0.6 : 1
+                }}
+              >
+                {mesclandoAssunto ? 'Atualizando Questões...' : 'Confirmar e Mesclar Assunto'}
               </button>
             </div>
           </div>
