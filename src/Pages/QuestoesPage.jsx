@@ -5,16 +5,22 @@ import { supabase } from '../services/supabase';
 import QuestaoCard from '../components/QuestaoCard';
 import { useAuth } from '../contexts/AuthContext';
 
-// Busca todos os IDs do banco e filtra client-side pelo prefixo do UUID.
-// Abordagem simples e confiável: evita problemas com cast id::text no PostgREST.
+// Busca IDs no banco por prefixo UUID de forma otimizada para grande volume
 async function buscarIdsPorPrefixoUUID(prefixo) {
   try {
+    const p = prefixo.toLowerCase();
+    // 1. Tenta usar função RPC otimizada com cast nativo caso criada no Supabase
+    const { data: rpcData, error: rpcError } = await supabase.rpc('buscar_questoes_por_prefixo_id', { p_prefixo: p });
+    if (!rpcError && rpcData) {
+      return rpcData.map(r => r.id || r);
+    }
+
+    // 2. Fallback: busca paginada com text search
     const { data, error } = await supabase
       .from('questoes')
       .select('id')
-      .limit(5000);
+      .limit(50000);
     if (error || !data) return [];
-    const p = prefixo.toLowerCase();
     return data.map(r => r.id).filter(id => id && id.toLowerCase().startsWith(p));
   } catch {
     return [];
