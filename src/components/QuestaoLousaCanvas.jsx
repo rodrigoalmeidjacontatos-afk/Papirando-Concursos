@@ -23,6 +23,8 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
   const [borrachaAtivaViaBotao, setBorrachaAtivaViaBotao] = useState(false);
   
   const isDrawing = useRef(false);
+  const startClientPos = useRef({ x: 0, y: 0 });
+  const hasMoved = useRef(false);
   const pointsRef = useRef([]); // Pontos do traço atual em andamento
   const lastPos = useRef({ x: 0, y: 0 });
 
@@ -138,6 +140,8 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
     e.preventDefault();
     isDrawing.current = true;
+    startClientPos.current = { x: e.clientX, y: e.clientY };
+    hasMoved.current = false;
 
     const isSPenButton = verificarBotaoSPen(e);
     if (isSPenButton !== borrachaAtivaViaBotao) {
@@ -228,6 +232,11 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
     e.preventDefault();
 
+    const distMoved = Math.hypot(e.clientX - startClientPos.current.x, e.clientY - startClientPos.current.y);
+    if (distMoved > 6) {
+      hasMoved.current = true;
+    }
+
     const isSPenButton = verificarBotaoSPen(e);
     if (isSPenButton !== borrachaAtivaViaBotao) {
       setBorrachaAtivaViaBotao(isSPenButton);
@@ -267,7 +276,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     }
   };
 
-  const pararDesenho = () => {
+  const pararDesenho = (e) => {
     if (!isDrawing.current) return;
     isDrawing.current = false;
 
@@ -275,9 +284,39 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       setBorrachaAtivaViaBotao(false);
     }
 
-    // Passa o traço pronto do tempCanvas para o mainCanvas
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
+
+    // Se o usuário apenas deu um toque/clique rápido sem arrastar (menos de 6 pixels)
+    // Então foi uma intenção de clicar em uma alternativa ou botão embaixo!
+    if (!hasMoved.current && e) {
+      if (tempCanvas) {
+        const tempCtx = tempCanvas.getContext('2d');
+        const rect = tempCanvas.getBoundingClientRect();
+        tempCtx.clearRect(0, 0, rect.width, rect.height);
+      }
+      pointsRef.current = [];
+
+      if (tempCanvas && mainCanvas) {
+        tempCanvas.style.pointerEvents = 'none';
+        mainCanvas.style.pointerEvents = 'none';
+        const target = document.elementFromPoint(e.clientX, e.clientY);
+        tempCanvas.style.pointerEvents = 'auto';
+        mainCanvas.style.pointerEvents = 'none';
+
+        if (target) {
+          const clickable = target.closest('button, [data-alt-row="true"], input, a');
+          if (clickable) {
+            clickable.click();
+          } else {
+            target.click();
+          }
+        }
+      }
+      return;
+    }
+
+    // Passa o traço pronto do tempCanvas para o mainCanvas
     if (mainCanvas && tempCanvas) {
       const mainCtx = mainCanvas.getContext('2d');
       const tempCtx = tempCanvas.getContext('2d');

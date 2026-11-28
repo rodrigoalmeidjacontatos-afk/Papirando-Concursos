@@ -498,12 +498,18 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
 
           return (
             <div key={alt.letra} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Botão Tesoura (Eliminar) - Sempre clicável mesmo com a lousa ativa */}
               <button
                 onClick={() => toggleEliminada(alt.letra)}
                 disabled={status !== null}
                 style={{
-                  background: 'none', border: 'none', color: isEliminada ? corErro : '#666',
-                  cursor: status ? 'default' : 'pointer', fontSize: '18px', padding: 0
+                  position: 'relative',
+                  zIndex: 35,
+                  background: 'none', border: 'none', color: isEliminada ? corErro : '#888',
+                  cursor: status ? 'default' : 'pointer', fontSize: '18px', padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.2s, transform 0.1s'
                 }}
                 title={isEliminada ? "Restaurar alternativa" : "Riscar alternativa"}
               >
@@ -515,6 +521,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
               </button>
               
               <div 
+                data-alt-row="true"
                 onClick={() => {
                   if (status) return;
                   if (eliminadas.includes(alt.letra)) {
@@ -537,7 +544,30 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
                   opacity: (isEliminada && !isGabarito) ? 0.5 : 1
                 }}
               >
-                <span style={{ fontWeight: 'bold', marginRight: '12px', color: isGabarito ? corAcerto : (isErroUser ? corErro : '#888') }}>
+                {/* Letra da alternativa como pill selecionável com zIndex superior */}
+                <span 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (status) return;
+                    if (eliminadas.includes(alt.letra)) {
+                      setEliminadas(eliminadas.filter(l => l !== alt.letra));
+                    }
+                    setRespostaMarcada(alt.letra);
+                  }}
+                  style={{ 
+                    position: 'relative',
+                    zIndex: 35,
+                    cursor: 'pointer',
+                    fontWeight: 'bold', 
+                    marginRight: '12px', 
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: isSelecionada ? corPrimaria : 'rgba(255,255,255,0.08)',
+                    color: isSelecionada ? '#FFF' : (isGabarito ? corAcerto : (isErroUser ? corErro : '#DDD')),
+                    border: isSelecionada ? `1px solid ${corPrimaria}` : '1px solid transparent'
+                  }}
+                  title="Clique para selecionar esta alternativa"
+                >
                   {alt.letra})
                 </span>
                 <span style={{ flex: 1, lineHeight: '1.5' }} dangerouslySetInnerHTML={{ __html: alt.texto }} />
@@ -551,13 +581,15 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
       </div>
 
       {/* AÇÕES DA QUESTÃO */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '16px 20px', borderTop: '1px solid #333' }}>
+      <div style={{ position: 'relative', zIndex: 35, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '16px 20px', borderTop: '1px solid #333' }}>
         <div style={{ display: 'flex', gap: '12px' }}>
           {!status ? (
             <button
               onClick={responder}
               disabled={loading || !respostaMarcada}
               style={{
+                position: 'relative',
+                zIndex: 35,
                 backgroundColor: respostaMarcada ? corPrimaria : '#444',
                 color: '#FFF',
                 border: 'none',
