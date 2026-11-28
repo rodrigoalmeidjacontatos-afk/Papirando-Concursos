@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
+import QuestaoLousaCanvas from './QuestaoLousaCanvas';
 
 export default function QuestaoCard({ questao, numero, userEmail, userId, onRespondeu }) {
   const [eliminadas, setEliminadas] = useState([]);
@@ -11,6 +12,8 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   const [expandirTexto, setExpandirTexto] = useState(false);
   const [noCaderno, setNoCaderno] = useState(false);
   const [salvandoChute, setSalvandoChute] = useState(false);
+  const [modoLousa, setModoLousa] = useState(false);
+  const cardContainerRef = useRef(null);
 
   useEffect(() => {
     // Resetar estado quando mudar de questão (se renderizado no mesmo componente)
@@ -273,15 +276,19 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   const corErro = '#F44336';
 
   return (
-    <div style={{
-      backgroundColor: '#1E1E24',
-      borderRadius: '12px',
-      marginBottom: '20px',
-      border: '1px solid #333',
-      color: '#FFF',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-      overflow: 'hidden'
-    }}>
+    <div 
+      ref={cardContainerRef}
+      style={{
+        position: 'relative',
+        backgroundColor: '#1E1E24',
+        borderRadius: '12px',
+        marginBottom: '20px',
+        border: modoLousa ? '1px solid #FFD700' : '1px solid #333',
+        color: '#FFF',
+        boxShadow: modoLousa ? '0 4px 18px rgba(255, 215, 0, 0.15)' : '0 4px 12px rgba(0,0,0,0.2)',
+        overflow: 'hidden',
+        transition: 'border 0.2s, box-shadow 0.2s'
+      }}>
       {/* HEADER DA QUESTÃO - LINHA 1: Número | Badge ID | Breadcrumb */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '10px',
@@ -331,8 +338,31 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
           )}
         </div>
 
-        {/* Favorito - empurrado para a direita */}
-        <div style={{ marginLeft: 'auto' }}>
+        {/* Ações à Direita: Botão Lousa / Rascunho / Tablet / Caneta + Favorito */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setModoLousa(v => !v)}
+            style={{
+              background: modoLousa ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${modoLousa ? '#FFD700' : '#444'}`,
+              borderRadius: '6px',
+              color: modoLousa ? '#FFD700' : '#CCC',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+              boxShadow: modoLousa ? '0 0 10px rgba(255, 215, 0, 0.25)' : 'none'
+            }}
+            title={modoLousa ? "Ocultar / Desativar modo desenho e marca-texto" : "Ativar modo caneta, marca-texto e rascunho (Tablet e PC)"}
+          >
+            <span style={{ fontSize: '13px' }}>✏️</span>
+            <span>{modoLousa ? 'Anotando (Ativo)' : 'Rascunho / Lousa'}</span>
+          </button>
+
           <button
             onClick={toggleFavorito}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: favorita ? '#FFC107' : '#CCC', transition: '0.2s', padding: '2px' }}
@@ -375,6 +405,13 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
           </span>
         )}
       </div>
+
+      {/* Camada Lousa / Rascunho Digital (Caneta, Marca-texto, Borracha) */}
+      <QuestaoLousaCanvas 
+        ativo={modoLousa} 
+        containerRef={cardContainerRef} 
+        onFechar={() => setModoLousa(false)} 
+      />
 
       {/* CORPO DA QUESTÃO */}
       <div style={{ padding: '20px 20px 0 20px' }}>
