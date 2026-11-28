@@ -1,40 +1,38 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 /**
- * Componente QuestaoLousaCanvas (Versão 4.0 Pro: Espessura Dinâmica & Snap-to-Line)
- * Principais melhorias:
- * - Controle de Espessura da Caneta (fina 1px até grossa 8px) com controle deslizante em tempo real.
- * - Snap-to-Line Automático (Régua Inteligente): Ao grifar ou sublinhar e segurar a caneta parada por 0.4s no final, o traço se transforma em uma linha perfeitamente reta (estilo GoodNotes/Samsung Notes).
- * - Arquitetura de 2 Canvases sem sobreposição de bolhas/círculos.
- * - Opacidade ajustável de 5% a 45% no Marca-Texto.
- * - Suporte nativo ao botão da S-Pen como borracha instantânea.
- * - Elementos clicáveis mesmo com o modo lousa ativo (tesoura, alternativas e responder).
+ * Componente QuestaoLousaCanvas (Versão 4.1: Alinhamento Travado ao Conteúdo)
+ * - Envolve o conteúdo da questão (enunciado + alternativas + ações) em um container relativo próprio,
+ *   mantendo a barra de ferramentas FORA desse container para que abrir/fechar a lousa NUNCA desloque os grifos.
+ * - Preserva escala 1:1 ao redimensionar altura para evitar distorção vertical das anotações.
+ * - Controle de Espessura da Caneta (1px a 8px) e Snap-to-Line automático (linha reta ao segurar 0.4s).
  */
-export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
+export default function QuestaoLousaCanvas({ ativo, questaoId, onFechar, children }) {
+  const areaRef = useRef(null);
   const mainCanvasRef = useRef(null); // Canvas permanente com todos os traços confirmados
   const tempCanvasRef = useRef(null); // Canvas temporário para o traço ativo
+  const prevSizeRef = useRef({ width: 0, height: 0 });
   
   const [modo, setModo] = useState('caneta'); // 'caneta', 'marca_texto', 'borracha'
   const [cor, setCor] = useState('#FFD700'); // Dourado padrão
-  const [espessuraCaneta, setEspessuraCaneta] = useState(2); // 1px a 8px (padrão 2px fino e elegante)
+  const [espessuraCaneta, setEspessuraCaneta] = useState(2); // 1px a 8px
   const espessuraMarcaTexto = 18; // largura ideal para grifar linha de texto
   const [opacidadeMarcaTexto, setOpacidadeMarcaTexto] = useState(0.15); // 15% suave
-  const [dedoDesenha, setDedoDesenha] = useState(true); // se falso, dedo rola tela e apenas caneta/mouse desenha
-  const [historico, setHistorico] = useState([]); // Snapshots para Desfazer (Undo)
+  const [dedoDesenha, setDedoDesenha] = useState(true);
+  const [historico, setHistorico] = useState([]);
   const [temDesenho, setTemDesenho] = useState(false);
   const [borrachaAtivaViaBotao, setBorrachaAtivaViaBotao] = useState(false);
-  const [linhaRetaAtiva, setLinhaRetaAtiva] = useState(false); // Feedback visual quando o snap de linha reta é ativado
+  const [linhaRetaAtiva, setLinhaRetaAtiva] = useState(false);
   
   const isDrawing = useRef(false);
   const startClientPos = useRef({ x: 0, y: 0 });
   const hasMoved = useRef(false);
-  const pointsRef = useRef([]); // Pontos do traço atual em andamento
+  const pointsRef = useRef([]);
   const lastPos = useRef({ x: 0, y: 0 });
   const lastSnapCheckPos = useRef({ x: 0, y: 0 });
-  const snapTimerRef = useRef(null); // Timer para detectar pausa e esticar linha reta
+  const snapTimerRef = useRef(null);
   const isSnappedRef = useRef(false);
 
-  // Cores predefinidas para caneta e marca-texto
   const cores = [
     { label: 'Amarelo', valor: '#FFD700' },
     { label: 'Verde', valor: '#00E676' },
@@ -43,15 +41,48 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     { label: 'Branco', valor: '#FFFFFF' }
   ];
 
-  // Ajusta o tamanho de ambos os canvases de acordo com o container da questão
+  // Limpa os canvases caso o componente seja reutilizado para outra questão
+  useEffect(() => {
+    const mainCanvas = mainCanvasRef.current;
+    const tempCanvas = tempCanvasRef.current;
+    if (mainCanvas) {
+      const ctx = mainCanvas.getContext('2d');
+      const rect = mainCanvas.getBoundingClientRect();
+      if (ctx) ctx.clearRect(0, 0, rect.width || mainCanvas.width, rect.height || mainCanvas.height);
+    }
+    if (tempCanvas) {
+      const ctx = tempCanvas.getContext('2d');
+      const rect = tempCanvas.getBoundingClientRect();
+      if (ctx) ctx.clearRect(0, 0, rect.width || tempCanvas.width, rect.height || tempCanvas.height);
+    }
+    setHistorico([]);
+    setTemDesenho(false);
+  }, [questaoId]);
+
+  // Ajusta o tamanho de ambos os canvases preservando a proporção exata sem esticar na vertical
   const redimensionarCanvas = useCallback(() => {
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
-    const container = containerRef?.current;
+    const container = areaRef.current;
     if (!mainCanvas || !tempCanvas || !container) return;
 
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const oldW = prevSizeRef.current.width;
+    const oldH = prevSizeRef.current.height;
+
+    // Se a dimensão lógica não mudou, não recria o buffer (evita perda de qualidade/flicker)
+    if (
+      Math.abs(rect.width - oldW) < 0.5 &&
+      Math.abs(rect.height - oldH) < 0.5 &&
+      mainCanvas.width > 0
+    ) {
+      return;
+    }
+
     let imagemSalva = null;
-    if (mainCanvas.width > 0 && mainCanvas.height > 0) {
+    if (mainCanvas.width > 0 && mainCanvas.height > 0 && oldW > 0 && oldH > 0) {
       try {
         imagemSalva = mainCanvas.toDataURL();
       } catch (e) {
@@ -59,7 +90,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       }
     }
 
-    const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
     [mainCanvas, tempCanvas].forEach(c => {
@@ -77,25 +107,29 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       }
     });
 
-    // Restaura o desenho salvo no canvas principal
+    prevSizeRef.current = { width: rect.width, height: rect.height };
+
+    // Restaura o desenho salvo mantendo escala 1:1 (ou proporcional apenas se a largura mudou)
     if (imagemSalva) {
       const img = new Image();
       img.onload = () => {
         const ctx = mainCanvas.getContext('2d');
-        if (ctx) ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        if (!ctx) return;
+        const scaleX = oldW > 0 ? rect.width / oldW : 1;
+        ctx.drawImage(img, 0, 0, oldW * scaleX, oldH * scaleX);
       };
       img.src = imagemSalva;
     }
-  }, [containerRef]);
+  }, []);
 
   useEffect(() => {
     redimensionarCanvas();
     window.addEventListener('resize', redimensionarCanvas);
 
     let ro = null;
-    if (typeof ResizeObserver !== 'undefined' && containerRef?.current) {
+    if (typeof ResizeObserver !== 'undefined' && areaRef.current) {
       ro = new ResizeObserver(() => redimensionarCanvas());
-      ro.observe(containerRef.current);
+      ro.observe(areaRef.current);
     }
 
     return () => {
@@ -103,9 +137,15 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       if (ro) ro.disconnect();
       clearTimeout(snapTimerRef.current);
     };
-  }, [redimensionarCanvas, containerRef]);
+  }, [redimensionarCanvas]);
 
-  // Salva snapshot no histórico para a função Desfazer
+  // Garante redimensionamento imediato ao ativar a lousa caso o container estivesse oculto
+  useEffect(() => {
+    if (ativo) {
+      redimensionarCanvas();
+    }
+  }, [ativo, redimensionarCanvas]);
+
   const salvarSnapshot = () => {
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) return;
@@ -127,7 +167,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     };
   };
 
-  // Detecta se o botão da S-Pen (ou botão direito) está pressionado
   const verificarBotaoSPen = (e) => {
     return (
       (e.buttons & 2) !== 0 ||
@@ -139,8 +178,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
   const iniciarDesenho = (e) => {
     if (!ativo) return;
-    
-    // Se o usuário optou por deixar o dedo apenas rolando a página:
     if (e.pointerType === 'touch' && !dedoDesenha) {
       return;
     }
@@ -152,6 +189,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     isSnappedRef.current = false;
     setLinhaRetaAtiva(false);
     clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = null;
 
     const isSPenButton = verificarBotaoSPen(e);
     if (isSPenButton !== borrachaAtivaViaBotao) {
@@ -182,7 +220,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     }
   };
 
-  // Renderiza o traço ativo no tempCanvas
   const renderizarTracoAtivo = (modoEfetivo) => {
     const tempCanvas = tempCanvasRef.current;
     if (!tempCanvas) return;
@@ -211,12 +248,10 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       ctx.lineWidth = espessuraCaneta;
     }
 
-    // Se o Snap-to-Straight-Line foi acionado (usuário segurou a caneta parada no fim do traço):
     if (isSnappedRef.current && pts.length >= 2) {
       const start = pts[0];
       let end = lastPos.current;
 
-      // Alinhamento inteligente: se a linha for quase horizontal (< 25% de desvio), alinha perfeitamente com a linha de texto
       const dx = Math.abs(end.x - start.x);
       const dy = Math.abs(end.y - start.y);
       if (dx > 25 && dy / dx < 0.22) {
@@ -304,7 +339,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
       renderizarTracoAtivo(modoEfetivo);
 
-      // Snap-to-Line: Só reinicia o timer se o movimento passar de 4px (evita que micro-tremor da S-Pen impeça o disparo)
       const snapDist = Math.hypot(
         lastPos.current.x - lastSnapCheckPos.current.x,
         lastPos.current.y - lastSnapCheckPos.current.y
@@ -318,7 +352,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
             isSnappedRef.current = true;
             setLinhaRetaAtiva(true);
             renderizarTracoAtivo(modoEfetivo);
-          }, 400); // 400ms segurando parada
+          }, 400);
         }
       }
     }
@@ -340,7 +374,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
 
-    // Se o usuário apenas deu um toque/clique rápido sem arrastar (menos de 6 pixels):
     if (!hasMoved.current && e) {
       if (tempCanvas) {
         const tempCtx = tempCanvas.getContext('2d');
@@ -369,7 +402,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       return;
     }
 
-    // Passa o traço pronto do tempCanvas para o mainCanvas
     if (mainCanvas && tempCanvas) {
       const mainCtx = mainCanvas.getContext('2d');
       const tempCtx = tempCanvas.getContext('2d');
@@ -427,7 +459,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
   return (
     <>
-      {/* BARRA DE FERRAMENTAS FLUTUANTE MODERNA */}
+      {/* BARRA DE FERRAMENTAS FLUTUANTE MODERNA (Fora da área dos canvases para evitar deslocamento ao fechar) */}
       {ativo && (
         <div style={{
           position: 'sticky',
@@ -449,7 +481,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
           flexWrap: 'wrap',
           justifyContent: 'center'
         }}>
-          {/* Caneta Fina */}
+          {/* Caneta */}
           <button
             onClick={() => setModo('caneta')}
             style={{
@@ -463,7 +495,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
             ✏️ Caneta
           </button>
 
-          {/* Controle de Espessura da Caneta (quando Caneta está ativa) */}
+          {/* Controle de Espessura da Caneta */}
           {modo === 'caneta' && (
             <div 
               style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '12px' }}
@@ -504,7 +536,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
             🖍️ Marca-Texto
           </button>
 
-          {/* Opacidade do Marca-Texto (Exibida quando Marca-Texto está ativo) */}
+          {/* Opacidade do Marca-Texto */}
           {modo === 'marca_texto' && (
             <div 
               style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '12px' }}
@@ -555,7 +587,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
           <div style={{ width: '1px', height: '18px', backgroundColor: '#555' }} />
 
-          {/* Paleta de Cores (apenas se não estiver na borracha) */}
+          {/* Paleta de Cores */}
           {modo !== 'borracha' && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               {cores.map(c => (
@@ -580,7 +612,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
           <div style={{ width: '1px', height: '18px', backgroundColor: '#555' }} />
 
-          {/* Modo Tablet: Toque com dedo desenha ou rola tela */}
+          {/* Modo Tablet */}
           <button
             onClick={() => setDedoDesenha(v => !v)}
             style={{
@@ -636,7 +668,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
                   color: '#FFF',
                   padding: '4px 8px'
                 }}
-                title="Fechar barra de desenho (suas anotações continuam visíveis)"
+                title="Fechar barra de desenho (suas anotações continuam visíveis exatamente no lugar)"
               >
                 ✕ Fechar
               </button>
@@ -645,41 +677,46 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
         </div>
       )}
 
-      {/* CANVAS PRINCIPAL (DESENHOS PERMANENTES) */}
-      <canvas
-        ref={mainCanvasRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          zIndex: 15,
-          pointerEvents: 'none',
-          display: (ativo || temDesenho) ? 'block' : 'none',
-          backgroundColor: 'transparent'
-        }}
-      />
+      {/* CONTAINER RELATIVO EXCLUSIVO DO CONTEÚDO + CANVASES */}
+      <div ref={areaRef} style={{ position: 'relative' }}>
+        {children}
 
-      {/* CANVAS TEMPORÁRIO (TRAÇO ATIVO COM INTERAÇÃO DO USUÁRIO) */}
-      <canvas
-        ref={tempCanvasRef}
-        onPointerDown={iniciarDesenho}
-        onPointerMove={desenhar}
-        onPointerUp={pararDesenho}
-        onPointerCancel={pararDesenho}
-        onPointerLeave={pararDesenho}
-        onContextMenu={(e) => e.preventDefault()}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          zIndex: ativo ? 25 : 5,
-          pointerEvents: ativo ? 'auto' : 'none',
-          display: ativo ? 'block' : 'none',
-          backgroundColor: 'transparent',
-          cursor: ativo ? ((modo === 'borracha' || borrachaAtivaViaBotao) ? 'cell' : 'crosshair') : 'default',
-          touchAction: (ativo && dedoDesenha) ? 'none' : 'pan-y'
-        }}
-      />
+        {/* CANVAS PRINCIPAL (DESENHOS PERMANENTES) */}
+        <canvas
+          ref={mainCanvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 15,
+            pointerEvents: 'none',
+            display: (ativo || temDesenho) ? 'block' : 'none',
+            backgroundColor: 'transparent'
+          }}
+        />
+
+        {/* CANVAS TEMPORÁRIO (TRAÇO ATIVO COM INTERAÇÃO DO USUÁRIO) */}
+        <canvas
+          ref={tempCanvasRef}
+          onPointerDown={iniciarDesenho}
+          onPointerMove={desenhar}
+          onPointerUp={pararDesenho}
+          onPointerCancel={pararDesenho}
+          onPointerLeave={pararDesenho}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: ativo ? 25 : 5,
+            pointerEvents: ativo ? 'auto' : 'none',
+            display: ativo ? 'block' : 'none',
+            backgroundColor: 'transparent',
+            cursor: ativo ? ((modo === 'borracha' || borrachaAtivaViaBotao) ? 'cell' : 'crosshair') : 'default',
+            touchAction: (ativo && dedoDesenha) ? 'none' : 'pan-y'
+          }}
+        />
+      </div>
     </>
   );
 }

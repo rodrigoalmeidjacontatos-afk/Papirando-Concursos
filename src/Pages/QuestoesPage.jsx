@@ -422,68 +422,175 @@ export default function QuestoesPage() {
                 />
               ))}
 
-              {/* PAGINAÇÃO */}
+              {/* PAGINAÇÃO E RODAPÉ DA PÁGINA */}
               {totalQuestoes > 0 && (() => {
                 const totalPaginas = Math.ceil(totalQuestoes / porPagina) || 1;
+                const inicioItem = ((paginaAtual - 1) * porPagina) + 1;
+                const fimItem = Math.min(paginaAtual * porPagina, totalQuestoes);
 
-                // Gera os itens visíveis: 1 2 3 4 5 ... N  ou  1 ... 4 5 6 ... N
+                const irParaPagina = (novaPagina) => {
+                  if (novaPagina < 1 || novaPagina > totalPaginas || novaPagina === paginaAtual) return;
+                  setPaginaAtual(novaPagina);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+
+                // Gera os itens visíveis ao redor da página atual: 1 ... 4 5 6 ... N
                 const gerarPaginas = () => {
                   const itens = [];
                   if (totalPaginas <= 7) {
                     for (let i = 1; i <= totalPaginas; i++) itens.push(i);
                   } else {
-                    itens.push(1, 2, 3, 4, 5);
-                    if (paginaAtual > 5 && paginaAtual < totalPaginas - 1) {
-                      itens.push('..a', paginaAtual - 1, paginaAtual, paginaAtual + 1, '..b');
-                    } else {
-                      itens.push('..a');
-                    }
+                    itens.push(1);
+                    if (paginaAtual > 4) itens.push('..a');
+                    const start = Math.max(2, paginaAtual - 1);
+                    const end = Math.min(totalPaginas - 1, paginaAtual + 1);
+                    for (let i = start; i <= end; i++) itens.push(i);
+                    if (paginaAtual < totalPaginas - 3) itens.push('..b');
                     itens.push(totalPaginas);
                   }
                   return itens;
                 };
 
                 const btnBase = {
-                  minWidth: '36px', height: '36px',
+                  minWidth: '38px', height: '38px',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '6px', border: '1px solid #D0D5DD',
-                  backgroundColor: '#FFF', color: '#344054',
-                  cursor: 'pointer', fontSize: '14px', fontWeight: '500',
-                  transition: 'all 0.15s', padding: '0 6px'
+                  borderRadius: '8px', border: '1px solid #2F2F3A',
+                  backgroundColor: '#25252D', color: '#D1D5DB',
+                  cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                  transition: 'all 0.18s ease', padding: '0 8px'
                 };
-                const btnAtivo = { ...btnBase, backgroundColor: '#EEF4FF', borderColor: '#84ADFF', color: '#2563EB', fontWeight: '700' };
-                const btnDesabilitado = { ...btnBase, opacity: 0.4, cursor: 'not-allowed', color: '#888' };
+                const btnAtivo = {
+                  ...btnBase,
+                  backgroundColor: '#F3B749',
+                  borderColor: '#F3B749',
+                  color: '#111115',
+                  fontWeight: '800',
+                  boxShadow: '0 0 14px rgba(243, 183, 73, 0.35)'
+                };
+                const btnDesabilitado = {
+                  ...btnBase,
+                  opacity: 0.35,
+                  cursor: 'not-allowed',
+                  color: '#6B7280'
+                };
 
                 return (
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginTop: '28px', padding: '16px 0' }}>
-                    {gerarPaginas().map((item, idx) => {
-                      if (item === '..a' || item === '..b') return (
-                        <span key={item} style={{ color: '#888', padding: '0 4px', fontSize: '14px' }}>...</span>
-                      );
-                      const isAtiva = item === paginaAtual;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => setPaginaAtual(item)}
-                          style={isAtiva ? btnAtivo : btnBase}
-                          onMouseEnter={e => !isAtiva && (e.currentTarget.style.backgroundColor = '#F9FAFB')}
-                          onMouseLeave={e => !isAtiva && (e.currentTarget.style.backgroundColor = '#FFF')}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                    {/* Seta próxima */}
+                  <div style={{
+                    marginTop: '28px',
+                    marginBottom: '44px',
+                    padding: '18px 24px',
+                    backgroundColor: '#1E1E24',
+                    border: '1px solid #2C2C35',
+                    borderRadius: '14px',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '16px'
+                  }}>
+                    {/* Resumo à Esquerda */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#F3F4F6' }}>
+                        Página <span style={{ color: '#F3B749' }}>{paginaAtual}</span> de {totalPaginas}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                        Mostrando {inicioItem}–{fimItem} de {totalQuestoes} questões
+                      </span>
+                    </div>
+
+                    {/* Controles de Paginação Centrais */}
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {/* Seta anterior */}
+                      <button
+                        onClick={() => irParaPagina(paginaAtual - 1)}
+                        style={paginaAtual <= 1 ? btnDesabilitado : btnBase}
+                        disabled={paginaAtual <= 1}
+                        title="Página anterior"
+                        onMouseEnter={e => paginaAtual > 1 && (e.currentTarget.style.borderColor = '#F3B749')}
+                        onMouseLeave={e => paginaAtual > 1 && (e.currentTarget.style.borderColor = '#2F2F3A')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                      </button>
+
+                      {gerarPaginas().map((item, idx) => {
+                        if (item === '..a' || item === '..b') return (
+                          <span key={item} style={{ color: '#6B7280', padding: '0 4px', fontSize: '14px', fontWeight: '700' }}>...</span>
+                        );
+                        const isAtiva = item === paginaAtual;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => irParaPagina(item)}
+                            style={isAtiva ? btnAtivo : btnBase}
+                            onMouseEnter={e => {
+                              if (!isAtiva) {
+                                e.currentTarget.style.backgroundColor = '#2E2E38';
+                                e.currentTarget.style.borderColor = '#555';
+                              }
+                            }}
+                            onMouseLeave={e => {
+                              if (!isAtiva) {
+                                e.currentTarget.style.backgroundColor = '#25252D';
+                                e.currentTarget.style.borderColor = '#2F2F3A';
+                              }
+                            }}
+                          >
+                            {item}
+                          </button>
+                        );
+                      })}
+
+                      {/* Seta próxima */}
+                      <button
+                        onClick={() => irParaPagina(paginaAtual + 1)}
+                        style={paginaAtual >= totalPaginas ? btnDesabilitado : btnBase}
+                        disabled={paginaAtual >= totalPaginas}
+                        title="Próxima página"
+                        onMouseEnter={e => paginaAtual < totalPaginas && (e.currentTarget.style.borderColor = '#F3B749')}
+                        onMouseLeave={e => paginaAtual < totalPaginas && (e.currentTarget.style.borderColor = '#2F2F3A')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Botão Voltar ao Topo à Direita */}
                     <button
-                      onClick={() => paginaAtual < totalPaginas && setPaginaAtual(p => p + 1)}
-                      style={paginaAtual >= totalPaginas ? btnDesabilitado : btnBase}
-                      disabled={paginaAtual >= totalPaginas}
-                      onMouseEnter={e => paginaAtual < totalPaginas && (e.currentTarget.style.backgroundColor = '#F9FAFB')}
-                      onMouseLeave={e => paginaAtual < totalPaginas && (e.currentTarget.style.backgroundColor = '#FFF')}
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(243, 183, 73, 0.12)',
+                        border: '1px solid rgba(243, 183, 73, 0.45)',
+                        color: '#F3B749',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = '#F3B749';
+                        e.currentTarget.style.color = '#111115';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'rgba(243, 183, 73, 0.12)';
+                        e.currentTarget.style.color = '#F3B749';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                      title="Rolar suavemente para o início da página"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9e040c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6" />
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="18 15 12 9 6 15" />
                       </svg>
+                      Voltar ao topo
                     </button>
                   </div>
                 );

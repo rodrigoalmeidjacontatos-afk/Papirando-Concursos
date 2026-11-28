@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import QuestaoLousaCanvas from './QuestaoLousaCanvas';
 
@@ -13,7 +13,6 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
   const [noCaderno, setNoCaderno] = useState(false);
   const [salvandoChute, setSalvandoChute] = useState(false);
   const [modoLousa, setModoLousa] = useState(false);
-  const cardContainerRef = useRef(null);
 
   useEffect(() => {
     // Resetar estado quando mudar de questão (se renderizado no mesmo componente)
@@ -277,7 +276,6 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
 
   return (
     <div 
-      ref={cardContainerRef}
       style={{
         position: 'relative',
         backgroundColor: '#1E1E24',
@@ -406,12 +404,12 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
         )}
       </div>
 
-      {/* Camada Lousa / Rascunho Digital (Caneta, Marca-texto, Borracha) */}
+      {/* Camada Lousa / Rascunho Digital envolvendo apenas o conteúdo (mantém alinhamento fixo ao fechar) */}
       <QuestaoLousaCanvas 
         ativo={modoLousa} 
-        containerRef={cardContainerRef} 
+        questaoId={questao.id}
         onFechar={() => setModoLousa(false)} 
-      />
+      >
 
       {/* CORPO DA QUESTÃO */}
       <div style={{ padding: '20px 20px 0 20px' }}>
@@ -422,6 +420,7 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
             <button 
               onClick={() => setExpandirTexto(!expandirTexto)}
               style={{
+                position: 'relative', zIndex: 35,
                 display: 'inline-flex', alignItems: 'center', gap: '8px', 
                 backgroundColor: 'transparent', color: '#FF9800', 
                 border: '1px solid #FF9800', borderRadius: '20px', 
@@ -675,6 +674,8 @@ export default function QuestaoCard({ questao, numero, userEmail, userId, onResp
           )}
         </div>
       </div>
+
+      </QuestaoLousaCanvas>
 
       {/* COMENTÁRIOS DA QUESTÃO */}
       {mostrarComentario && (
