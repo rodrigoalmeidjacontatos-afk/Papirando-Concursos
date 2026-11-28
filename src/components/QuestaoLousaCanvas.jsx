@@ -1,24 +1,23 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 /**
- * Componente QuestaoLousaCanvas (Versão 2.0 Ultra Low-Latency)
- * Recursos e Otimizações:
- * - Botão S-Pen / Stylus: Pressionar o botão da S-Pen (ou botão direito do mouse) ativa a Borracha instantaneamente.
- * - Desempenho / Zero Delay: Canvas desynchronized, coalesced events (120Hz/240Hz S-Pen), interpolação suave e aceleração por hardware.
- * - Controle de Opacidade ajustável (10% a 100%) para caneta e marca-texto.
- * - Sensibilidade à Pressão nativa da S-Pen (Apple Pencil / Stylus W3C).
- * - Palm Rejection / Modo Dedo Desenha ou Dedo Rola.
+ * Componente QuestaoLousaCanvas
+ * - Canvas 100% transparente sobre a questão (sem tela preta).
+ * - Marca-texto com opacidade ajustável (destaca sem esconder o texto da questão).
+ * - Caneta sólida para anotações, contas e marcações.
+ * - Suporte nativo ao botão da S-Pen (Samsung) e botão direito como Borracha instantânea.
+ * - Interpolação suave e captura de alta frequência da S-Pen (coalesced events).
  */
 export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
   const canvasRef = useRef(null);
   const [modo, setModo] = useState('caneta'); // 'caneta', 'marca_texto', 'borracha'
   const [cor, setCor] = useState('#FFD700'); // Dourado padrão
   const [espessura, setEspessura] = useState(3);
-  const [opacidade, setOpacidade] = useState(1.0); // 1.0 (100%) padrão para caneta, 0.35 para marca-texto
+  const [opacidadeMarcaTexto, setOpacidadeMarcaTexto] = useState(0.35); // 35% ideal para marca-texto
   const [dedoDesenha, setDedoDesenha] = useState(true); // se falso, dedo rola tela e apenas caneta/mouse desenha
   const [historico, setHistorico] = useState([]); // Snapshots para Desfazer (Undo)
   const [temDesenho, setTemDesenho] = useState(false);
-  const [borrachaAtivaViaBotao, setBorrachaAtivaViaBotao] = useState(false); // Feedback visual quando botão da S-Pen é segurado
+  const [borrachaAtivaViaBotao, setBorrachaAtivaViaBotao] = useState(false);
   
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -32,13 +31,13 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     { label: 'Branco', valor: '#FFFFFF' }
   ];
 
-  // Ajusta o tamanho do canvas de acordo com o container da questão com desynchronized para latência mínima
+  // Ajusta o tamanho do canvas de acordo com o container da questão mantendo transparência total
   const redimensionarCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef?.current;
     if (!canvas || !container) return;
 
-    // Salva a imagem atual antes de redimensionar para não perder anotações
+    // Salva a imagem atual antes de redimensionar
     let imagemSalva = null;
     if (canvas.width > 0 && canvas.height > 0) {
       try {
@@ -56,11 +55,14 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     canvas.style.width = `${rect.width}px`;
     canvas.style.height = `${rect.height}px`;
 
-    // Utiliza desynchronized para desenho de ultra baixa latência (bypass do compositor no Chrome/Android)
-    const ctx = canvas.getContext('2d', { desynchronized: true }) || canvas.getContext('2d');
+    // 2D context padrão garantidamente transparente
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
     ctx.scale(dpr, dpr);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.clearRect(0, 0, rect.width, rect.height);
 
     // Restaura o desenho salvo se houver
     if (imagemSalva) {
@@ -110,8 +112,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     };
   };
 
-  // Verifica se o botão lateral da S-Pen (Samsung Stylus Barrel Button) está pressionado
-  // No Pointer Events: buttons & 2 (Right/Barrel) ou buttons & 32 (Eraser) ou button === 2 / 5
+  // Detecta se o botão da S-Pen (ou botão direito) está pressionado
   const verificarBotaoSPen = (e) => {
     return (
       (e.buttons & 2) !== 0 ||
@@ -128,13 +129,13 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       ctx.lineWidth = espessura * 6;
     } else if (modoEfetivo === 'marca_texto') {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = opacidade;
+      ctx.globalAlpha = opacidadeMarcaTexto; // Opacidade do marca-texto
       ctx.strokeStyle = cor;
       ctx.lineWidth = espessura * 4.5;
     } else {
-      // Caneta normal com modulação suave por pressão da S-Pen (se disponível)
+      // Caneta sólida normal com modulação por pressão
       ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = opacidade;
+      ctx.globalAlpha = 1.0;
       ctx.strokeStyle = cor;
       const fatorPressao = (pressao > 0 && pressao <= 1) ? (0.6 + pressao * 0.8) : 1;
       ctx.lineWidth = espessura * fatorPressao;
@@ -190,7 +191,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     aplicarEstiloTraco(ctx, modoEfetivo, pressao);
 
     ctx.beginPath();
-    // Interpolação suave de ponto médio para curvas limpas sem cantos vivos
     const midX = (start.x + end.x) / 2;
     const midY = (start.y + end.y) / 2;
     ctx.moveTo(start.x, start.y);
@@ -218,8 +218,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     }
     const modoEfetivo = isSPenButton ? 'borracha' : modo;
 
-    // Coalesced Events: processa todas as coordenadas intermediárias de alta precisão (120Hz/240Hz da S-Pen)
-    // Isso remove totalmente o jitter e o atraso do traço
+    // Coalesced Events: processa micro-coordenadas em alta taxa da S-Pen
     const eventos = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : [e];
 
     for (let i = 0; i < eventos.length; i++) {
@@ -270,17 +269,6 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     setTemDesenho(false);
   };
 
-  const selecionarModo = (novoModo) => {
-    setModo(novoModo);
-    if (novoModo === 'caneta') {
-      setEspessura(3);
-      if (opacidade < 0.5) setOpacidade(1.0); // Ajusta opacidade para sólida se estava em marca-texto
-    } else if (novoModo === 'marca_texto') {
-      setEspessura(6);
-      if (opacidade > 0.6) setOpacidade(0.35); // Ajusta opacidade para semi-transparente ideal
-    }
-  };
-
   return (
     <>
       {/* BARRA DE FERRAMENTAS FLUTUANTE MODERNA */}
@@ -307,7 +295,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
         }}>
           {/* Caneta Fina */}
           <button
-            onClick={() => selecionarModo('caneta')}
+            onClick={() => { setModo('caneta'); setEspessura(3); }}
             style={{
               ...toolBtnStyle,
               backgroundColor: modo === 'caneta' && !borrachaAtivaViaBotao ? '#333345' : 'transparent',
@@ -321,7 +309,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
           {/* Marca-texto */}
           <button
-            onClick={() => selecionarModo('marca_texto')}
+            onClick={() => { setModo('marca_texto'); setEspessura(6); }}
             style={{
               ...toolBtnStyle,
               backgroundColor: modo === 'marca_texto' && !borrachaAtivaViaBotao ? '#333345' : 'transparent',
@@ -333,9 +321,36 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
             🖍️ Marca-Texto
           </button>
 
+          {/* Opacidade do Marca-Texto (Exibida quando Marca-Texto está ativo) */}
+          {modo === 'marca_texto' && (
+            <div 
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 4px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '12px' }}
+              title="Ajuste a opacidade/transparência do Marca-Texto"
+            >
+              <span style={{ fontSize: '11px', color: '#BBB' }}>💧</span>
+              <input
+                type="range"
+                min="15"
+                max="70"
+                step="5"
+                value={Math.round(opacidadeMarcaTexto * 100)}
+                onChange={(e) => setOpacidadeMarcaTexto(Number(e.target.value) / 100)}
+                style={{
+                  width: '55px',
+                  accentColor: cor,
+                  cursor: 'pointer',
+                  height: '4px'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: cor, fontWeight: 'bold', minWidth: '28px' }}>
+                {Math.round(opacidadeMarcaTexto * 100)}%
+              </span>
+            </div>
+          )}
+
           {/* Borracha */}
           <button
-            onClick={() => selecionarModo('borracha')}
+            onClick={() => setModo('borracha')}
             style={{
               ...toolBtnStyle,
               backgroundColor: (modo === 'borracha' || borrachaAtivaViaBotao) ? '#4A1525' : 'transparent',
@@ -343,43 +358,12 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
               color: (modo === 'borracha' || borrachaAtivaViaBotao) ? '#FF5252' : '#AAA',
               boxShadow: borrachaAtivaViaBotao ? '0 0 10px #FF5252' : 'none'
             }}
-            title="Borracha (Dica: No tablet Samsung, segure o botão na caneta S-Pen para apagar instantaneamente!)"
+            title="Borracha (No tablet Samsung, segure o botão na caneta S-Pen para apagar instantaneamente)"
           >
             🧹 {borrachaAtivaViaBotao ? 'Borracha (S-Pen)' : 'Borracha'}
           </button>
 
           <div style={{ width: '1px', height: '18px', backgroundColor: '#555' }} />
-
-          {/* Controle de Opacidade Dinâmico */}
-          {modo !== 'borracha' && (
-            <div 
-              style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
-              title="Ajuste a opacidade / transparência do traço"
-            >
-              <span style={{ fontSize: '11px', color: '#BBB' }}>💧</span>
-              <input
-                type="range"
-                min="10"
-                max="100"
-                step="5"
-                value={Math.round(opacidade * 100)}
-                onChange={(e) => setOpacidade(Number(e.target.value) / 100)}
-                style={{
-                  width: '60px',
-                  accentColor: '#FFD700',
-                  cursor: 'pointer',
-                  height: '4px'
-                }}
-              />
-              <span style={{ fontSize: '11px', color: '#FFD700', fontWeight: 'bold', minWidth: '32px' }}>
-                {Math.round(opacidade * 100)}%
-              </span>
-            </div>
-          )}
-
-          {modo !== 'borracha' && (
-            <div style={{ width: '1px', height: '18px', backgroundColor: '#555' }} />
-          )}
 
           {/* Paleta de Cores (apenas se não estiver na borracha) */}
           {modo !== 'borracha' && (
@@ -471,7 +455,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
         </div>
       )}
 
-      {/* CANVAS TRANSPARENTE SOBREPOSTO COM DESEMPENHO NATIVO */}
+      {/* CANVAS 100% TRANSPARENTE SOBREPOSTO */}
       <canvas
         ref={canvasRef}
         onPointerDown={iniciarDesenho}
@@ -485,11 +469,11 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
           top: 0,
           left: 0,
           zIndex: ativo ? 25 : 5,
-          pointerEvents: ativo ? 'auto' : 'none', // Quando desativado, cliques vão normalmente para o texto e alternativas
+          pointerEvents: ativo ? 'auto' : 'none',
+          display: (ativo || temDesenho) ? 'block' : 'none',
+          backgroundColor: 'transparent',
           cursor: ativo ? ((modo === 'borracha' || borrachaAtivaViaBotao) ? 'cell' : 'crosshair') : 'default',
-          touchAction: (ativo && dedoDesenha) ? 'none' : 'pan-y',
-          transform: 'translateZ(0)', // Aceleração por GPU para renderização imediata
-          willChange: 'transform'
+          touchAction: (ativo && dedoDesenha) ? 'none' : 'pan-y'
         }}
       />
     </>
