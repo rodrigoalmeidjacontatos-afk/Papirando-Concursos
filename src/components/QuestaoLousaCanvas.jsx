@@ -1,32 +1,38 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 /**
- * Componente QuestaoLousaCanvas (Versão 3.0 Fluid Highlighter & Dual-Canvas)
+ * Componente QuestaoLousaCanvas (Versão 4.0 Pro: Espessura Dinâmica & Snap-to-Line)
  * Principais melhorias:
- * - Arquitetura de 2 Canvases: Elimina 100% das sobreposições de círculos e traços picotados no Marca-Texto.
- * - Traço contínuo e fluido: O marca-texto desenha como uma fita uniforme e translúcida, sem "uma bola em cima da outra".
- * - Opacidade ultrafina: Permite ajustar a partir de 5% até 45% (passo de 1%), deixando o texto perfeitamente legível.
- * - Suporte nativo ao botão da S-Pen (Samsung) para apagar automaticamente como borracha.
- * - Totalmente transparente, leve e com palm rejection.
+ * - Controle de Espessura da Caneta (fina 1px até grossa 8px) com controle deslizante em tempo real.
+ * - Snap-to-Line Automático (Régua Inteligente): Ao grifar ou sublinhar e segurar a caneta parada por 0.4s no final, o traço se transforma em uma linha perfeitamente reta (estilo GoodNotes/Samsung Notes).
+ * - Arquitetura de 2 Canvases sem sobreposição de bolhas/círculos.
+ * - Opacidade ajustável de 5% a 45% no Marca-Texto.
+ * - Suporte nativo ao botão da S-Pen como borracha instantânea.
+ * - Elementos clicáveis mesmo com o modo lousa ativo (tesoura, alternativas e responder).
  */
 export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
   const mainCanvasRef = useRef(null); // Canvas permanente com todos os traços confirmados
-  const tempCanvasRef = useRef(null); // Canvas temporário para o traço ativo (impede multiplicação de opacidade)
+  const tempCanvasRef = useRef(null); // Canvas temporário para o traço ativo
   
   const [modo, setModo] = useState('caneta'); // 'caneta', 'marca_texto', 'borracha'
   const [cor, setCor] = useState('#FFD700'); // Dourado padrão
-  const [espessura, setEspessura] = useState(3);
-  const [opacidadeMarcaTexto, setOpacidadeMarcaTexto] = useState(0.15); // 15% suave por padrão
+  const [espessuraCaneta, setEspessuraCaneta] = useState(2); // 1px a 8px (padrão 2px fino e elegante)
+  const espessuraMarcaTexto = 18; // largura ideal para grifar linha de texto
+  const [opacidadeMarcaTexto, setOpacidadeMarcaTexto] = useState(0.15); // 15% suave
   const [dedoDesenha, setDedoDesenha] = useState(true); // se falso, dedo rola tela e apenas caneta/mouse desenha
   const [historico, setHistorico] = useState([]); // Snapshots para Desfazer (Undo)
   const [temDesenho, setTemDesenho] = useState(false);
   const [borrachaAtivaViaBotao, setBorrachaAtivaViaBotao] = useState(false);
+  const [linhaRetaAtiva, setLinhaRetaAtiva] = useState(false); // Feedback visual quando o snap de linha reta é ativado
   
   const isDrawing = useRef(false);
   const startClientPos = useRef({ x: 0, y: 0 });
   const hasMoved = useRef(false);
   const pointsRef = useRef([]); // Pontos do traço atual em andamento
   const lastPos = useRef({ x: 0, y: 0 });
+  const lastSnapCheckPos = useRef({ x: 0, y: 0 });
+  const snapTimerRef = useRef(null); // Timer para detectar pausa e esticar linha reta
+  const isSnappedRef = useRef(false);
 
   // Cores predefinidas para caneta e marca-texto
   const cores = [
@@ -95,6 +101,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     return () => {
       window.removeEventListener('resize', redimensionarCanvas);
       if (ro) ro.disconnect();
+      clearTimeout(snapTimerRef.current);
     };
   }, [redimensionarCanvas, containerRef]);
 
@@ -142,6 +149,9 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     isDrawing.current = true;
     startClientPos.current = { x: e.clientX, y: e.clientY };
     hasMoved.current = false;
+    isSnappedRef.current = false;
+    setLinhaRetaAtiva(false);
+    clearTimeout(snapTimerRef.current);
 
     const isSPenButton = verificarBotaoSPen(e);
     if (isSPenButton !== borrachaAtivaViaBotao) {
@@ -150,12 +160,12 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
     const pos = getCoordenadas(e);
     lastPos.current = pos;
+    lastSnapCheckPos.current = pos;
     pointsRef.current = [pos];
 
     const modoEfetivo = isSPenButton ? 'borracha' : modo;
 
     if (modoEfetivo === 'borracha') {
-      // Borracha atua diretamente no canvas principal
       const mainCanvas = mainCanvasRef.current;
       if (!mainCanvas) return;
       const ctx = mainCanvas.getContext('2d');
@@ -164,7 +174,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, espessura * 5, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, 16, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     } else {
@@ -172,8 +182,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     }
   };
 
-  // Renderiza o traço ativo no tempCanvas como UM ÚNICO PATH contínuo
-  // Isso impede matematicamente que círculos ou segmentos se sobreponham e multipliquem a opacidade!
+  // Renderiza o traço ativo no tempCanvas
   const renderizarTracoAtivo = (modoEfetivo) => {
     const tempCanvas = tempCanvasRef.current;
     if (!tempCanvas) return;
@@ -192,24 +201,42 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
 
     if (modoEfetivo === 'marca_texto') {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = opacidadeMarcaTexto; // Opacidade uniforme sem acumulação
+      ctx.globalAlpha = opacidadeMarcaTexto;
       ctx.strokeStyle = cor;
-      ctx.lineWidth = espessura * 5.5; // Largura ideal para grifar linha de texto
+      ctx.lineWidth = espessuraMarcaTexto;
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1.0;
       ctx.strokeStyle = cor;
-      ctx.lineWidth = espessura;
+      ctx.lineWidth = espessuraCaneta;
+    }
+
+    // Se o Snap-to-Straight-Line foi acionado (usuário segurou a caneta parada no fim do traço):
+    if (isSnappedRef.current && pts.length >= 2) {
+      const start = pts[0];
+      let end = lastPos.current;
+
+      // Alinhamento inteligente: se a linha for quase horizontal (< 25% de desvio), alinha perfeitamente com a linha de texto
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+      if (dx > 25 && dy / dx < 0.22) {
+        end = { x: end.x, y: start.y };
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+      ctx.restore();
+      return;
     }
 
     if (pts.length === 1) {
-      // Ponto único
       ctx.beginPath();
       ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
       ctx.fillStyle = cor;
       ctx.fill();
     } else {
-      // Curva contínua e suave
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
 
@@ -255,7 +282,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.lineWidth = espessura * 10;
+      ctx.lineWidth = 26;
 
       for (let i = 0; i < eventos.length; i++) {
         const pos = getCoordenadas(eventos[i]);
@@ -269,26 +296,51 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     } else {
       for (let i = 0; i < eventos.length; i++) {
         const pos = getCoordenadas(eventos[i]);
-        pointsRef.current.push(pos);
         lastPos.current = pos;
+        if (!isSnappedRef.current) {
+          pointsRef.current.push(pos);
+        }
       }
+
       renderizarTracoAtivo(modoEfetivo);
+
+      // Snap-to-Line: Só reinicia o timer se o movimento passar de 4px (evita que micro-tremor da S-Pen impeça o disparo)
+      const snapDist = Math.hypot(
+        lastPos.current.x - lastSnapCheckPos.current.x,
+        lastPos.current.y - lastSnapCheckPos.current.y
+      );
+      if (snapDist > 4 || !snapTimerRef.current) {
+        lastSnapCheckPos.current = lastPos.current;
+        clearTimeout(snapTimerRef.current);
+        if (hasMoved.current && pointsRef.current.length > 3 && !isSnappedRef.current) {
+          snapTimerRef.current = setTimeout(() => {
+            if (!isDrawing.current) return;
+            isSnappedRef.current = true;
+            setLinhaRetaAtiva(true);
+            renderizarTracoAtivo(modoEfetivo);
+          }, 400); // 400ms segurando parada
+        }
+      }
     }
   };
 
   const pararDesenho = (e) => {
     if (!isDrawing.current) return;
     isDrawing.current = false;
+    clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = null;
 
     if (borrachaAtivaViaBotao) {
       setBorrachaAtivaViaBotao(false);
+    }
+    if (linhaRetaAtiva) {
+      setLinhaRetaAtiva(false);
     }
 
     const mainCanvas = mainCanvasRef.current;
     const tempCanvas = tempCanvasRef.current;
 
-    // Se o usuário apenas deu um toque/clique rápido sem arrastar (menos de 6 pixels)
-    // Então foi uma intenção de clicar em uma alternativa ou botão embaixo!
+    // Se o usuário apenas deu um toque/clique rápido sem arrastar (menos de 6 pixels):
     if (!hasMoved.current && e) {
       if (tempCanvas) {
         const tempCtx = tempCanvas.getContext('2d');
@@ -296,6 +348,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
         tempCtx.clearRect(0, 0, rect.width, rect.height);
       }
       pointsRef.current = [];
+      isSnappedRef.current = false;
 
       if (tempCanvas && mainCanvas) {
         tempCanvas.style.pointerEvents = 'none';
@@ -330,6 +383,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
     }
 
     pointsRef.current = [];
+    isSnappedRef.current = false;
   };
 
   const desfazer = () => {
@@ -397,7 +451,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
         }}>
           {/* Caneta Fina */}
           <button
-            onClick={() => { setModo('caneta'); setEspessura(3); }}
+            onClick={() => setModo('caneta')}
             style={{
               ...toolBtnStyle,
               backgroundColor: modo === 'caneta' && !borrachaAtivaViaBotao ? '#333345' : 'transparent',
@@ -409,21 +463,48 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
             ✏️ Caneta
           </button>
 
+          {/* Controle de Espessura da Caneta (quando Caneta está ativa) */}
+          {modo === 'caneta' && (
+            <div 
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '12px' }}
+              title="Espessura da Caneta (1px fina a 8px grossa)"
+            >
+              <span style={{ fontSize: '11px', color: '#BBB' }}>📏</span>
+              <input
+                type="range"
+                min="1"
+                max="8"
+                step="1"
+                value={espessuraCaneta}
+                onChange={(e) => setEspessuraCaneta(Number(e.target.value))}
+                style={{
+                  width: '50px',
+                  accentColor: cor,
+                  cursor: 'pointer',
+                  height: '4px'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: cor, fontWeight: 'bold', minWidth: '24px' }}>
+                {espessuraCaneta}px
+              </span>
+            </div>
+          )}
+
           {/* Marca-texto */}
           <button
-            onClick={() => { setModo('marca_texto'); setEspessura(6); }}
+            onClick={() => setModo('marca_texto')}
             style={{
               ...toolBtnStyle,
               backgroundColor: modo === 'marca_texto' && !borrachaAtivaViaBotao ? '#333345' : 'transparent',
               borderColor: modo === 'marca_texto' && !borrachaAtivaViaBotao ? cor : 'transparent',
               color: modo === 'marca_texto' && !borrachaAtivaViaBotao ? cor : '#AAA'
             }}
-            title="Marca-Texto (Sublinhar / Destacar com transparência suave)"
+            title="Marca-Texto (Sublinhar com transparência suave e linha reta inteligente)"
           >
             🖍️ Marca-Texto
           </button>
 
-          {/* Opacidade do Marca-Texto (Exibida quando Marca-Texto está ativo: de 5% a 45%) */}
+          {/* Opacidade do Marca-Texto (Exibida quando Marca-Texto está ativo) */}
           {modo === 'marca_texto' && (
             <div 
               style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '12px' }}
@@ -438,7 +519,7 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
                 value={Math.round(opacidadeMarcaTexto * 100)}
                 onChange={(e) => setOpacidadeMarcaTexto(Number(e.target.value) / 100)}
                 style={{
-                  width: '60px',
+                  width: '50px',
                   accentColor: cor,
                   cursor: 'pointer',
                   height: '4px'
@@ -448,6 +529,13 @@ export default function QuestaoLousaCanvas({ ativo, containerRef, onFechar }) {
                 {Math.round(opacidadeMarcaTexto * 100)}%
               </span>
             </div>
+          )}
+
+          {/* Indicador de Linha Reta / Régua */}
+          {linhaRetaAtiva && (
+            <span style={{ fontSize: '11px', color: '#00E676', fontWeight: 'bold', padding: '2px 6px', backgroundColor: 'rgba(0,230,118,0.15)', borderRadius: '8px' }}>
+              📏 Reta
+            </span>
           )}
 
           {/* Borracha */}
