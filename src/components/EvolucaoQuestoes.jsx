@@ -44,7 +44,18 @@ export default function EvolucaoQuestoes({ userEmail }) {
 
       // Aplica filtro de período apenas se não for modo geral
       if (periodoSelecionado !== null) {
-        query = query.gte('created_at', new Date(Date.now() - periodoSelecionado * 24 * 60 * 60 * 1000).toISOString());
+        if (periodoSelecionado === 1) {
+          // 'Hoje': início do dia local do usuário (00:00:00.000)
+          const hojeInicio = new Date();
+          hojeInicio.setHours(0, 0, 0, 0);
+          query = query.gte('created_at', hojeInicio.toISOString());
+        } else {
+          // Outros períodos (7, 30, 90 dias): X dias atrás a partir do início do dia de X dias atrás
+          const dataLimite = new Date();
+          dataLimite.setDate(dataLimite.getDate() - periodoSelecionado);
+          dataLimite.setHours(0, 0, 0, 0);
+          query = query.gte('created_at', dataLimite.toISOString());
+        }
       }
 
       let { data: respostasRaw, error: errRespostas } = await query;
